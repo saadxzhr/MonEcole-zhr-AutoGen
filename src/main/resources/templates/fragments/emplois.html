@@ -12,7 +12,7 @@
     <div class="col-md">
         <select id="filterFormateur" class="form-select">
             <option value="">Tous les formateurs</option>
-            <option th:each="f : ${formateur}" th:value="${f.id}" th:text="${f.nom + ' ' + f.prenom}"></option>
+            <option th:each="f : ${formateur}" th:value="${f.cin}" th:text="${f.nom + ' ' + f.prenom}"></option>
         </select>
     </div>
 

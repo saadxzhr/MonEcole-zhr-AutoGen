@@ -8,10 +8,10 @@ function loadContent(pageOrUrl) {
     matieres: "/req/matieres",
     employes: "/req/employes",
     users: "/req/users",
-    accueilsecretariat: "/req/accueildirection",
+    accueildirection: "/req/accueildirection",
   };
 
-  let url = urlMap[pageOrUrl] ?? pageOrUrl; //qlqs pqge ont des alias
+  let url = urlMap[pageOrUrl] ?? pageOrUrl; //qlqs page ont des alias
 
   if (!url) {
     console.error("Unknown page:", page);

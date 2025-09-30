@@ -80,7 +80,7 @@ function changerMotDePass() {
 //   matiereSelect.addEventListener("change", filterRows);
 // }
 
-
+//Filtrer emplois du temps
 function trouverEmploidt() {
   const dateInput = document.getElementById("searchDate");
   const formateurSelect = document.getElementById("filterFormateur");
@@ -421,12 +421,12 @@ function actionsEmploi() {
       const row = e.target.closest("tr");
       const id = row.getAttribute("data-id");
 
-      if (confirm("Êtes-vous sûr de vouloir supprimer cet emploi ?")) {
+      if (confirm("Êtes-vous sûr de vouloir supprimer cet emploi?")) {
         const res = await fetch(`/req/emploi/supprimer/${id}`, {
           method: "DELETE",
         });
         if (res.ok) {
-          alert("Emploi supprimé !");
+          alert("Emploi supprimé!");
           row.remove();
         } else {
           alert("Erreur lors de la suppression.");
@@ -652,9 +652,9 @@ function actionsMatiere() {
         // Show confirmation alert based on mode
         const mode = form.getAttribute("data-mode");
         if (mode === "add") {
-          alert(`matiere "${matiereObj.nom_matiere}" ajoutée avec succès.`);
+          alert(`Matière "${matiereObj.nom_matiere}" ajoutée avec succès.`);
         } else if (mode === "edit") {
-          alert(`matiere "${matiereObj.nom_matiere}" modifiée avec succès.`);
+          alert(`Matière "${matiereObj.nom_matiere}" modifiée avec succès.`);
         }
 
         loadContent("matieres"); // reload table
@@ -794,11 +794,11 @@ function actionsEmploye() {
         const mode = form.getAttribute("data-mode");
         if (mode === "add") {
           alert(
-            `Employe "${employeObj.nom}" "${employeObj.prenom}" ajoutée avec succès.`
+            `Employé "${employeObj.nom}" "${employeObj.prenom}" ajoutée avec succès.`
           );
         } else if (mode === "edit") {
           alert(
-            `Employe "${employeObj.nom}" "${employeObj.prenom}"modifiée avec succès.`
+            `Employé "${employeObj.nom}" "${employeObj.prenom}" modifiée avec succès.`
           );
         }
 
@@ -878,6 +878,7 @@ function actionsEmploye() {
   });
 }
 
+//Filtrer Employee par role
 function trouverEmploye() {
   const roleSelect = document.getElementById("filterRole");
   const rows = document.querySelectorAll("#employesTable tbody tr");
@@ -1012,6 +1013,7 @@ function actionsUsers() {
   });
 }
 
+//Filtrer utilisateurs par role
 function trouverUser() {
   const roleSelect = document.getElementById("filterRole");
   const rows = document.querySelectorAll("#usersTable tbody tr");
@@ -1034,6 +1036,8 @@ function trouverUser() {
   roleSelect.addEventListener("change", filterRows);
 }
 
+
+//Afficher la liste des employees (cin) sur button page d'accueil direction
 function afficherEmployes(toggleBtnId, listContainerId) {
   const toggleBtn = document.getElementById(toggleBtnId);
   const list = document.getElementById(listContainerId);
@@ -1057,7 +1061,7 @@ function afficherEmployes(toggleBtnId, listContainerId) {
     e.stopPropagation();
   });
 }
-
+//Afficher la liste des Matieres (filiere) sur button page d'accueil direction
 function afficherMatieres(toggleBtnId, listContainerId) {
   const toggleBtn = document.getElementById(toggleBtnId);
   const list = document.getElementById(listContainerId);
@@ -1080,7 +1084,7 @@ function afficherMatieres(toggleBtnId, listContainerId) {
     e.stopPropagation();
   });
 }
-
+//Afficher la liste des Filieres (cin resp) sur button page d'accueil direction
 function afficherFilieres(toggleBtnId, listContainerId) {
   const toggleBtn = document.getElementById(toggleBtnId);
   const list = document.getElementById(listContainerId);
@@ -1290,7 +1294,7 @@ function createProgressChart() {
   }
 }
 
-
+//Dupliquer les emplois du temps selon nombre d'heurs (condition ajouter les emplois d'une seul semaine avant appliquer)
 function submitGenerateRecurring(form) {
     const formData = new FormData(form);
     const codeMatiere = formData.get("codeMatiere");
@@ -1343,7 +1347,7 @@ function showToast(message, type = 'success') {
 
 
 
-//Graph progression bar par filiere
+//Graph progression bar par filiere (1 par 1)
 // function createProgressCharts() {
 //   console.log("=== Starting createProgressCharts ===");
 
@@ -1499,7 +1503,7 @@ function showToast(message, type = 'success') {
 //   console.log("All charts created successfully");
 // }
 
-
+//Graph progression bar par filiere (2 par 2)
 function createProgressCharts() {
   console.log("=== Starting createProgressCharts ===");
 

@@ -371,17 +371,17 @@ public class DirectionController {
 
     ////
     
-
-    @PostMapping("/generate-recurring")
-    @ResponseBody
-    public ResponseEntity<?> generateRecurring(@RequestParam("codeMatiere") String codeMatiere) {
-        try {
-            emploiDuTempsService.generateRecurringSchedule(codeMatiere);
-            return ResponseEntity.ok("✅ Recurring schedule generated for " + codeMatiere);
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body("❌ Error: " + e.getMessage());
+        //Dupliquer les emplois du temps selon nombre d'heurs (condition ajouter les emplois d'une seul semaine avant appliquer)
+        @PostMapping("/generate-recurring")
+        @ResponseBody
+        public ResponseEntity<?> generateRecurring(@RequestParam("codeMatiere") String codeMatiere) {
+            try {
+                emploiDuTempsService.generateRecurringSchedule(codeMatiere);
+                return ResponseEntity.ok("✅ Recurring schedule generated for " + codeMatiere);
+            } catch (Exception e) {
+                return ResponseEntity.badRequest().body("❌ Error: " + e.getMessage());
+            }
         }
-    }
 }
 
 
