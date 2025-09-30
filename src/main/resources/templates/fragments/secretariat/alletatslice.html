@@ -1,0 +1,46 @@
+<div th:fragment="content (etatdavancement)">
+ 
+        <div th:if="${#lists.isEmpty(etatdavancement)}">
+            <p>Rien a modifier</p>
+        </div>
+        <div th:if="${!#lists.isEmpty(etatdavancement)}" class="alletatslice_scrollable">
+        <table>
+            <thead>
+                <tr>
+                    <th>Action</th>
+                    <th>Date</th>
+                    <th>Heure</th>
+                    <th>Formateur</th>
+                    <th>Filière</th>
+                    <th>Matière</th>
+                    <th>Statut</th>
+                    <th>Type d'activité</th>
+                    <th>Objectif</th>
+                    <th>Descriptif</th>
+                    <th>Observations</th>
+                    <th>Prochaine séance</th>
+            </thead>
+            <tbody>
+                <tr th:each="etat : ${etatdavancement}">
+                    <input type="hidden" th:value="${etat.id}" />
+                    <td>
+                        <button th:class="${etat.statut == 'A modifier' ? 'btn btn-modt activer-btn' : 'btn activer-btn btn-secondary'}" class="btn btn-modt activer-btn" th:attr="data-id=${etat.id}" id='btn_am' th:text="${etat.statut == 'En attente' ? 'En Attente' : etat.statut == 'A modifier' ? 'Annuler modification' : 'Rempli'}" th:disabled="${etat.statut == 'A modifier' ? 'false' : 'true'}">Annuler modification</button>
+                    </td>
+                    <td th:text="${etat.emploiDuTemps.date}"></td>
+                    <td th:text="${#strings.concat(etat.emploiDuTemps.heure_debut, ' - ', etat.emploiDuTemps.heure_fin)}"></td>
+                    <td th:text="${etat.emploiDuTemps.nomCompletEmploye}"></td>
+                    <td th:text="${etat.emploiDuTemps.matiere.filiere.nom_filiere}"></td>
+                    <td th:text="${etat.emploiDuTemps.matiere.nom_matiere}"></td>
+                    <td th:text="${etat.statut}"></td>
+                    <td th:text="${etat.type_activite}"></td>
+                    <td th:text="${etat.objectif}"></td>
+                    <td th:text="${etat.descriptif}"></td>
+                    <td th:text="${etat.observations}"></td>
+                    <td th:text="${etat.suivant}"></td>
+                </tr>
+            </tbody>
+        </table>
+
+ </div>
+    </div>
+

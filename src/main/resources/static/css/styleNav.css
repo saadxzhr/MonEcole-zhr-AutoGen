@@ -1,0 +1,325 @@
+    body,
+    .modal-content {
+    background-image: url('https://www.transparenttextures.com/patterns/noise-pattern-with-subtle-cross-lines.png');
+    background-color: #adc6c966;
+    }
+
+    /* Side bar and table */
+
+    /* Sidebar styling */
+    .sidebar {
+        background-image: url('https://www.transparenttextures.com/patterns/dark-exa.png');
+        width: 17%;
+        height: 100vh;
+        padding: 1%;
+        position: fixed;
+        top: 0;
+        left: 0;
+        background-color: #051e31;
+    }
+
+    .sidebar ul {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+
+    .sidebar ul li {
+        padding: 0px;
+        margin: 10px 0px;
+        border-radius: 0px;
+    }
+
+    .sidebar ul li .btn {
+        color: #ecf0f1;
+        text-align: left;
+        width: 100%;
+        font-family: 'Lato', sans-serif;
+        font-weight: bold;
+        font-size: 1.1rem;
+        text-decoration: none;
+        background-color: #fdfdfd21;
+        border-left: solid 3px #e6e9ec;
+        border-radius: 0px;
+        font-style: italic;
+    }
+
+    .sidebar ul li .btn:hover {
+        background-color: #838c94;
+        color: #fff;
+    }
+
+    /* Main content wrapper */
+    .content-wrapper {
+        margin-left: 17%; /* leave space for sidebar */
+        padding: 20px;
+    }
+
+    /* Table styling */
+    .scrollable {
+        max-height: 81vh;
+        overflow-y: auto;
+        /* border: #4c6884 2px solid; */
+    }
+
+    .alletatslice_scrollable {
+        max-height: 38vh;
+        overflow-y: auto;
+        /* border: #4c6884 2px solid; */
+    }
+
+
+    .cin_scrollable {
+        max-height: 88vh;
+        overflow-y: auto;
+
+    }
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.87rem;
+        font-family: Arial, sans-serif;
+    }
+
+    thead {
+        background-color: #163f5d;
+        color: white;
+        position: sticky;
+        top: 0;
+        z-index: 1;
+    }
+
+    thead th {
+        position: sticky;
+        top: 0;
+        z-index: 5;
+        padding: 12px;
+        text-align: left;
+        word-wrap: break-word;
+        
+    }
+    tbody tr:nth-child(2n) {
+        background-color: #fff;
+    }
+    tbody tr:nth-child(even) {
+        background-color: #f2f2f2;
+    }
+
+    tbody td {
+        padding: 10px;
+        border-bottom: 1px solid #ddd;
+        text-align: left;
+    }
+
+    tbody tr:hover {
+        background-color: #dfe6e9;
+    }
+
+    #nom {
+        margin-top: 7%;
+        margin-bottom: 2rem;
+        font-size: large;
+        color: antiquewhite;
+        text-align: center;
+    }
+
+    hr {
+        height:0px;
+        border-width:0;
+        color:white;
+        background-color:white;
+        margin: 2rem;
+        padding: 0px;
+    }
+
+
+    .btn-mod{
+        background-color: #1B637A;
+        color: #e5fef8;
+        border-color: #08f0f0;
+        padding: 0.35em 1.1em;
+    }
+    .btn-mod:hover{
+        background-color: #26d6d6;
+    }
+
+    .btn-modt{
+        background-color: #1B637A;
+        margin-right: 15%;
+        color: #e5fef8;
+        border-color: #08f0f0;
+    }
+    .btn-modt:hover{
+        background-color: #26d6d6;
+    }
+
+    .btn-danger{
+        background-color: #380d0d9c
+    }
+
+    .btn-warning{
+        background-color: #1c5e6d9c
+    }
+
+
+    .btn-primary{
+        background-color: #1e557d;
+        padding: 0.33em 1.5em;
+    }
+
+    #exportToExcel{
+        background-color: #1e7d57;
+        padding: 0.33em 1.5em;
+    }
+    .btn-outline-info{
+        background-color: #1e557d;
+        border-width: 2px;
+        border-top-style: solid;
+        color: white;
+        
+    }
+
+    /* Filters bar sticky at the top */
+    
+
+
+    /* Modal inner appearance */
+    .modal {
+    background-image: url('https://www.transparenttextures.com/patterns/cubes.png');
+    background-color: rgba(0, 0, 0, 0.604);
+    }
+    .modal-content {
+    background-image: url('https://www.transparenttextures.com/patterns/cubes.png');
+    background-color: #f5f7f9;
+    border-radius: 10px;
+    box-shadow: 0 0 25px rgba(0,0,0,0.6);
+    padding: 20px;  
+    border: 1px solid #ccc;  
+    max-width: 40%; 
+    margin: auto;
+    }
+    .close{
+        color: red;
+        font-size: 150%;
+        will-change: 155;
+    }
+
+    .showList{
+        background-image: url('https://www.transparenttextures.com/patterns/cubes.png');
+        background-color: #f5f7f9;
+        border-radius: 10px;
+        box-shadow: 0 0 25px rgba(0,0,0,0.6);
+        display: none; 
+        z-index: 1050; 
+        width: auto; 
+        max-height: 1600%; 
+        overflow-y: auto;
+    }
+
+h2{
+    font-family: 'Aileron', sans-serif;
+    font-weight: black;
+    letter-spacing: -0.05em;
+}
+
+
+ 
+fieldset {
+    background-color: #f0f4f8;
+    border: #999 solid 1px;
+    border-radius: 10px;
+    padding: 5px;
+    border: solid 3px #94b4b6;
+    margin-bottom: 2%;
+    
+}
+
+legend {
+    all: revert;
+    font-family: 'Lato', sans-serif;
+    font-weight: 700;
+    font-size: 1.2rem;
+    font-style: italic;
+    background-color: #f0f4f8db;
+    border: solid 3px #94b4b6;
+    border-radius: 5px;
+    padding: 0rem 1.1rem;
+    margin-bottom: 0.5rem;
+
+}
+
+
+@font-face {
+  font-family: 'Lato';
+  src: url('/fonts/Lato-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Lato';
+  src: url('/fonts/fonts/Lato/Lato-Bold.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Lato';
+  src: url('/fonts/Lato-BoldItalic.ttf') format('truetype');
+  font-weight: 700;
+  font-style: italic;
+}
+
+
+#progressBarChart {
+    max-width: 100% !important;
+    max-height: 400px !important;
+}
+
+.chart-container {
+    position: relative;
+    height: 400px;
+    width: 100%;
+    overflow: hidden;
+}
+
+.generate-recurring-form{
+    display: inline-block;;
+    margin-left: 1%;
+}
+
+
+
+/* chart 2 by 2 */
+.chart-row {
+display: flex;
+flex-wrap: wrap;
+justify-content: space-between;
+margin-bottom: 20px;
+}
+
+.chart-column {
+flex: 1 1 48%;
+margin: 0.2%;
+box-sizing: border-box;
+padding: 10px;
+background-color: #f9f9f9;
+border-radius: 8px;
+border: 1px solid #ddd;
+}
+
+.chart-column h4 {
+margin-top: 0;
+font-size: 1rem;
+}
+
+.chart-column canvas {
+width: 100% !important;
+height: 300px !important;
+}
+
+@media (max-width: 768px) {
+.chart-column {
+    flex: 1 1 100%;
+}
+}

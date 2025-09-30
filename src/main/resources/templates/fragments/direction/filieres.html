@@ -1,0 +1,127 @@
+<div th:fragment="content">
+  <fieldset>
+    <legend>Filières</legend>
+
+    <!-- Table -->
+    <div th:if="${#lists.isEmpty(filieres)}">
+      <p>Aucune filière</p>
+    </div>
+    <div class="mb-3 row gx-2 gy-2 align-items-center">
+      <div class="col-md">
+        <select id="filterNiveau" class="form-select">
+          <option value="">Tous les niveaux</option>
+          <option
+            th:each="n : ${niveaux}"
+            th:value="${n}"
+            th:text="${n}"></option>
+        </select>
+      </div>
+      <div class="col-md">
+        <button id="openModalBtn" class="btn btn-primary mb-0">
+          Ajouter Filière
+        </button>
+      </div>
+    </div>
+    <div th:if="${!#lists.isEmpty(filieres)}" class="scrollable">
+      <table id="filiereTable">
+        <thead>
+          <tr>
+            <th>Actions</th>
+            <th>Code filière</th>
+            <th>Nom filère</th>
+            <th>Niveau</th>
+            <th>Duree heures</th>
+            <th>Description</th>
+            <th>Responsable</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr th:each="filiere : ${filieres}" th:attr="data-id=${filiere.id}">
+            <td>
+              <button class="btn btn-mod btn-sm modify-btn">Modifier</button>
+              <button class="btn btn-danger btn-sm delete-btn">
+                Supprimer
+              </button>
+            </td>
+            <td th:text="${filiere.code_filiere}"></td>
+            <td th:text="${filiere.nom_filiere}"></td>
+            <td th:text="${filiere.niveau}"></td>
+            <td th:text="${filiere.duree_heures}"></td>
+            <td th:text="${filiere.description}"></td>
+            <td th:text="${filiere.responsable}"></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <!-- Modal -->
+    <div id="filiereModal" class="modal" style="display: none">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h4 class="modal-title">Ajouter une filière</h4>
+          <span
+            class="close"
+            data-dismiss="modal"
+            style="position: right; cursor: pointer"
+            >&times;</span
+          >
+        </div>
+        <form id="filiereForm" data-mode="add">
+          <input type="hidden" name="id" />
+          <div class="mb-2">
+            <label>Code filière:</label>
+            <input
+              type="text"
+              name="code_filiere"
+              class="form-control"
+              required />
+          </div>
+
+          <div class="mb-2">
+            <label>Nom filière:</label>
+            <input
+              type="text"
+              name="nom_filiere"
+              class="form-control"
+              required />
+          </div>
+
+          <div class="mb-2">
+            <label>niveau:</label>
+            <input type="text" name="niveau" class="form-control" required />
+          </div>
+
+          <div class="mb-2">
+            <label>Duree:</label>
+            <input
+              type="number"
+              name="duree_heures"
+              class="form-control"
+              required />
+          </div>
+
+          <div class="mb-2">
+            <label>Responsable:</label>
+            <select name="responsable" class="form-select" required>
+              <option
+                th:each="f : ${formateurs}"
+                th:value="${f.cin}"
+                th:text="${f.nom + ' ' + f.prenom}"></option>
+            </select>
+          </div>
+
+          <div class="mb-2">
+            <label>Description:</label>
+            <input
+              type="text"
+              name="description"
+              class="form-control"
+              required />
+          </div>
+          <button type="submit" class="btn btn-success mt-2" id="submitBtn">
+            Enregistrer
+          </button>
+        </form>
+      </div>
+    </div>
+  </fieldset>
+</div>

@@ -1,0 +1,34 @@
+// Architecture de l'application
+digraph {
+	subgraph cluster_client {
+		color=lightblue label="Client (Navigateur)" style=dashed
+		HTML [label="HTML (Thymeleaf)" fillcolor=lightblue style=filled]
+		CSS [label=CSS fillcolor=lightblue style=filled]
+		JS [label="JavaScript (AJAX)" fillcolor=lightblue style=filled]
+	}
+	subgraph cluster_backend {
+		color=lightgreen label="Backend (Spring Boot)" style=dashed
+		Controller [label="Couche Contrôleur" fillcolor=lightgreen style=filled]
+		Service [label="Couche Service" fillcolor=lightgreen style=filled]
+		Repository [label="Couche Accès aux Données" fillcolor=lightgreen style=filled]
+		Model [label="Couche Modèle (Entités)" fillcolor=lightgreen style=filled]
+		Security [label="Couche Sécurité" fillcolor=lightgreen style=filled]
+	}
+	subgraph cluster_db {
+		color=orange label="Base de données" style=dashed
+		PostgreSQL [label=PostgreSQL fillcolor=orange style=filled]
+	}
+	HTML -> Controller [label="Requête HTTP / AJAX"]
+	JS -> Controller [label="Requête AJAX / JSON"]
+	Controller -> Service [label=Appelle]
+	Service -> Repository [label=Appelle]
+	Repository -> Model [label=Utilise]
+	Repository -> PostgreSQL [label="Requête SQL"]
+	PostgreSQL -> Repository [label="Résultat requête"]
+	Model -> Service [label="Objets de données"]
+	Service -> Controller [label="Réponse"]
+	Controller -> HTML [label="Retour / rendu page"]
+	Security -> Controller [label="Authentification & Autorisation" style=dotted]
+	CSS -> HTML [label=Style]
+	JS -> HTML [label="Interactivité"]
+}

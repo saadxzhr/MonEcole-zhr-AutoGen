@@ -1,0 +1,160 @@
+<div th:fragment="content">
+  <fieldset>
+            <legend>Emplois du temps</legend>
+
+
+<!-- Filteres -->
+<div class="mb-3 row gx-2 gy-2 align-items-center">
+    <div class="col-md">
+        <input type="text" id="searchDate" class="form-control" placeholder="Rechercher par date..." />
+    </div>
+
+    <div class="col-md">
+        <select id="filterFormateur" class="form-select">
+            <option value="">Tous les formateurs</option>
+            <option th:each="f : ${formateur}" th:value="${f.id}" th:text="${f.nom + ' ' + f.prenom}"></option>
+        </select>
+    </div>
+
+    <div class="col-md">
+        <select id="filterFiliere" class="form-select">
+            <option value="">Toutes les filières</option>
+            <option th:each="fl : ${filiere}" th:value="${fl.id}" th:text="${fl.nom_filiere}"></option>
+        </select>
+    </div>
+
+    <div class="col-md">
+        <select id="filterMatiere" class="form-select">
+            <option value="">Toutes les matières</option>
+            <option th:each="m : ${matiere}"
+                    th:value="${m.code_matiere}"
+                    th:text="${m.nom_matiere}"
+                    th:attr="data-filiere-id=${m.filiere.id}"></option>
+        </select>
+    </div>
+    <div class="col-md">
+      <button id="openModalBtn" class="btn btn-primary mb-0">Ajouter emploi</button>
+    </div>
+    <div class="col-md">
+        <button id="exportToExcel" class="btn btn-primary">Télécharger en Excel</button>
+</div>
+</div>
+
+
+<!-- Table -->
+<div th:if="${#lists.isEmpty(emplois)}">
+    <p>Rien à remplir</p>
+</div>
+
+<div th:if="${!#lists.isEmpty(emplois)}" class="scrollable">
+    <table id="emploiTable">
+        <thead>
+            <tr>
+                <th>Actions</th>
+                <th>Date</th>
+                <th>Jour</th>
+                <th>Heure</th>
+                <th>Formateur</th>
+                <th>Filière</th>
+                <th>Matière</th>
+                <th>Salle</th>
+                <th>Semestre</th>
+            </tr>
+        </thead>
+        <tbody>
+             <tr th:each="emploi : ${emplois}" 
+                  th:attr="data-id=${emploi.id},
+                          data-cin=${emploi.cin},
+                          data-filiere-id=${emploi.matiere.filiere.id},
+                          data-code-matiere=${emploi.matiere.code_matiere}">
+                <td>
+                    <button class="btn btn-mod btn-sm modify-btn">Modifier</button>
+                    <button class="btn btn-danger btn-sm delete-btn dlt-emploi">Supprimer</button>
+                    <form class="generate-recurring-form" th:attr="data-code=${emploi.matiere.code_matiere}">
+                        <input type="hidden" name="codeMatiere" th:value="${emploi.matiere.code_matiere}" />
+                        <button type="submit" class="btn btn-outline-secondary">
+                                          <span class="visually-hidden">Button</span>
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-magic" viewBox="0 0 16 16">
+                          <path d="M9.5 2.672a.5.5 0 1 0 1 0V.843a.5.5 0 0 0-1 0zm4.5.035A.5.5 0 0 0 13.293 2L12 3.293a.5.5 0 1 0 .707.707zM7.293 4A.5.5 0 1 0 8 3.293L6.707 2A.5.5 0 0 0 6 2.707zm-.621 2.5a.5.5 0 1 0 0-1H4.843a.5.5 0 1 0 0 1zm8.485 0a.5.5 0 1 0 0-1h-1.829a.5.5 0 0 0 0 1zM13.293 10A.5.5 0 1 0 14 9.293L12.707 8a.5.5 0 1 0-.707.707zM9.5 11.157a.5.5 0 0 0 1 0V9.328a.5.5 0 0 0-1 0zm1.854-5.097a.5.5 0 0 0 0-.706l-.708-.708a.5.5 0 0 0-.707 0L8.646 5.94a.5.5 0 0 0 0 .707l.708.708a.5.5 0 0 0 .707 0l1.293-1.293Zm-3 3a.5.5 0 0 0 0-.706l-.708-.708a.5.5 0 0 0-.707 0L.646 13.94a.5.5 0 0 0 0 .707l.708.708a.5.5 0 0 0 .707 0z"></path>
+                        </svg></button>
+                    </form>
+
+                </td>
+                <td th:text="${emploi.date}"></td>
+                <td th:text="${emploi.jour_semaine}"></td>
+                <td th:text="${#strings.concat(emploi.heure_debut, ' - ', emploi.heure_fin)}"></td>
+                <td th:text="${emploi.nomCompletEmploye}"></td>
+                <td th:text="${emploi.matiere.filiere.nom_filiere}"></td>
+                <td th:text="${emploi.matiere.nom_matiere}"></td>
+                <td th:text="${emploi.salle}"></td>
+                <td th:text="${emploi.semestre}"></td>
+            </tr>
+        </tbody>
+    </table>
+    <!-- fragments/upload-form.html -->
+<form th:action="@{/req/upload-excel}" method="post" enctype="multipart/form-data">
+    <input type="file" name="file" accept=".xls,.xlsx" required />
+    <button type="submit">Upload Excel</button>
+</form>
+</div>
+
+
+<!-- Modal -->
+<div id="emploiModal" class="modal" style="display:none;">
+
+  <div class="modal-content">
+    <div class="modal-header">
+      <h4 class="modal-title">Modifier un emploi du temps</h4>
+      <span class="close" data-dismiss="modal" style="position: right; cursor: pointer">&times;</span>
+    </div>
+    <form id="ajouterEmploi" data-mode="add">
+      <input type="hidden" name="id" />
+      <div class="mb-2">
+        <label>Date:</label>
+        <input type="date" name="date" class="form-control" required />
+      </div>
+
+      <div class="mb-2">
+        <label>Heure début:</label>
+        <select name="heure_debut" class="form-select" required></select>
+      </div>
+
+      <div class="mb-2">
+        <label>Heure fin:</label>
+        <select name="heure_fin" class="form-select" required></select>
+      </div>
+
+      <div class="mb-2">
+        <label>Formateur:</label>
+        <select name="cin" class="form-select" required>
+          <option value="">Formateur</option>
+          <option th:each="f : ${formateur}" th:value="${f.cin}" th:text="${f.nom + ' ' + f.prenom}"></option>
+        </select>
+      </div>
+
+      <div class="mb-2">
+        <label>Salle:</label>
+        <input type="text" name="salle" class="form-control" required />
+      </div>
+
+      <div class="mb-2">
+        <label>Matière:</label>
+        <select name="code_matiere" class="form-select" required>
+          <option th:each="m : ${matiere}" th:value="${m.code_matiere}" th:text="${m.nom_matiere}"></option>
+        </select>
+      </div>
+
+      <div class="mb-2">
+        <label>Semestre:</label>
+        <select name="semestre" class="form-select" required>
+          <option value="S1">S1</option>
+          <option value="S2">S2</option>
+        </select>
+      </div>
+
+      <button type="submit" class="btn btn-success mt-2" id="submitBtn">Enregistrer</button>
+    </form>
+  </div>
+</div>
+</fieldset>
+</div>
