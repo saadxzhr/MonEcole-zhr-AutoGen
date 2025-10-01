@@ -26,6 +26,7 @@ import com.myschool.backend.Model.EtatDavancement;
 import com.myschool.backend.Model.Filiere;
 import com.myschool.backend.Model.MyAppUser;
 import com.myschool.backend.Repository.EmployeRepository;
+import com.myschool.backend.Repository.EtatDavancementRepository;
 import com.myschool.backend.Repository.FiliereRepository;
 import com.myschool.backend.Repository.MatiereRepository;
 import com.myschool.backend.Repository.MyAppUserRepository;
@@ -47,6 +48,9 @@ public class DirectionController {
     
     @Autowired
     private EtatDavancementService etatDavancementService;
+
+    @Autowired
+    private EtatDavancementRepository etatDavancementRepository;
 
     @Autowired
     private MyAppUserRepository myAppUserRepository;
@@ -366,6 +370,31 @@ public class DirectionController {
     }
 
     ////
+    @PostMapping("/req/etat/toggle")
+    @ResponseBody
+    public ResponseEntity<String> toggleEtat(@RequestBody Map<String, Object> payload) {
+        try {
+            Long id = Long.valueOf(payload.get("id").toString());
+            // 1. Find the Etat by ID
+            EtatDavancement etat = etatDavancementRepository.findById(id)
+                    .orElseThrow(() -> new RuntimeException("Etat not found"));
+
+            // 2. Toggle the statut
+            if ("Rempli".equals(etat.getStatut())) {
+                etat.setStatut("A modifier");
+            } else if ("A modifier".equals(etat.getStatut())) {
+                etat.setStatut("Rempli");
+            }
+
+            // 3. Save changes
+            etatDavancementRepository.save(etat);
+
+            // 4. Return the new statut as response
+            return ResponseEntity.ok(etat.getStatut());
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Erreur: " + e.getMessage());
+        }
+    }
 
     
 }

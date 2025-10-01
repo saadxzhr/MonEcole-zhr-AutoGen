@@ -20,11 +20,13 @@ function loadContent(pageOrUrl) {
 
   // Read CSRF token from meta tag
   const csrfToken = document.querySelector('meta[name="_csrf"]').content;
-  const csrfHeader = document.querySelector('meta[name="_csrf_header"]').content;
+  const csrfHeader = document.querySelector(
+    'meta[name="_csrf_header"]'
+  ).content;
 
   fetch(url, {
-      method: 'GET',
-    })
+    method: "GET",
+  })
     .then((response) => {
       if (!response.ok) {
         throw new Error(`HTTP ${response.status} - ${response.statusText}`);
@@ -34,13 +36,17 @@ function loadContent(pageOrUrl) {
     .then((html) => {
       document.getElementById("direction-content").innerHTML = html;
       if (url.includes("accueildirection")) {
-        annulerModification();
+        //activer/'desactiver' modification
+        document.addEventListener("click", function (event) {
+          if (event.target.classList.contains("activer-btn")) {
+            toggleStatut(event.target);
+          }
+        });
         afficherEmployes("toggleEmployesBtn", "employesList");
         afficherMatieres("toggleMatieresBtn", "matieresList");
         afficherFilieres("toggleFilieresBtn", "filieresList");
         setTimeout(() => createProgressChart(), 150);
         setTimeout(() => createProgressCharts(), 150);
-        
       }
       if (url.includes("users")) {
         actionsUsers();
@@ -64,12 +70,14 @@ function loadContent(pageOrUrl) {
       if (url.includes("emplois")) {
         trouverEmploidt();
         actionsEmploi();
-        document.querySelectorAll(".generate-recurring-form").forEach(form => {
+        document
+          .querySelectorAll(".generate-recurring-form")
+          .forEach((form) => {
             form.addEventListener("submit", function (e) {
-                e.preventDefault();
-                submitGenerateRecurring(form);
+              e.preventDefault();
+              submitGenerateRecurring(form);
             });
-        });
+          });
         document
           .getElementById("exportToExcel")
           .addEventListener("click", function () {
@@ -77,9 +85,15 @@ function loadContent(pageOrUrl) {
           });
       }
       if (url.includes("alletat")) {
-        activerModification();
-        annulerModification();
         trouverEtatdav();
+
+        //Activer/desactiver modification
+        document.addEventListener("click", function (event) {
+          if (event.target.classList.contains("activer-btn")) {
+            toggleStatut(event.target);
+          }
+        });
+
         // Event listener for the export button to trigger export when clicked
         document
           .getElementById("exportToExcel")
@@ -101,9 +115,9 @@ document.addEventListener("DOMContentLoaded", function () {
   // Attach logout function
   const logoutBtn = document.getElementById("logoutBtn");
   if (logoutBtn) {
-      logoutBtn.addEventListener("click", (e) => {
-          e.preventDefault();
-          logoutUser();
-      });
+    logoutBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      logoutUser();
+    });
   }
 });

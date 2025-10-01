@@ -66,17 +66,16 @@
                         data-matiere-id=${etat.emploiDuTemps.matiere.id}">
              
                     <td>
-                        <button 
+                        <button
                             th:class="${etat.statut == 'Rempli' || etat.statut == 'A modifier' ? 'btn btn-modt activer-btn' : 'btn activer-btn btn-secondary'}"
-                            class="btn btn-modt activer-btn" 
-                            th:attr="data-id=${etat.id}" 
-                            id="btn_am"
+                            class="btn activer-btn"
+                            th:attr="data-id=${etat.id}, data-statut=${etat.statut}"
                             th:text="${etat.statut == 'A modifier' ? 'Annuler modification' 
                                     : etat.statut == 'Rempli' ? 'Activer modification' 
                                     : 'En Attente'}"
                             th:disabled="${etat.statut == 'En attente' ? 'true' : 'false'}">
-                            Action
                         </button>
+
                         
                     </td>
                     <td th:text="${etat.emploiDuTemps.date}"></td>

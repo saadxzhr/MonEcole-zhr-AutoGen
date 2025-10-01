@@ -67,44 +67,6 @@ function changerMotDePass() {
 
 
 //Trouver un emploi
-// function trouverEmploidt() {
-//   const dateInput = document.getElementById("searchDate");
-//   const formateurSelect = document.getElementById("filterFormateur");
-//   const filiereSelect = document.getElementById("filterFiliere");
-//   const matiereSelect = document.getElementById("filterMatiere");
-//   const rows = document.querySelectorAll("#emploiTable tbody tr");
-
-//   function filterRows() {
-//     const dateValue = dateInput.value.toLowerCase();
-//     const formateurValue = formateurSelect.value.toLowerCase();
-//     const filiereValue = filiereSelect.value.toLowerCase();
-//     const matiereValue = matiereSelect.value.toLowerCase();
-
-//     rows.forEach((row) => {
-//       const cells = row.querySelectorAll("td");
-//       const [, date, , , formateur, filiere, matiere] = Array.from(cells).map(
-//         (td) => td.textContent.toLowerCase()
-//       );
-
-//       const matchDate = date.includes(dateValue);
-//       const matchFormateur =
-//         !formateurValue || formateur.includes(formateurValue);
-//       const matchFiliere = !filiereValue || filiere.includes(filiereValue);
-//       const matchmatiere = !matiereValue || matiere.includes(matiereValue);
-
-//       row.style.display =
-//         matchDate && matchFormateur && matchFiliere && matchmatiere
-//           ? ""
-//           : "none";
-//     });
-//   }
-
-//   dateInput.addEventListener("input", filterRows);
-//   formateurSelect.addEventListener("change", filterRows);
-//   filiereSelect.addEventListener("change", filterRows);
-//   matiereSelect.addEventListener("change", filterRows);
-// }
-
 //Filtrer emplois du temps
 function trouverEmploidt() {
   const dateInput = document.getElementById("searchDate");
@@ -278,90 +240,145 @@ function trouverEtatdav() {
 
 
 //Activer modification etat D'av
-function activerModification() {
-  document.addEventListener("click", function (event) {
-    if (event.target.classList.contains("activer-btn")) {
-      const button = event.target;
-      const row = button.closest("tr");
-      const id = button.getAttribute("data-id");
+// function activerModification() {
+//   document.addEventListener("click", function (event) {
+//     if (event.target.classList.contains("activer-btn")) {
+//       const button = event.target;
+//       const row = button.closest("tr");
+//       const id = button.getAttribute("data-id");
 
-      const csrfToken = document.querySelector('meta[name="_csrf"]').content;
-      const csrfHeader = document.querySelector('meta[name="_csrf_header"]').content;
+//       const csrfToken = document.querySelector('meta[name="_csrf"]').content;
+//       const csrfHeader = document.querySelector('meta[name="_csrf_header"]').content;
 
-      // Send update to Spring Boot
-      fetch("/req/etat/statut", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          [csrfHeader]: csrfToken
-        },
-        body: JSON.stringify({ id: id, statut: "A modifier" }),
-      })
-        .then((response) => {
-          if (response.ok) {
-            // Disable the button immediately
-            button.disabled = true;
-            button.textContent = "Modification activée";
-            button.classList.remove("btn-warning");
-            button.classList.add("btn-secondary");
+//       // Send update to Spring Boot
+//       fetch("/req/etat/statut", {
+//         method: "POST",
+//         headers: {
+//           "Content-Type": "application/json",
+//           [csrfHeader]: csrfToken
+//         },
+//         body: JSON.stringify({ id: id, statut: "A modifier" }),
+//       })
+//         .then((response) => {
+//           if (response.ok) {
+//             // Disable the button immediately
+//             button.disabled = true;
+//             button.textContent = "Modification activée";
+//             button.classList.remove("btn-warning");
+//             button.classList.add("btn-secondary");
 
-            // Update statut column in the UI (column index 5 = statut)
-            const statutCell = row.querySelectorAll("td")[6];
-            statutCell.textContent = "A modifier";
-          } else {
-            alert("Échec de la mise à jour du statut.");
-          }
-        })
-        .catch((err) => {
-          alert("Erreur réseau : " + err);
-        });
-    }
-  });
-}
+//             // Update statut column in the UI (column index 5 = statut)
+//             const statutCell = row.querySelectorAll("td")[6];
+//             statutCell.textContent = "A modifier";
+//           } else {
+//             alert("Échec de la mise à jour du statut.");
+//           }
+//         })
+//         .catch((err) => {
+//           alert("Erreur réseau : " + err);
+//         });
+//     }
+//   });
+// }
 
 //Annuler modification etat D'av
-function annulerModification() {
-  document.addEventListener("click", function (event) {
-    if (event.target.classList.contains("activer-btn")) {
-      const button = event.target;
+// function annulerModification() {
+//   document.addEventListener("click", function (event) {
+//     if (event.target.classList.contains("activer-btn")) {
+//       const button = event.target;
+//       const row = button.closest("tr");
+//       const id = button.getAttribute("data-id");
+
+//       // Read CSRF token from meta tag
+//       const csrfToken = document.querySelector('meta[name="_csrf"]').content;
+//       const csrfHeader = document.querySelector('meta[name="_csrf_header"]').content;
+
+
+//       // Send update to Spring Boot
+//       fetch("/req/etat/annuler", {
+//         method: "POST",
+//         headers: {
+//           "Content-Type": "application/json",
+//           [csrfHeader]: csrfToken
+//         },
+//         body: JSON.stringify({ id: id }),
+//       })
+//         .then((response) => {
+//           if (response.ok) {
+//             // Disable the button immediately
+//             button.disabled = true;
+//             button.textContent = "Modification Annulée";
+//             button.classList.remove("btn-warning");
+//             button.classList.add("btn-secondary");
+
+//             // Update statut column in the UI (column index 5 = statut)
+//             const statutCell = row.querySelectorAll("td")[6];
+//             statutCell.textContent = "Modification Annulée";
+//           } else {
+//             alert("Échec de la mise à jour du statut.");
+//           }
+//         })
+//         .catch((err) => {
+//           alert("Erreur réseau : " + err);
+//         });
+//     }
+//   });
+// }
+
+
+
+function toggleStatut(button) {
+  const id = button.getAttribute("data-id");
+  const currentStatut = button.getAttribute("data-statut");
+
+  // Decide new statut
+  const newStatut = currentStatut === "Rempli" ? "A modifier" : "Rempli";
+
+  // CSRF token
+  const csrfToken = document.querySelector('meta[name="_csrf"]').content;
+  const csrfHeader = document.querySelector('meta[name="_csrf_header"]').content;
+
+  // Prevent spamming
+  button.disabled = true;
+
+  fetch("/req/etat/toggle", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      [csrfHeader]: csrfToken
+    },
+    body: JSON.stringify({ id, newStatut })
+  })
+    .then((res) => {
+      if (!res.ok) throw new Error("Server error");
+
+      // Update button attributes
+      button.setAttribute("data-statut", newStatut);
+      button.textContent =
+        newStatut === "Rempli" ? "Activer modification" : "Annuler modification";
+
+      button.classList.toggle("btn-secondary", newStatut === "Rempli");
+      button.classList.toggle("btn-warning", newStatut === "A modifier");
+
+      // Update statut column in same row
       const row = button.closest("tr");
-      const id = button.getAttribute("data-id");
-
-      // Read CSRF token from meta tag
-      const csrfToken = document.querySelector('meta[name="_csrf"]').content;
-      const csrfHeader = document.querySelector('meta[name="_csrf_header"]').content;
-
-
-      // Send update to Spring Boot
-      fetch("/req/etat/annuler", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          [csrfHeader]: csrfToken
-        },
-        body: JSON.stringify({ id: id }),
-      })
-        .then((response) => {
-          if (response.ok) {
-            // Disable the button immediately
-            button.disabled = true;
-            button.textContent = "Modification Annulée";
-            button.classList.remove("btn-warning");
-            button.classList.add("btn-secondary");
-
-            // Update statut column in the UI (column index 5 = statut)
-            const statutCell = row.querySelectorAll("td")[6];
-            statutCell.textContent = "Modification Annulée";
-          } else {
-            alert("Échec de la mise à jour du statut.");
-          }
-        })
-        .catch((err) => {
-          alert("Erreur réseau : " + err);
-        });
-    }
-  });
+      if (row) {
+        const statutCell = row.querySelectorAll("td")[6]; // index of statut column
+        if (statutCell) statutCell.textContent = newStatut;
+      }
+    })
+    .catch((err) => {
+      console.error(err);
+      alert("Erreur lors de la mise à jour");
+    })
+    .finally(() => {
+      button.disabled = false;
+    });
 }
+
+// Attach globally
+
+
 
 //actions sur table emploidutemps
 function actionsEmploi() {

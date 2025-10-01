@@ -40,7 +40,12 @@ function loadContent(pageOrUrl) {
 
       // Run any page-specific logic after loading
       if (url.includes("accueilsecretariat")) {
-        annulerModification();
+        //activer/'desactiver' modification
+        document.addEventListener("click", function (event) {
+          if (event.target.classList.contains("activer-btn")) {
+            toggleStatut(event.target);
+          }
+        });
         setTimeout(() => createProgressChart(), 150);
         setTimeout(() => createProgressCharts(), 150);
       }
@@ -65,8 +70,13 @@ function loadContent(pageOrUrl) {
           });
       }
       if (url.includes("alletat")) {
-        activerModification();
-        annulerModification();
+        //activer/'desactiver' modification
+        document.addEventListener("click", function (event) {
+          if (event.target.classList.contains("activer-btn")) {
+            toggleStatut(event.target);
+          }
+        });
+        //filtrer
         trouverEtatdav();
         // Event listener for the export button to trigger export when clicked
         document
