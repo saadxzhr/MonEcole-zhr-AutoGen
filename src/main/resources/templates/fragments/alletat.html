@@ -55,15 +55,16 @@
                     <th>Descriptif</th>
                     <th>Observations</th>
                     <th>Prochaine séance</th>
+                </tr>
             </thead>
             <tbody>
                 <tr th:each="etat : ${etatdavancement}"
-                th:attr="data-statut=${etat.statut}, 
+                th:attr="data-id=${etat.id},
+                        data-statut=${etat.statut}, 
                         data-formateur-id=${etat.emploiDuTemps.employe.id}, 
                         data-filiere-id=${etat.emploiDuTemps.matiere.filiere.id}, 
                         data-matiere-id=${etat.emploiDuTemps.matiere.id}">
              
-                    <input type="hidden" th:value="${etat.id}" />
                     <td>
                         <button 
                             th:class="${etat.statut == 'Rempli' || etat.statut == 'A modifier' ? 'btn btn-modt activer-btn' : 'btn activer-btn btn-secondary'}"

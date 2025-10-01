@@ -18,11 +18,6 @@ public class ContentController {
         return "login";
     }
 
-    @GetMapping("/logout")
-    public String logout() {
-        // Redirect to login page
-        return "login";
-    }
 
     @RequestMapping("favicon.ico")
     public void favicon() {
@@ -95,7 +90,7 @@ public class ContentController {
 
     @GetMapping("/fragment/accueilsecretariat")
     public String allEtatSlice() {
-        return "fragments/secretariat/accueilsecretariat :: content";
+        return "fragments/accueilsecretariat :: content";
     }
 
     //Direction

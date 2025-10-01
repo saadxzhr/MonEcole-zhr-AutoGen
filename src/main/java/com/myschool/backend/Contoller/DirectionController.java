@@ -41,10 +41,6 @@ import com.myschool.backend.Model.Matiere;
 
 @Controller
 public class DirectionController {
-
-    @Autowired
-    private EmploiDuTempsService emploiDuTempsService;
-    
     
     @Autowired
     private excelService excelService;

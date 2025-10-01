@@ -73,7 +73,7 @@ function loadContent(pageOrUrl) {
         document
           .getElementById("exportToExcel")
           .addEventListener("click", function () {
-            exportTableToExcel("emploiTable", "Etat_rapport.xlsx");
+            exportTableToExcel("emploiTable", "EmploisDutemps.xlsx");
           });
       }
       if (url.includes("alletat")) {

@@ -7,7 +7,6 @@ import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -55,7 +54,7 @@ public class SecurityConfig {
             })
 
             .logout(logout -> logout
-                .logoutUrl("/logout").permitAll()
+                .logoutUrl("/logout")
                 .logoutSuccessUrl("/login?logout")   
                 .invalidateHttpSession(true)
                 .deleteCookies("JSESSIONID")
@@ -65,11 +64,11 @@ public class SecurityConfig {
             
             .authorizeHttpRequests(registry -> {
                 registry.requestMatchers("/login", "/css/**", "/js/**").permitAll();
-                registry.requestMatchers("/direction/**", "/secretariat/**").hasRole("Direction");
-                registry.requestMatchers("/formateur/**").hasAnyAuthority("ROLE_Formateur_Vacataire", "ROLE_Formateur_Permanent");
+                registry.requestMatchers("/direction/**").hasRole("Direction");
                 registry.requestMatchers("/secretariat/**").hasRole("Secretariat");
-                registry.requestMatchers("/generate-recurring/**")
-                                        .hasAnyRole("Direction", "Secretariat");
+                registry.requestMatchers("/generate-recurring/**").hasAnyRole("Direction", "Secretariat");
+                registry.requestMatchers("/formateur/**").hasAnyAuthority("ROLE_Formateur_Vacataire", "ROLE_Formateur_Permanent");
+
                 
                 registry.anyRequest().authenticated();
                 

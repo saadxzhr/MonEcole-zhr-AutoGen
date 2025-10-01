@@ -14,5 +14,5 @@ public class BackendApplication {
 }	
 
 //git add .
-//git commit -m "Revision - Ajout des commentaires - Regler le filtrage des emplois du temps - Test de page d'attente de chargement (makes it look more slow)"
+//git commit -m "Revision - add csrf - fix recurring on secretariat"
 //git push

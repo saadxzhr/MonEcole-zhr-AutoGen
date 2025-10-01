@@ -1203,7 +1203,6 @@ function exportTableToExcel(tableId, fileName) {
 // Function to create progress chart
 // Function to create progress chart with detailed tooltips
 function createProgressChart() {
-  console.log("=== Starting createProgressChart ===");
 
   const canvas = document.getElementById("progressBarChart");
   if (!canvas) {
@@ -1224,9 +1223,8 @@ function createProgressChart() {
   if (dataAttr) {
     try {
       detailedData = JSON.parse(dataAttr);
-      console.log("Parsed detailed data:", detailedData);
     } catch (e) {
-      console.error("Error parsing progress data:", e);
+        console.error("Error parsing progress data:", e);
       return;
     }
   } else {
@@ -1249,11 +1247,6 @@ function createProgressChart() {
     filieres.push(details.filiere || "Non assignée");
   });
 
-  console.log("Chart labels:", labels);
-  console.log("Progress data:", progressData);
-  console.log("Total hours:", totalHours);
-  console.log("Completed hours:", completedHours);
-  console.log("Filieres:", filieres);
 
   if (labels.length === 0) {
     console.error("No labels found - chart will be empty");
@@ -1360,7 +1353,6 @@ function createProgressChart() {
         },
       },
     });
-    console.log("Chart created successfully");
   } catch (error) {
     console.error("Error creating chart:", error);
   }
@@ -1583,6 +1575,8 @@ function showToast(message, type = 'success') {
 //   console.log("All charts created successfully");
 // }
 
+
+
 //Graph progression bar par filiere (2 par 2)
 function createProgressCharts() {
   console.log("=== Starting createProgressCharts ===");
@@ -1764,7 +1758,7 @@ function logoutUser() {
 }
 
 // Usage: attach to a button
-document.getElementById("logoutBtn").addEventListener("click", (e) => {
-    e.preventDefault();
-    logoutUser();
-});
+// document.getElementById("logoutBtn").addEventListener("click", (e) => {
+//     e.preventDefault();
+//     logoutUser();
+// });
