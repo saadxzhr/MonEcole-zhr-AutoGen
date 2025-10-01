@@ -49,14 +49,13 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception{
        //Exécutez logique personnalisée d'authentification apres connexion reussie.
         return http
-            .csrf(AbstractHttpConfigurer::disable)
             .formLogin(httpForm ->{
                 httpForm.loginPage("/login").permitAll();
                 httpForm.successHandler(new CustomAuthenticationSuccessHandler());
             })
 
             .logout(logout -> logout
-                .logoutUrl("/logout")
+                .logoutUrl("/logout").permitAll()
                 .logoutSuccessUrl("/login?logout")   
                 .invalidateHttpSession(true)
                 .deleteCookies("JSESSIONID")
@@ -66,9 +65,11 @@ public class SecurityConfig {
             
             .authorizeHttpRequests(registry -> {
                 registry.requestMatchers("/login", "/css/**", "/js/**").permitAll();
-                registry.requestMatchers("/direction/**", "/secretariat/**", "/generate-recurring/**").hasRole("Direction");
+                registry.requestMatchers("/direction/**", "/secretariat/**").hasRole("Direction");
                 registry.requestMatchers("/formateur/**").hasAnyAuthority("ROLE_Formateur_Vacataire", "ROLE_Formateur_Permanent");
-                registry.requestMatchers("/secretariat/**", "/generate-recurring/**").hasRole("Secretariat");
+                registry.requestMatchers("/secretariat/**").hasRole("Secretariat");
+                registry.requestMatchers("/generate-recurring/**")
+                                        .hasAnyRole("Direction", "Secretariat");
                 
                 registry.anyRequest().authenticated();
                 

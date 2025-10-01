@@ -4,6 +4,7 @@ package com.myschool.backend.Contoller;
 
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
 
 
 
@@ -17,20 +18,31 @@ public class ContentController {
         return "login";
     }
 
-    @GetMapping("/test")
-    public String test() {
-        return "test";
-    }
-    
-    @GetMapping("/req/signup")
-    public String signup() {
-        return "signup";
+    @GetMapping("/logout")
+    public String logout() {
+        // Redirect to login page
+        return "login";
     }
 
-    @GetMapping("/index")
-    public String index() {
-        return "index";
+    @RequestMapping("favicon.ico")
+    public void favicon() {
+        // No-op to stop 404 logs
     }
+
+    // @GetMapping("/test")
+    // public String test() {
+    //     return "test";
+    // }
+    
+    // @GetMapping("/req/signup")
+    // public String signup() {
+    //     return "signup";
+    // }
+
+    // @GetMapping("/index")
+    // public String index() {
+    //     return "index";
+    // }
     @GetMapping("/formateur")
     public String formateurPage() {
         return "formateur";

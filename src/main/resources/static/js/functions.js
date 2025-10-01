@@ -3,7 +3,13 @@ function changerMotDePass() {
   const submitButton = document.getElementById("submit");
   if (!submitButton) return;
 
-  submitButton.addEventListener("click", () => {
+  // Remove existing listeners (in case fragment reloaded)
+  const newButton = submitButton.cloneNode(true);
+  submitButton.parentNode.replaceChild(newButton, submitButton);
+
+  newButton.addEventListener("click", async (e) => {
+    e.preventDefault();
+
     const oldPassword = document.getElementById("password").value.trim();
     const newPassword = document.getElementById("newpass").value.trim();
     const confirmPassword = document.getElementById("newpassconf").value.trim();
@@ -23,23 +29,42 @@ function changerMotDePass() {
       newpass: newPassword,
     };
 
-    fetch("/req/changepass", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(data),
-    })
-      .then((response) => {
-        if (response.ok) {
-          alert("done!!");
-        }
-      })
-      .catch((error) => {
-        alert("Erreur réseau : " + error);
+    const csrfToken = document.querySelector('meta[name="_csrf"]').content;
+    const csrfHeader = document.querySelector('meta[name="_csrf_header"]').content;
+
+    // Disable button to prevent multiple clicks
+    newButton.disabled = true;
+
+    try {
+      const response = await fetch("/req/changepass", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          [csrfHeader]: csrfToken,
+        },
+        body: JSON.stringify(data),
       });
+
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+      const result = await response.json(); // expecting JSON from server
+      if (result.success) {
+        alert("Mot de passe modifié avec succès !");
+        // Optionally, clear inputs
+        document.getElementById("password").value = "";
+        document.getElementById("newpass").value = "";
+        document.getElementById("newpassconf").value = "";
+      } else {
+        alert("Erreur: " + (result.message || "Impossible de changer le mot de passe."));
+      }
+    } catch (error) {
+      alert("Erreur réseau : " + error);
+    } finally {
+      newButton.disabled = false;
+    }
   });
 }
+
 
 //Trouver un emploi
 // function trouverEmploidt() {
@@ -260,11 +285,15 @@ function activerModification() {
       const row = button.closest("tr");
       const id = button.getAttribute("data-id");
 
+      const csrfToken = document.querySelector('meta[name="_csrf"]').content;
+      const csrfHeader = document.querySelector('meta[name="_csrf_header"]').content;
+
       // Send update to Spring Boot
       fetch("/req/etat/statut", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          [csrfHeader]: csrfToken
         },
         body: JSON.stringify({ id: id, statut: "A modifier" }),
       })
@@ -298,11 +327,17 @@ function annulerModification() {
       const row = button.closest("tr");
       const id = button.getAttribute("data-id");
 
+      // Read CSRF token from meta tag
+      const csrfToken = document.querySelector('meta[name="_csrf"]').content;
+      const csrfHeader = document.querySelector('meta[name="_csrf_header"]').content;
+
+
       // Send update to Spring Boot
       fetch("/req/etat/annuler", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          [csrfHeader]: csrfToken
         },
         body: JSON.stringify({ id: id }),
       })
@@ -334,6 +369,10 @@ function actionsEmploi() {
   const form = document.getElementById("ajouterEmploi");
   const closeBtn = document.querySelector(".close");
   const submitBtn = document.getElementById("submitBtn");
+
+  const csrfToken = document.querySelector('meta[name="_csrf"]').content;
+  const csrfHeader = document.querySelector('meta[name="_csrf_header"]').content;
+
 
   // Open Add Modal
   document.getElementById("openModalBtn").addEventListener("click", () => {
@@ -400,10 +439,13 @@ function actionsEmploi() {
       ? `/req/emploi/modifier/${data.id}`
       : `/req/emploi/ajouter`;
     const method = isEdit ? "PUT" : "POST";
-
+    
     const response = await fetch(url, {
       method: method,
-      headers: { "Content-Type": "application/json" },
+      headers: {
+                  "Content-Type": "application/json",
+                  [csrfHeader]: csrfToken
+                },
       body: JSON.stringify(data),
     });
 
@@ -424,6 +466,9 @@ function actionsEmploi() {
       if (confirm("Êtes-vous sûr de vouloir supprimer cet emploi?")) {
         const res = await fetch(`/req/emploi/supprimer/${id}`, {
           method: "DELETE",
+          headers: {
+                      [csrfHeader]: csrfToken
+                    }
         });
         if (res.ok) {
           alert("Emploi supprimé!");
@@ -473,6 +518,9 @@ function actionsFiliere() {
   const modal = document.getElementById("filiereModal");
   const closeBtn = document.querySelector(".close");
 
+  const csrfToken = document.querySelector('meta[name="_csrf"]').content;
+  const csrfHeader = document.querySelector('meta[name="_csrf_header"]').content;
+  
   document.getElementById("openModalBtn").addEventListener("click", () => {
     submitBtn.textContent = "Ajouter";
     document.getElementById("filiereModal").style.display = "block";
@@ -498,6 +546,7 @@ function actionsFiliere() {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        [csrfHeader]: csrfToken,
       },
       body: JSON.stringify(filiereObj),
     })
@@ -565,6 +614,9 @@ function actionsFiliere() {
       if (confirm(`Voulez-vous supprimer la filière ${nom_filiere} ?`)) {
         fetch(`/req/filieres/delete/${id}`, {
           method: "DELETE",
+          headers: {
+              [csrfHeader]: csrfToken
+          }
         })
           .then((res) => {
             if (!res.ok) throw new Error("Erreur de suppression");
@@ -614,6 +666,8 @@ function actionsMatiere() {
   const modal = document.getElementById("matiereModal");
   const closeBtn = document.querySelector(".close");
 
+  const csrfToken = document.querySelector('meta[name="_csrf"]').content;
+  const csrfHeader = document.querySelector('meta[name="_csrf_header"]').content;
   document.getElementById("openModalBtn").addEventListener("click", () => {
     submitBtn.textContent = "Ajouter";
     document.querySelector(".modal-title").textContent = "Ajouter une matiere";
@@ -639,6 +693,7 @@ function actionsMatiere() {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        [csrfHeader]: csrfToken,
       },
       body: JSON.stringify(matiereObj),
     })
@@ -706,6 +761,9 @@ function actionsMatiere() {
       if (confirm(`Voulez-vous supprimer le matiere ${nom_matiere} ?`)) {
         fetch(`/req/matieres/delete/${id}`, {
           method: "DELETE",
+          headers: {
+              [csrfHeader]: csrfToken
+          }
         })
           .then((res) => {
             if (!res.ok) throw new Error("Erreur de suppression");
@@ -755,6 +813,9 @@ function actionsEmploye() {
   const modal = document.getElementById("employeModal");
   const closeBtn = document.querySelector(".close");
 
+  const csrfToken = document.querySelector('meta[name="_csrf"]').content;
+  const csrfHeader = document.querySelector('meta[name="_csrf_header"]').content;
+
   document.getElementById("openModalBtn").addEventListener("click", () => {
     submitBtn.textContent = "Ajouter";
     document.querySelector(".modal-title").textContent = "Ajouter un employe";
@@ -780,6 +841,7 @@ function actionsEmploye() {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        [csrfHeader]: csrfToken,
       },
       body: JSON.stringify(employeObj),
     })
@@ -860,6 +922,9 @@ function actionsEmploye() {
       if (confirm(`Voulez-vous supprimer l'employe "${cin}" ?`)) {
         fetch(`/req/employes/delete/${id}`, {
           method: "DELETE",
+          headers: {
+                    [csrfHeader]: csrfToken
+                }
         })
           .then((res) => {
             if (!res.ok) throw new Error("Erreur de suppression");
@@ -908,6 +973,9 @@ function actionsUsers() {
   const modal = document.getElementById("usersModal");
   const closeBtn = document.querySelector(".close");
 
+  const csrfToken = document.querySelector('meta[name="_csrf"]').content;
+  const csrfHeader = document.querySelector('meta[name="_csrf_header"]').content;
+
   document.getElementById("openModalBtn").addEventListener("click", () => {
     submitBtn.textContent = "Ajouter";
     document.querySelector(".modal-title").textContent =
@@ -934,6 +1002,7 @@ function actionsUsers() {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        [csrfHeader]: csrfToken,
       },
       body: JSON.stringify(usersObj),
     })
@@ -995,6 +1064,9 @@ function actionsUsers() {
       if (confirm(`Voulez-vous supprimer cette utilisateur "${username}" ?`)) {
         fetch(`/req/users/delete/${id}`, {
           method: "DELETE",
+          headers: {
+              [csrfHeader]: csrfToken
+          }
         })
           .then((res) => {
             if (!res.ok) throw new Error("Erreur de suppression");
@@ -1296,26 +1368,34 @@ function createProgressChart() {
 
 //Dupliquer les emplois du temps selon nombre d'heurs (condition ajouter les emplois d'une seul semaine avant appliquer)
 function submitGenerateRecurring(form) {
+    // ensure meta tags exist
+    const csrfToken = document.querySelector('meta[name="_csrf"]')?.content;
+    const csrfHeader = document.querySelector('meta[name="_csrf_header"]')?.content;
+
+    if (!csrfToken || !csrfHeader) {
+        console.error("CSRF token or header missing!");
+        return;
+    }
+
     const formData = new FormData(form);
-    const codeMatiere = formData.get("codeMatiere");
-    const csrfName = [...formData.keys()].find(k => k !== "codeMatiere");
-    const csrfValue = formData.get(csrfName);
 
     fetch('/generate-recurring', {
         method: 'POST',
         headers: {
-            'X-CSRF-TOKEN': csrfValue
+          [csrfHeader]: csrfToken
         },
         body: formData
     })
-    .then(response => response.text().then(message => ({ status: response.ok, message })))
+    .then(resp => resp.text().then(msg => ({ status: resp.ok, message: msg })))
     .then(result => {
         showToast(result.message, result.status ? 'success' : 'danger');
     })
-    .catch(error => {
-        showToast("❌ Une erreur est survenue: " + error, 'danger');
+    .catch(err => {
+        showToast("❌ Une erreur est survenue: " + err, 'danger');
     });
 }
+
+
 
 
 
@@ -1660,3 +1740,31 @@ function createProgressCharts() {
 }
 
 
+
+function logoutUser() {
+    const csrfToken = document.querySelector('meta[name="_csrf"]').content;
+
+    fetch('/logout', {
+        method: 'POST',
+        headers: {
+            'X-CSRF-TOKEN': csrfToken
+        }
+    })
+    .then(response => {
+        if (response.ok) {
+            window.location.href = '/login?logout'; // redirect after logout
+        } else {
+            alert("Erreur lors de la déconnexion.");
+        }
+    })
+    .catch(error => {
+        console.error("Logout error:", error);
+        alert("Une erreur est survenue lors de la déconnexion.");
+    });
+}
+
+// Usage: attach to a button
+document.getElementById("logoutBtn").addEventListener("click", (e) => {
+    e.preventDefault();
+    logoutUser();
+});

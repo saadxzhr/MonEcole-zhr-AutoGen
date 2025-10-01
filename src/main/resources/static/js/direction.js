@@ -18,7 +18,13 @@ function loadContent(pageOrUrl) {
     return;
   }
 
-  fetch(url)
+  // Read CSRF token from meta tag
+  const csrfToken = document.querySelector('meta[name="_csrf"]').content;
+  const csrfHeader = document.querySelector('meta[name="_csrf_header"]').content;
+
+  fetch(url, {
+      method: 'GET',
+    })
     .then((response) => {
       if (!response.ok) {
         throw new Error(`HTTP ${response.status} - ${response.statusText}`);
@@ -91,4 +97,13 @@ function loadContent(pageOrUrl) {
 }
 document.addEventListener("DOMContentLoaded", function () {
   loadContent("accueildirection");
+
+  // Attach logout function
+  const logoutBtn = document.getElementById("logoutBtn");
+  if (logoutBtn) {
+      logoutBtn.addEventListener("click", (e) => {
+          e.preventDefault();
+          logoutUser();
+      });
+  }
 });

@@ -9,11 +9,15 @@
                 <li><button class="btn btn-link" onclick="loadContent('emplois')" >Emplois du temps</button></li>
                 <li><button class="btn btn-link" onclick="loadContent('changepass')" style="margin-bottom: 0px;">Modifier mot de passe</button></li>
             </ul>
-            <div  class="mt-auto">
-                <a href="/logout" class="btn btn-danger w-100" style="margin-top: auto;">
-                🔒 Se déconnecter
-                </a>
-            </div>  
+            <div class="mt-auto">
+                <form action="/logout" method="post">
+                    <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
+                    <button type="submit" id="logoutBtn" class="btn btn-danger w-100" style="margin-top: auto;">
+                        🔒 Se déconnecter
+                    </button>
+                </form>
+            </div>
+
         </div>
         
 </div>

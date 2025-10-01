@@ -16,7 +16,9 @@ function loadContent(pageOrUrl) {
         return;
     }
 
-    fetch(url)
+    fetch(url, {
+            method: 'GET',
+        })
         .then(response => {
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status} - ${response.statusText}`);
@@ -50,6 +52,8 @@ function initChangePassScript() {
         const newPassword = document.getElementById("newpass").value.trim();
         const confirmPassword = document.getElementById("newpassconf").value.trim();
 
+        const csrfToken = document.querySelector('meta[name="_csrf"]').content;
+        const csrfHeader = document.querySelector('meta[name="_csrf_header"]').content;
 
         if (!oldPassword || !newPassword || !confirmPassword) {
             alert('Tous les champs sont obligatoires.');
@@ -69,7 +73,8 @@ function initChangePassScript() {
         fetch('/req/changepass', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                [csrfHeader]: csrfToken,
             },
             body: JSON.stringify(data) //convert to string
         })
@@ -87,3 +92,23 @@ function initChangePassScript() {
         });
     })
 }
+
+
+
+document.getElementById("logoutBtn").addEventListener("click", async (e) => {
+    e.preventDefault(); // prevent default if it's inside a form
+    const csrfToken = document.querySelector('meta[name="_csrf"]').content;
+
+    const response = await fetch('/logout', {
+        method: 'POST',
+        headers: {
+            'X-CSRF-TOKEN': csrfToken
+        }
+    });
+
+    if (response.ok) {
+        window.location.href = '/login?logout'; // redirect after logout
+    } else {
+        alert("Erreur lors de la déconnexion.");
+    }
+});

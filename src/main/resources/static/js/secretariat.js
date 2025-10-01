@@ -1,20 +1,34 @@
-//load secretariat content
 function loadContent(pageOrUrl) {
-  let urlMap = {
+  const urlMap = {
     etatsdavancement: "/req/alletat",
     emplois: "/req/emplois",
     changepass: "/req/changepass",
     accueilsecretariat: "/req/accueilsecretariat",
   };
 
-  let url = urlMap[pageOrUrl] ?? pageOrUrl; //qlqs pqge ont des alias
-
+  const url = urlMap[pageOrUrl] ?? pageOrUrl;
   if (!url) {
-    console.error("Unknown page:", page);
+    console.error("Unknown page:", pageOrUrl);
     return;
   }
 
-  fetch(url)
+  const contentContainer = document.getElementById("secretariat-content");
+  const loader = document.getElementById("loading-overlay");
+
+  // Show loader if loading takes more than 100ms
+  const loaderTimeout = setTimeout(() => {
+    loader.style.display = "flex";
+  }, 200);
+
+  // Read CSRF token from meta tag
+  const csrfToken = document.querySelector('meta[name="_csrf"]').content;
+  const csrfHeader = document.querySelector(
+    'meta[name="_csrf_header"]'
+  ).content;
+
+  fetch(url, {
+    method: "GET",
+  })
     .then((response) => {
       if (!response.ok) {
         throw new Error(`HTTP ${response.status} - ${response.statusText}`);
@@ -22,34 +36,69 @@ function loadContent(pageOrUrl) {
       return response.text();
     })
     .then((html) => {
-      document.getElementById("secretariat-content").innerHTML = html;
+      contentContainer.innerHTML = html;
+
+      // Run any page-specific logic after loading
       if (url.includes("accueilsecretariat")) {
-        annulerModification(); //charger apres chargement de page
+        annulerModification();
         setTimeout(() => createProgressChart(), 150);
         setTimeout(() => createProgressCharts(), 150);
       }
-
       if (url.includes("changepass")) {
-        changerMotDePass(); //charger apres chargement de page
+        changerMotDePass();
       }
       if (url.includes("emplois")) {
         trouverEmploidt();
         actionsEmploi();
+        document
+          .querySelectorAll(".generate-recurring-form")
+          .forEach((form) => {
+            form.addEventListener("submit", function (e) {
+              e.preventDefault();
+              submitGenerateRecurring(form);
+            });
+          });
+        document
+          .getElementById("exportToExcel")
+          .addEventListener("click", function () {
+            exportTableToExcel("emploiTable", "Etat_rapport.xlsx");
+          });
       }
       if (url.includes("alletat")) {
         activerModification();
         annulerModification();
         trouverEtatdav();
+        // Event listener for the export button to trigger export when clicked
+        document
+          .getElementById("exportToExcel")
+          .addEventListener("click", function () {
+            exportTableToExcel("etatTable", "Etat_rapport.xlsx");
+          });
       }
     })
     .catch((err) => {
       console.error("Failed to load content:", err);
-      document.getElementById(
-        "secretariat-content"
-      ).innerHTML = `<p style="color:red;">Erreur de chargement</p>`;
+      contentContainer.innerHTML = `<p style="color:red;">Erreur de chargement</p>`;
+    })
+    .finally(() => {
+      clearTimeout(loaderTimeout);
+      loader.style.display = "none";
     });
+    
+
+
 }
 
+// ✅ First-time content load when the app loads
 document.addEventListener("DOMContentLoaded", function () {
   loadContent("accueilsecretariat");
+
+  // Attach logout function
+  const logoutBtn = document.getElementById("logoutBtn");
+  if (logoutBtn) {
+      logoutBtn.addEventListener("click", (e) => {
+          e.preventDefault();
+          logoutUser();
+      });
+  }
 });

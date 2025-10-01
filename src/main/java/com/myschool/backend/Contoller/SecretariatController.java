@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -166,4 +167,15 @@ public class SecretariatController {
         return ResponseEntity.ok().build();
     }
 
+    //Dupliquer les emplois du temps selon nombre d'heurs (condition ajouter les emplois d'une seul semaine avant appliquer)
+    @PostMapping("/generate-recurring")
+    @ResponseBody
+    public ResponseEntity<?> generateRecurring(@RequestParam("codeMatiere") String codeMatiere) {
+        try {
+            emploiDuTempsService.generateRecurringSchedule(codeMatiere);
+            return ResponseEntity.ok("✅ Recurring schedule generated for " + codeMatiere);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("❌ Error: " + e.getMessage());
+        }
+    }
 }

@@ -1,21 +1,50 @@
-
 <div th:fragment="sidebar" class="sidebar">
-        <div class="sidebar d-flex flex-column">
-            <ul class="nav flex-column  w-100">
-                <p id='nom'><span th:text="${employeName}">Nom Employé</span></p>
-                <hr style="height:2px;border-width:0;color:white;background-color:white;margin: 0px;">
-                <li><button class="btn btn-link" onclick="loadContent('accueil')">Accueil</button></li>
-                <li><button class="btn btn-link" onclick="loadContent('etatsdavancement')">Historique</button></li>
-                <li><button class="btn btn-link" onclick="loadContent('emploi')">Emploi du temps</button></li>
-                <li><button class="btn btn-link" onclick="loadContent('changepass')">Modifier mot de passe</button></li>
-            </ul>
-            <div  class="mt-auto">
-                <a href="/logout" class="btn btn-danger w-100" style="margin-top: auto;">
-                🔒 Se déconnecter
-                </a>
-            </div>  
-        </div>
-        
+  <div class="sidebar d-flex flex-column">
+    <ul class="nav flex-column w-100">
+      <p id="nom"><span th:text="${employeName}">Nom Employé</span></p>
+      <hr
+        style="
+          height: 2px;
+          border-width: 0;
+          color: white;
+          background-color: white;
+          margin: 0px;
+        " />
+      <li>
+        <button class="btn btn-link" onclick="loadContent('accueil')">
+          Accueil
+        </button>
+      </li>
+      <li>
+        <button class="btn btn-link" onclick="loadContent('etatsdavancement')">
+          Historique
+        </button>
+      </li>
+      <li>
+        <button class="btn btn-link" onclick="loadContent('emploi')">
+          Emploi du temps
+        </button>
+      </li>
+      <li>
+        <button class="btn btn-link" onclick="loadContent('changepass')">
+          Modifier mot de passe
+        </button>
+      </li>
+    </ul>
+    <div class="mt-auto">
+      <form action="/logout" method="post">
+        <input
+          type="hidden"
+          name="${_csrf.parameterName}"
+          value="${_csrf.token}" />
+        <button
+          type="submit"
+          id="logoutBtn"
+          class="btn btn-danger w-100"
+          style="margin-top: auto">
+          🔒 Se déconnecter
+        </button>
+      </form>
+    </div>
+  </div>
 </div>
-    
-

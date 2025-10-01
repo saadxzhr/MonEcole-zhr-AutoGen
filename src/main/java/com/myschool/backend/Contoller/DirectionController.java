@@ -352,36 +352,26 @@ public class DirectionController {
     
 
     // ✅ Let Spring inject it via constructor
-        public DirectionController(excelService excelService) {
-            this.excelService = excelService;
-        }
+    public DirectionController(excelService excelService) {
+        this.excelService = excelService;
+    }
 
-        @PostMapping("/req/upload-excel")
-        @ResponseBody
-        public ResponseEntity<?> uploadExcelFile(@RequestParam("file") MultipartFile file) {
-            try {
-                excelService.importExcelData(file);
-                return ResponseEntity.ok("✅ File uploaded and data imported successfully!");
-            } catch (Exception e) {
-                return ResponseEntity
-                        .badRequest()
-                        .body("❌ Error uploading file: " + e.getMessage());
-            }
+    @PostMapping("/req/upload-excel")
+    @ResponseBody
+    public ResponseEntity<?> uploadExcelFile(@RequestParam("file") MultipartFile file) {
+        try {
+            excelService.importExcelData(file);
+            return ResponseEntity.ok("✅ File uploaded and data imported successfully!");
+        } catch (Exception e) {
+            return ResponseEntity
+                    .badRequest()
+                    .body("❌ Error uploading file: " + e.getMessage());
         }
+    }
 
     ////
+
     
-        //Dupliquer les emplois du temps selon nombre d'heurs (condition ajouter les emplois d'une seul semaine avant appliquer)
-        @PostMapping("/generate-recurring")
-        @ResponseBody
-        public ResponseEntity<?> generateRecurring(@RequestParam("codeMatiere") String codeMatiere) {
-            try {
-                emploiDuTempsService.generateRecurringSchedule(codeMatiere);
-                return ResponseEntity.ok("✅ Recurring schedule generated for " + codeMatiere);
-            } catch (Exception e) {
-                return ResponseEntity.badRequest().body("❌ Error: " + e.getMessage());
-            }
-        }
 }
 
 
