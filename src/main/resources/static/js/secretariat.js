@@ -46,6 +46,7 @@ function loadContent(pageOrUrl) {
             toggleStatut(event.target);
           }
         });
+        //executer fonction
         setTimeout(() => createProgressChart(), 150);
         setTimeout(() => createProgressCharts(), 150);
       }

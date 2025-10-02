@@ -20,9 +20,7 @@ function loadContent(pageOrUrl) {
 
   // Read CSRF token from meta tag
   const csrfToken = document.querySelector('meta[name="_csrf"]').content;
-  const csrfHeader = document.querySelector(
-    'meta[name="_csrf_header"]'
-  ).content;
+  const csrfHeader = document.querySelector('meta[name="_csrf_header"]').content;
 
   fetch(url, {
     method: "GET",
@@ -42,6 +40,7 @@ function loadContent(pageOrUrl) {
             toggleStatut(event.target);
           }
         });
+        //executer fonction
         afficherEmployes("toggleEmployesBtn", "employesList");
         afficherMatieres("toggleMatieresBtn", "matieresList");
         afficherFilieres("toggleFilieresBtn", "filieresList");

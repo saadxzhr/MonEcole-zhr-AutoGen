@@ -14,5 +14,5 @@ public class BackendApplication {
 }	
 
 //git add .
-//git commit -m "Relger decalage du fichier excel d'etat d'avancement"
+//git commit -m "Relger probleme bouton activer/annuler modification"
 //git push

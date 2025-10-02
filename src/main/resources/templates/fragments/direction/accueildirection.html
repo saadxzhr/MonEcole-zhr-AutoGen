@@ -58,19 +58,21 @@
         </div>
       </div>
     </div>
+     <!-- Matiere Progress -->
     <fieldset>
       <legend>Progression des Matières</legend>
       <div style="position: relative; height: auto; width: 100%; padding: 10px">
         <canvas id="progressBarChart"></canvas>
       </div>
     </fieldset>
+    <!-- Matiere Progress par filiere-->
     <fieldset>
       <legend>Progression des Matières</legend>
       <div
         id="progressChartsContainer"
         style="width: 100%; padding: 10px"></div>
     </fieldset>
-
+    <!-- table -->
     <fieldset>
       <legend>Etats d'avancements a modifier</legend>
       <div
@@ -83,8 +85,8 @@
       <div
         th:insert="~{fragments/alletatslice :: content(etatdavancement=${etatdavancementEnAttente})}"></div>
     </fieldset>
-    <!-- Add Bar Chart for Matiere Progress -->
   </div>
+
   <!-- Hidden div to store progress data for JavaScript -->
   <div
     id="progressDataContainer"

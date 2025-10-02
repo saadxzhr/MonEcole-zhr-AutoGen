@@ -42,7 +42,7 @@ document.addEventListener("DOMContentLoaded", function () {
 });
 
 
-// Charger cette fonction apres fragment 'changepass' est charger
+// Charger mot de passe
 function initChangePassScript() {
     const submitButton = document.getElementById("submit");
     if (!submitButton) return;
@@ -94,7 +94,7 @@ function initChangePassScript() {
 }
 
 
-
+//Se deconnecter
 document.getElementById("logoutBtn").addEventListener("click", async (e) => {
     e.preventDefault(); // prevent default if it's inside a form
     const csrfToken = document.querySelector('meta[name="_csrf"]').content;

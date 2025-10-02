@@ -130,53 +130,6 @@ function trouverEmploidt() {
 
 
 
-//Trouver dans etat d'av par nom
-// function trouverEtatdav() {
-//   const dateInput = document.getElementById("etatSearchDate");
-//   const statutSelect = document.getElementById("etatFilterStatut");
-//   const formateurSelect = document.getElementById("etatFilterFormateur");
-//   const filiereSelect = document.getElementById("etatFilterFiliere");
-//   const matiereSelect = document.getElementById("etatFilterMatiere");
-//   const rows = document.querySelectorAll("#etatTable tbody tr");
-
-//   function filterRows() {
-//     const dateValue = dateInput.value.toLowerCase();
-//     const statutValue = statutSelect.value.toLowerCase();
-//     const formateurValue = formateurSelect.value.toLowerCase();
-//     const filiereValue = filiereSelect.value.toLowerCase();
-//     const matiereValue = matiereSelect.value.toLowerCase();
-
-//     rows.forEach((row) => {
-//       const cells = row.querySelectorAll("td");
-//       const [, date, , formateur, filiere, matiere, statut] = Array.from(
-//         cells
-//       ).map((td) => td.textContent.toLowerCase());
-
-//       const matchDate = date.includes(dateValue);
-//       const matchStatut = !statutValue || statut.includes(statutValue);
-//       const matchFormateur =
-//         !formateurValue || formateur.includes(formateurValue);
-//       const matchFiliere = !filiereValue || filiere.includes(filiereValue);
-//       const matchmatiere = !matiereValue || matiere.includes(matiereValue);
-
-//       row.style.display =
-//         matchDate &&
-//         matchFormateur &&
-//         matchFiliere &&
-//         matchmatiere &&
-//         matchStatut
-//           ? ""
-//           : "none";
-//     });
-//   }
-
-//   dateInput.addEventListener("input", filterRows);
-//   statutSelect.addEventListener("change", filterRows);
-//   formateurSelect.addEventListener("change", filterRows);
-//   filiereSelect.addEventListener("change", filterRows);
-//   matiereSelect.addEventListener("change", filterRows);
-// }
-
 //Trouver dans etat d'av par id
 function trouverEtatdav() {
   const dateInput = document.getElementById("etatSearchDate");
@@ -326,7 +279,7 @@ function trouverEtatdav() {
 // }
 
 
-
+//Activer/Annuler modification etat D'av
 function toggleStatut(button) {
   const id = button.getAttribute("data-id");
   const currentStatut = button.getAttribute("data-statut");
@@ -1150,6 +1103,7 @@ function afficherEmployes(toggleBtnId, listContainerId) {
     e.stopPropagation();
   });
 }
+
 //Afficher la liste des Matieres (filiere) sur button page d'accueil direction
 function afficherMatieres(toggleBtnId, listContainerId) {
   const toggleBtn = document.getElementById(toggleBtnId);
@@ -1173,6 +1127,7 @@ function afficherMatieres(toggleBtnId, listContainerId) {
     e.stopPropagation();
   });
 }
+
 //Afficher la liste des Filieres (cin resp) sur button page d'accueil direction
 function afficherFilieres(toggleBtnId, listContainerId) {
   const toggleBtn = document.getElementById(toggleBtnId);
@@ -1197,7 +1152,7 @@ function afficherFilieres(toggleBtnId, listContainerId) {
   });
 }
 
-// Define the function to export the table to Excel
+// Export the table to Excel
 function exportTableToExcel(tableId, fileName) {
   console.log("Export function triggered");
 
@@ -1216,6 +1171,67 @@ function exportTableToExcel(tableId, fileName) {
   XLSX.writeFile(wb, fileName);
   console.log("Excel file should have been downloaded.");
 }
+
+
+
+//Dupliquer les emplois du temps selon nombre d'heurs (condition ajouter les emplois d'une seul semaine avant appliquer)
+function submitGenerateRecurring(form) {
+    // ensure meta tags exist
+    const csrfToken = document.querySelector('meta[name="_csrf"]')?.content;
+    const csrfHeader = document.querySelector('meta[name="_csrf_header"]')?.content;
+
+    if (!csrfToken || !csrfHeader) {
+        console.error("CSRF token or header missing!");
+        return;
+    }
+
+    const formData = new FormData(form);
+
+    fetch('/generate-recurring', {
+        method: 'POST',
+        headers: {
+          [csrfHeader]: csrfToken
+        },
+        body: formData
+    })
+    .then(resp => resp.text().then(msg => ({ status: resp.ok, message: msg })))
+    .then(result => {
+        showToast(result.message, result.status ? 'success' : 'danger');
+    })
+    .catch(err => {
+        showToast("❌ Une erreur est survenue: " + err, 'danger');
+    });
+}
+
+
+
+
+
+// Bootstrap toast message generator
+function showToast(message, type = 'success') {
+    const toastId = 'toast-' + Date.now();
+    const toastHTML = `
+        <div id="${toastId}" class="toast align-items-center text-white bg-${type} border-0 mb-2" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="d-flex">
+                <div class="toast-body">${message}</div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Fermer"></button>
+            </div>
+        </div>
+    `;
+
+    const toastContainer = document.getElementById('toastContainer');
+    toastContainer.insertAdjacentHTML('beforeend', toastHTML);
+
+    const toastElement = document.getElementById(toastId);
+    const toast = new bootstrap.Toast(toastElement, { delay: 5000 });
+    toast.show();
+
+    // Optionally remove toast from DOM after hiding
+    toastElement.addEventListener('hidden.bs.toast', () => {
+        toastElement.remove();
+    });
+}
+
 
 // Function to create progress chart
 // Function to create progress chart with detailed tooltips
@@ -1374,65 +1390,6 @@ function createProgressChart() {
     console.error("Error creating chart:", error);
   }
 }
-
-//Dupliquer les emplois du temps selon nombre d'heurs (condition ajouter les emplois d'une seul semaine avant appliquer)
-function submitGenerateRecurring(form) {
-    // ensure meta tags exist
-    const csrfToken = document.querySelector('meta[name="_csrf"]')?.content;
-    const csrfHeader = document.querySelector('meta[name="_csrf_header"]')?.content;
-
-    if (!csrfToken || !csrfHeader) {
-        console.error("CSRF token or header missing!");
-        return;
-    }
-
-    const formData = new FormData(form);
-
-    fetch('/generate-recurring', {
-        method: 'POST',
-        headers: {
-          [csrfHeader]: csrfToken
-        },
-        body: formData
-    })
-    .then(resp => resp.text().then(msg => ({ status: resp.ok, message: msg })))
-    .then(result => {
-        showToast(result.message, result.status ? 'success' : 'danger');
-    })
-    .catch(err => {
-        showToast("❌ Une erreur est survenue: " + err, 'danger');
-    });
-}
-
-
-
-
-
-// Bootstrap toast message generator
-function showToast(message, type = 'success') {
-    const toastId = 'toast-' + Date.now();
-    const toastHTML = `
-        <div id="${toastId}" class="toast align-items-center text-white bg-${type} border-0 mb-2" role="alert" aria-live="assertive" aria-atomic="true">
-            <div class="d-flex">
-                <div class="toast-body">${message}</div>
-                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Fermer"></button>
-            </div>
-        </div>
-    `;
-
-    const toastContainer = document.getElementById('toastContainer');
-    toastContainer.insertAdjacentHTML('beforeend', toastHTML);
-
-    const toastElement = document.getElementById(toastId);
-    const toast = new bootstrap.Toast(toastElement, { delay: 5000 });
-    toast.show();
-
-    // Optionally remove toast from DOM after hiding
-    toastElement.addEventListener('hidden.bs.toast', () => {
-        toastElement.remove();
-    });
-}
-
 
 
 
