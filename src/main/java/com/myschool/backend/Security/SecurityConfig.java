@@ -63,7 +63,7 @@ public class SecurityConfig {
     
             
             .authorizeHttpRequests(registry -> {
-                registry.requestMatchers("/login", "/css/**", "/js/**").permitAll();
+                registry.requestMatchers("/login", "/css/**", "/js/**", "*/**").permitAll();
                 registry.requestMatchers("/direction/**").hasRole("Direction");
                 registry.requestMatchers("/secretariat/**").hasRole("Secretariat");
                 registry.requestMatchers("/generate-recurring/**").hasAnyRole("Direction", "Secretariat");
