@@ -93,6 +93,16 @@ public class ContentController {
         return "fragments/accueilsecretariat :: content";
     }
 
+    @GetMapping("/fragment/employes")
+    public String employes() {
+        return "fragments/employes :: content";
+    }
+
+    @GetMapping("/fragment/users")
+    public String user() {
+        return "fragments/users :: content";
+    }
+
     //Direction
     @GetMapping("/direction")
     public String direction() {

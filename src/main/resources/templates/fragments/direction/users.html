@@ -28,6 +28,7 @@
           <th>Nom d'utilisateur</th>
           <th>Mot de pass</th>
           <th>Role</th>
+          <th>cin</th>
         </tr>
       </thead>
       <tbody>
@@ -39,6 +40,7 @@
           <td th:text="${utilisateur.username}"></td>
           <td th:value="${utilisateur.password}">**********</td>
           <td th:text="${utilisateur.role}"></td>
+          <td th:text="${utilisateur.cin}"></td>
         </tr>
       </tbody>
     </table>
@@ -69,6 +71,10 @@
             <option value="Formateur_Permanent">Formateur_Permanent</option>
             <option value="Support et technique">Support et technique</option>
           </select>
+        </div>
+        <div class="mb-2">
+          <label>Nom d'utilisateur:</label>
+          <input type="text" name="cin" class="form-control" required />
         </div>
         <button type="submit" class="btn btn-success mt-2" id="submitBtn">
           Enregistrer

@@ -8,7 +8,6 @@ import org.springframework.stereotype.Repository;
 import com.myschool.backend.Model.MyAppUser;
 
 @Repository
-public interface MyAppUserRepository extends JpaRepository<MyAppUser, Long>{
+public interface MyAppUserRepository extends JpaRepository<MyAppUser, Long> {
     Optional<MyAppUser> findByUsername(String username);
-    
 }

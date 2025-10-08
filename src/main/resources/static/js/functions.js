@@ -856,11 +856,15 @@ function actionsEmploye() {
       const adresse = cells[4].innerText.trim();
       const telephone = cells[5].innerText.trim();
       const email = cells[6].innerText.trim();
-      const date_embauche = cells[7].innerText.trim();
+      const dateEmbauche = cells[7].innerText.trim();
       const role = cells[8].innerText.trim();
       const specialite = cells[9].innerText.trim();
-      const niveau_etude = cells[10].innerText.trim();
+      const niveauEtude = cells[10].innerText.trim();
       const salaire = cells[11].innerText.trim();
+      const maxHeuresSemaine = cells[12].innerText.trim();
+      const disponibleWeekend = cells[13].innerText.trim();
+      const seulementWeekend = cells[14].innerText.trim();
+      const actif = cells[15].innerText.trim();
 
       // Set fields
       form.setAttribute("data-mode", "edit");
@@ -871,11 +875,18 @@ function actionsEmploye() {
       form.querySelector('[name="adresse"]').value = adresse;
       form.querySelector('[name="telephone"]').value = telephone;
       form.querySelector('[name="email"]').value = email;
-      form.querySelector('[name="date_embauche"]').value = date_embauche;
+      form.querySelector('[name="dateEmbauche"]').value = dateEmbauche;
       form.querySelector('[name="role"]').value = role;
       form.querySelector('[name="specialite"]').value = specialite;
-      form.querySelector('[name="niveau_etude"]').value = niveau_etude;
+      form.querySelector('[name="niveauEtude"]').value = niveauEtude;
       form.querySelector('[name="salaire"]').value = salaire;
+      form.querySelector('[name="maxHeuresSemaine"]').value = maxHeuresSemaine;
+      form.querySelector('[name="disponibleWeekend"]').value = disponibleWeekend;
+      form.querySelector('[name="seulementWeekend"]').value = seulementWeekend;
+      form.querySelector('[name="actif"]').value = actif;
+
+
+
 
       submitBtn.textContent = "Modifier";
       modal.style.display = "block";
@@ -1011,6 +1022,7 @@ function actionsUsers() {
       const username = cells[1].innerText.trim();
       const password = cells[2].innerText.trim();
       const role = cells[3].innerText.trim();
+      const cin = cells[4].innerText.trim();
 
       // Set fields
       form.setAttribute("data-mode", "edit");
@@ -1018,6 +1030,7 @@ function actionsUsers() {
       form.querySelector('[name="username"]').value = username;
       form.querySelector('[name="password"]').value = password;
       form.querySelector('[name="role"]').value = role;
+      form.querySelector('[name="cin"]').value = cin;
 
       submitBtn.textContent = "Modifier";
       modal.style.display = "block";

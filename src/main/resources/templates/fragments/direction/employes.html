@@ -35,7 +35,12 @@
           <th>Role</th>
           <th>Specialité</th>
           <th>Niveau d'étude</th>
-          <th>Salaire</th>
+          <th>maxHeuresSemaine</th>
+          <th>maxHeuresSemaine</th>
+          <th>disponibleWeekend</th>
+          <th>seulementWeekend</th>
+          <th>actif</th>
+          
         </tr>
       </thead>
       <tbody>
@@ -50,11 +55,15 @@
           <td th:text="${employe.adresse}"></td>
           <td th:text="${employe.telephone}"></td>
           <td th:text="${employe.email}"></td>
-          <td th:text="${employe.date_embauche}"></td>
+          <td th:text="${employe.dateEmbauche}"></td>
           <td th:text="${employe.role}"></td>
           <td th:text="${employe.specialite}"></td>
-          <td th:text="${employe.niveau_etude}"></td>
+          <td th:text="${employe.niveauEtude}"></td>
           <td th:text="${employe.salaire}"></td>
+          <td th:text="${employe.maxHeuresSemaine}"></td>
+          <td th:text="${employe.disponibleWeekend}"></td>
+          <td th:text="${employe.seulementWeekend}"></td>
+          <td th:text="${employe.actif}"></td>
         </tr>
       </tbody>
     </table>
@@ -66,7 +75,7 @@
         <h4 class="modal-title">Ajouter un employé</h4>
         <span class="close" data-dismiss="modal" style="position: right; cursor: pointer">&times;</span>
       </div>
-      <form id="employeForm" data-mode="add">
+      <form id="employeForm" th:object="${employe}" data-mode="add">
         <input type="hidden" name="id" />
         <div class="mb-2">
           <label>Cin:</label>
@@ -99,7 +108,7 @@
 
         <div class="mb-2">
           <label>Date d'embauche:</label>
-          <input type="date" name="date_embauche" class="form-select" required>
+          <input type="date" name="dateEmbauche" class="form-select" required>
           </select>
         </div>
         <div class="mb-2">
@@ -119,13 +128,43 @@
 
         <div class="mb-2">
           <label>Niveau d'étude:</label>
-          <input type="text"  name="niveau_etude" class="form-control" required />
+          <input type="text"  name="niveauEtude" class="form-control" required />
         </div>
-  
+
         <div class="mb-2">
           <label>Salaire:</label>
           <input type="number" step="0.01" name="salaire" class="form-control" required />
         </div>
+
+        <div class="mb-2">
+          <label>Max Heures Semaine:</label>
+          <input type="number" step="0.01" name="maxHeuresSemaine" class="form-control" required />
+        </div>
+
+        <div class="mb-2">
+    <label>Disponible Weekend:</label>
+    <select th:field="*{disponibleWeekend}" class="form-select">
+        <option th:value="true" th:text="'Oui'"></option>
+        <option th:value="false" th:text="'Non'"></option>
+    </select>
+</div>
+
+    <div class="mb-2">
+        <label>Seulement Weekend:</label>
+        <select th:field="*{seulementWeekend}" class="form-select">
+            <option th:value="true" th:text="'Oui'"></option>
+            <option th:value="false" th:text="'Non'"></option>
+        </select>
+    </div>
+
+    <div class="mb-2">
+        <label>Actif:</label>
+        <select th:field="*{actif}" class="form-select">
+            <option th:value="true" th:text="'Oui'"></option>
+            <option th:value="false" th:text="'Non'"></option>
+        </select>
+    </div>
+
         
         <button type="submit" class="btn btn-success mt-2" id="submitBtn">
           Enregistrer

@@ -17,66 +17,45 @@ import com.myschool.backend.Service.MyAppUserService;
 import lombok.AllArgsConstructor;
 
 @Configuration
-@AllArgsConstructor
 @EnableWebSecurity
 public class SecurityConfig {
-    
-    @Autowired
-    private final MyAppUserService appUserService;
-    
-    
+
+    // Plus de champ final → pas de circularité
     @Bean
-    public UserDetailsService userDetailsService(){
-        return appUserService;
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
     }
-    
-    //initialisation des infos de l'utilisateur et encodage du mot de passe
+
     @Bean
-    public AuthenticationProvider authenticationProvider(){
+    public DaoAuthenticationProvider authenticationProvider(MyAppUserService userService) {
         DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
-        provider.setUserDetailsService(appUserService);
+        provider.setUserDetailsService(userService);
         provider.setPasswordEncoder(passwordEncoder());
         return provider;
     }
-        
-    @Bean
-    public PasswordEncoder passwordEncoder(){
-        return new BCryptPasswordEncoder();
-    }
-    
-    @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception{
-       //Exécutez logique personnalisée d'authentification apres connexion reussie.
-        return http
-            .formLogin(httpForm ->{
-                httpForm.loginPage("/login").permitAll();
-                httpForm.successHandler(new CustomAuthenticationSuccessHandler());
-            })
 
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        return http
+            .formLogin(form -> form
+                .loginPage("/login").permitAll()
+                .successHandler(new CustomAuthenticationSuccessHandler())
+            )
             .logout(logout -> logout
                 .logoutUrl("/logout")
-                .logoutSuccessUrl("/login?logout")   
+                .logoutSuccessUrl("/login?logout")
                 .invalidateHttpSession(true)
                 .deleteCookies("JSESSIONID")
                 .permitAll()
             )
-    
-            
-            .authorizeHttpRequests(registry -> {
-                registry.requestMatchers("/login", "/css/**", "/js/**", "*/**").permitAll();
-                registry.requestMatchers("/direction/**").hasRole("Direction");
-                registry.requestMatchers("/secretariat/**").hasRole("Secretariat");
-                registry.requestMatchers("/generate-recurring/**").hasAnyRole("Direction", "Secretariat");
-                registry.requestMatchers("/formateur/**").hasAnyAuthority("ROLE_Formateur_Vacataire", "ROLE_Formateur_Permanent");
-
-                
-                registry.anyRequest().authenticated();
-                
+            .authorizeHttpRequests(auth -> {
+                auth.requestMatchers("/login", "/css/**", "/js/**").permitAll();
+                auth.requestMatchers("/direction/**").hasRole("Direction");
+                auth.requestMatchers("/secretariat/**").hasRole("Secretariat");
+                auth.requestMatchers("/generate-recurring/**").hasAnyRole("Direction", "Secretariat");
+                auth.requestMatchers("/formateur/**").hasAnyAuthority("ROLE_Formateur_Vacataire", "ROLE_Formateur_Permanent");
+                auth.anyRequest().authenticated();
             })
             .build();
-
-        
     }
-    
-   
 }

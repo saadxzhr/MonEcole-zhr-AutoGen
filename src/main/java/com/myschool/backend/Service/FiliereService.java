@@ -1,26 +1,26 @@
-package com.myschool.backend.Service;
+// package com.myschool.backend.Service;
 
-import org.springframework.stereotype.Service;
+// import org.springframework.stereotype.Service;
 
-import com.myschool.backend.Model.Employe;
-import com.myschool.backend.Repository.EmployeRepository;
+// import com.myschool.backend.Model.Employe;
+// import com.myschool.backend.Repository.EmployeRepository;
 
-import java.util.List;
+// import java.util.List;
 
 
-@Service
-public class FiliereService {
+// @Service
+// public class FiliereService {
 
-    //charger liste des formateurs
-    private final EmployeRepository employeRepository;
-    public FiliereService(EmployeRepository employeRepository) {
-        this.employeRepository = employeRepository;
-    }
+//     //charger liste des formateurs
+//     private final EmployeRepository employeRepository;
+//     public FiliereService(EmployeRepository employeRepository) {
+//         this.employeRepository = employeRepository;
+//     }
 
-    public List<Employe> getFormateurs() {
-        return employeRepository.findAllFormateurs();
-    }
+//     public List<FormateurProjection> getFormateurs() {
+//         return employeRepository.findAllFormateurs();
+//     }
     
-}
+// }
 
 

@@ -22,49 +22,54 @@ import org.springframework.web.multipart.MultipartFile;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.myschool.backend.Model.Employe;
-import com.myschool.backend.Model.EtatDavancement;
-import com.myschool.backend.Model.Filiere;
+// import com.myschool.backend.Model.EtatDavancement;
+// import com.myschool.backend.Model.Filiere;
 import com.myschool.backend.Model.MyAppUser;
 import com.myschool.backend.Repository.EmployeRepository;
-import com.myschool.backend.Repository.EtatDavancementRepository;
-import com.myschool.backend.Repository.FiliereRepository;
-import com.myschool.backend.Repository.MatiereRepository;
+// import com.myschool.backend.Repository.EtatDavancementRepository;
+// import com.myschool.backend.Repository.FiliereRepository;
+// import com.myschool.backend.Repository.MatiereRepository;
 import com.myschool.backend.Repository.MyAppUserRepository;
-import com.myschool.backend.Service.CalculateProgress;
+// import com.myschool.backend.Service.CalculateProgress;
 import com.myschool.backend.Service.EmployeService;
-import com.myschool.backend.Service.EtatDavancementService;
-import com.myschool.backend.Service.FiliereService;
-import com.myschool.backend.Service.MatiereService;
-import com.myschool.backend.Service.excelService;
-import com.myschool.backend.Model.Matiere;
+// import com.myschool.backend.Service.EtatDavancementService;
+// import com.myschool.backend.Service.FiliereService;
+// import com.myschool.backend.Service.MatiereService;
+// import com.myschool.backend.Service.excelService;
+// import com.myschool.backend.Model.Matiere;
+// import com.myschool.backend.Service.excelService;
+import com.myschool.backend.Service.MyAppUserService;
 
 
 @Controller
 public class DirectionController {
     
-    @Autowired
-    private excelService excelService;
+    // @Autowired
+    // private excelService excelService;
     
-    @Autowired
-    private EtatDavancementService etatDavancementService;
+    // @Autowired
+    // private EtatDavancementService etatDavancementService;
 
-    @Autowired
-    private EtatDavancementRepository etatDavancementRepository;
+    // @Autowired
+    // private EtatDavancementRepository etatDavancementRepository;
 
     @Autowired
     private MyAppUserRepository myAppUserRepository;
 
     @Autowired
-    private FiliereRepository filiereRepository;
+    private MyAppUserService myAppUserService;
 
-    @Autowired
-    private FiliereService filiereService;
+    // @Autowired
+    // private FiliereRepository filiereRepository;
 
-    @Autowired
-    private MatiereRepository matiereRepository;
+    // @Autowired
+    // private FiliereService filiereService;
 
-    @Autowired
-    private MatiereService matiereService;
+    // @Autowired
+    // private MatiereRepository matiereRepository;
+
+    // @Autowired
+    // private MatiereService matiereService;
 
     @Autowired
     private EmployeRepository employeRepository;
@@ -75,8 +80,8 @@ public class DirectionController {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
-    @Autowired
-    private CalculateProgress CalculateProgress;
+    // @Autowired
+    // private CalculateProgress CalculateProgress;
 
     @GetMapping("/")
     public String redirectToDirection() {
@@ -91,6 +96,7 @@ public class DirectionController {
         employeService.getEmployeByCin(cin).ifPresent(employe -> {
             String fullName = employe.getNom() + " " + employe.getPrenom();
             model.addAttribute("employeName", fullName);
+
         }); 
         return "direction";
     }
@@ -104,144 +110,144 @@ public class DirectionController {
 
 
 
-    //accueil de direction
-    @GetMapping("/req/accueildirection")
-    public String getAccueil(Model model, Principal principal) throws JsonProcessingException {
-        //Donnee etat d'avacement
-        List<EtatDavancement> amodifier = etatDavancementService.getByStatut("A modifier");
-        List<EtatDavancement> enAttente = etatDavancementService.getByStatut("En attente");
-        model.addAttribute("etatdavancementAmodifier", amodifier);
-        model.addAttribute("etatdavancementEnAttente", enAttente);
+    // //accueil de direction
+    // @GetMapping("/req/accueildirection")
+    // public String getAccueil(Model model, Principal principal) throws JsonProcessingException {
+    //     //Donnee etat d'avacement
+    //     List<EtatDavancement> amodifier = etatDavancementService.getByStatut("A modifier");
+    //     List<EtatDavancement> enAttente = etatDavancementService.getByStatut("En attente");
+    //     model.addAttribute("etatdavancementAmodifier", amodifier);
+    //     model.addAttribute("etatdavancementEnAttente", enAttente);
 
-        //Donnee listes entites
-        List<Employe> employes = employeRepository.findAll();
-        model.addAttribute("employes", employes);
-        List<Matiere> matieres = matiereRepository.findAll();
-        model.addAttribute("matieres", matieres);
-        List<Filiere> filieres = filiereRepository.findAll();
-        model.addAttribute("filieres", filieres);
+    //     //Donnee listes entites
+    //     List<Employe> employes = employeRepository.findAll();
+    //     model.addAttribute("employes", employes);
+    //     List<Matiere> matieres = matiereRepository.findAll();
+    //     model.addAttribute("matieres", matieres);
+    //     List<Filiere> filieres = filiereRepository.findAll();
+    //     model.addAttribute("filieres", filieres);
 
-        //
-        Map<String, Map<String, Object>> detailedProgressData = CalculateProgress.getProgressDataWithDetails();
-        System.out.println("Detailed progress data: " + detailedProgressData);
+    //     //
+    //     Map<String, Map<String, Object>> detailedProgressData = CalculateProgress.getProgressDataWithDetails();
+    //     System.out.println("Detailed progress data: " + detailedProgressData);
         
-        try {
-            ObjectMapper mapper = new ObjectMapper();
-            String progressDataJson = mapper.writeValueAsString(detailedProgressData);
-            model.addAttribute("progressData", progressDataJson);
-        } catch (Exception e) {
-            System.out.println("Error converting to JSON: " + e.getMessage());
-            model.addAttribute("progressData", "{}");
-        }
+    //     try {
+    //         ObjectMapper mapper = new ObjectMapper();
+    //         String progressDataJson = mapper.writeValueAsString(detailedProgressData);
+    //         model.addAttribute("progressData", progressDataJson);
+    //     } catch (Exception e) {
+    //         System.out.println("Error converting to JSON: " + e.getMessage());
+    //         model.addAttribute("progressData", "{}");
+    //     }
 
-        return "fragments/direction/accueildirection :: content";
-    }
+    //     return "fragments/direction/accueildirection :: content";
+    // }
      
 
 
 
-    //////actions sur filiere
+    // //////actions sur filiere
 
 
 
-    //charger tout les filieres + charger les nom des formateurs
-    @GetMapping("/req/filieres")
-    public String getFilieres(Model model) {
-        List<Filiere> filieres = filiereRepository.findAll();
-        model.addAttribute("filieres", filieres);
-        model.addAttribute("formateurs", filiereService.getFormateurs());
-        model.addAttribute("niveaux", filiereRepository.getUniqueNiveau());
-        return "fragments/direction/filieres"; 
-    }
+    // //charger tout les filieres + charger les nom des formateurs
+    // @GetMapping("/req/filieres")
+    // public String getFilieres(Model model) {
+    //     List<Filiere> filieres = filiereRepository.findAll();
+    //     model.addAttribute("filieres", filieres);
+    //     model.addAttribute("formateurs", filiereService.getFormateurs());
+    //     model.addAttribute("niveaux", filiereRepository.getUniqueNiveau());
+    //     return "fragments/direction/filieres"; 
+    // }
 
-    //ajouter une filiere
-    @PostMapping("/req/filieres/save")
-    @ResponseBody
-    public ResponseEntity<?> saveFiliere(@RequestBody Filiere filiere) {
-        if (filiere.getId() != null) {
-            // Update mode
-            Optional<Filiere> existing = filiereRepository.findById(filiere.getId());
-            if (existing.isPresent()) {
-                Filiere existingFiliere = existing.get();
-                // Update all fields including code_filiere if you want to allow changing it
-                existingFiliere.setCode_filiere(filiere.getCode_filiere());
-                existingFiliere.setNom_filiere(filiere.getNom_filiere());
-                existingFiliere.setNiveau(filiere.getNiveau());
-                existingFiliere.setDuree_heures(filiere.getDuree_heures());
-                existingFiliere.setDescription(filiere.getDescription());
-                existingFiliere.setResponsable(filiere.getResponsable());
+    // //ajouter une filiere
+    // @PostMapping("/req/filieres/save")
+    // @ResponseBody
+    // public ResponseEntity<?> saveFiliere(@RequestBody Filiere filiere) {
+    //     if (filiere.getId() != null) {
+    //         // Update mode
+    //         Optional<Filiere> existing = filiereRepository.findById(filiere.getId());
+    //         if (existing.isPresent()) {
+    //             Filiere existingFiliere = existing.get();
+    //             // Update all fields including code_filiere if you want to allow changing it
+    //             existingFiliere.setCode_filiere(filiere.getCode_filiere());
+    //             existingFiliere.setNom_filiere(filiere.getNom_filiere());
+    //             existingFiliere.setNiveau(filiere.getNiveau());
+    //             existingFiliere.setDuree_heures(filiere.getDuree_heures());
+    //             existingFiliere.setDescription(filiere.getDescription());
+    //             existingFiliere.setResponsable(filiere.getResponsable());
 
-                filiereRepository.save(existingFiliere);
-            } else {
-                return ResponseEntity.badRequest().body("Filiere not found for update");
-            }
-        } else {
-            // Create mode
-            filiereRepository.save(filiere);
-        }
-        return ResponseEntity.ok().build();
-    }
-
-
-    //supprimer une filiere
-    @DeleteMapping("/req/filieres/delete/{id}")
-    @ResponseBody
-    public ResponseEntity<?> deleteFiliere(@PathVariable("id") Long id) {
-        filiereRepository.deleteById(id);
-        return ResponseEntity.ok().build();
-    }
+    //             filiereRepository.save(existingFiliere);
+    //         } else {
+    //             return ResponseEntity.badRequest().body("Filiere not found for update");
+    //         }
+    //     } else {
+    //         // Create mode
+    //         filiereRepository.save(filiere);
+    //     }
+    //     return ResponseEntity.ok().build();
+    // }
 
 
-
-    //////actions sur matiere
+    // //supprimer une filiere
+    // @DeleteMapping("/req/filieres/delete/{id}")
+    // @ResponseBody
+    // public ResponseEntity<?> deleteFiliere(@PathVariable("id") Long id) {
+    //     filiereRepository.deleteById(id);
+    //     return ResponseEntity.ok().build();
+    // }
 
 
 
-    //charger tout les filieres + charger les nom des formateurs
-    @GetMapping("/req/matieres")
-    public String getmatieres(Model model) {
-        List<Matiere> matieres = matiereRepository.findAll();
-        model.addAttribute("matieres", matieres);
-        model.addAttribute("filieres", matiereService.getFilieres());
-        return "fragments/direction/matieres"; 
-    }
+    // //////actions sur matiere
+
+
+
+    // //charger tout les filieres + charger les nom des formateurs
+    // @GetMapping("/req/matieres")
+    // public String getmatieres(Model model) {
+    //     List<Matiere> matieres = matiereRepository.findAll();
+    //     model.addAttribute("matieres", matieres);
+    //     model.addAttribute("filieres", matiereService.getFilieres());
+    //     return "fragments/direction/matieres"; 
+    // }
  
-    //ajouter une matiere
-    @PostMapping("/req/matieres/save")
-    @ResponseBody
-    public ResponseEntity<?> saveMatiere(@RequestBody Matiere matiere) {
-        if (matiere.getId()!= null) {
-            // Update mode
-            Optional<Matiere> existing = matiereRepository.findById(matiere.getId());
-            if (existing.isPresent()) {
-                Matiere existingMatiere = existing.get();
-                // Update all fields including code_filiere if you want to allow changing it
-                existingMatiere.setCode_matiere(matiere.getCode_matiere());
-                existingMatiere.setNom_matiere(matiere.getNom_matiere());
-                existingMatiere.setDescription(matiere.getDescription());
-                existingMatiere.setNombre_heures(matiere.getNombre_heures());
-                existingMatiere.setCoefficient(matiere.getCoefficient());
-                existingMatiere.setCode_filiere(matiere.getCode_filiere());
+    // //ajouter une matiere
+    // @PostMapping("/req/matieres/save")
+    // @ResponseBody
+    // public ResponseEntity<?> saveMatiere(@RequestBody Matiere matiere) {
+    //     if (matiere.getId()!= null) {
+    //         // Update mode
+    //         Optional<Matiere> existing = matiereRepository.findById(matiere.getId());
+    //         if (existing.isPresent()) {
+    //             Matiere existingMatiere = existing.get();
+    //             // Update all fields including code_filiere if you want to allow changing it
+    //             existingMatiere.setCode_matiere(matiere.getCode_matiere());
+    //             existingMatiere.setNom_matiere(matiere.getNom_matiere());
+    //             existingMatiere.setDescription(matiere.getDescription());
+    //             existingMatiere.setNombre_heures(matiere.getNombre_heures());
+    //             existingMatiere.setCoefficient(matiere.getCoefficient());
+    //             existingMatiere.setCode_filiere(matiere.getCode_filiere());
 
-                matiereRepository.save(existingMatiere);
-            } else {
-                return ResponseEntity.badRequest().body("Filiere not found for update");
-            }
-        } else {
-            // Create mode
-            matiereRepository.save(matiere);
-        }
-        return ResponseEntity.ok().build();
-    }
+    //             matiereRepository.save(existingMatiere);
+    //         } else {
+    //             return ResponseEntity.badRequest().body("Filiere not found for update");
+    //         }
+    //     } else {
+    //         // Create mode
+    //         matiereRepository.save(matiere);
+    //     }
+    //     return ResponseEntity.ok().build();
+    // }
 
 
-    //supprimer une filiere
-    @DeleteMapping("/req/matieres/delete/{id}")
-    @ResponseBody
-    public ResponseEntity<?> deleteMatiere(@PathVariable("id") Long id) {
-        matiereRepository.deleteById(id);
-        return ResponseEntity.ok().build();
-    }
+    // //supprimer une filiere
+    // @DeleteMapping("/req/matieres/delete/{id}")
+    // @ResponseBody
+    // public ResponseEntity<?> deleteMatiere(@PathVariable("id") Long id) {
+    //     matiereRepository.deleteById(id);
+    //     return ResponseEntity.ok().build();
+    // }
 
 
     //////actions sur matiere
@@ -251,6 +257,7 @@ public class DirectionController {
     public String getEmploye(Model model) {
         List<Employe> employes = employeRepository.findAll();
         model.addAttribute("employes", employes);
+        model.addAttribute("employe", new Employe());
         model.addAttribute("roles", employeRepository.getUniqueRole());
         return "fragments/direction/employes"; 
     }
@@ -271,11 +278,17 @@ public class DirectionController {
                 existingEmploye.setAdresse(employe.getAdresse());
                 existingEmploye.setTelephone(employe.getTelephone());
                 existingEmploye.setEmail(employe.getEmail());
-                existingEmploye.setDate_embauche(employe.getDate_embauche());
+                existingEmploye.setDateEmbauche(employe.getDateEmbauche());
                 existingEmploye.setRole(employe.getRole());
                 existingEmploye.setSpecialite(employe.getSpecialite());
-                existingEmploye.setNiveau_etude(employe.getNiveau_etude());
+                existingEmploye.setNiveauEtude(employe.getNiveauEtude());
                 existingEmploye.setSalaire(employe.getSalaire());
+//cin, nom, prenom, adresse, telephone, email, dateEmbauche, role, specialite, 
+//niveauEtude, salaire, maxHeuresSemaine, disponibleWeekend, seulementWeekend, actif
+                existingEmploye.setMaxHeuresSemaine(employe.getMaxHeuresSemaine());
+                existingEmploye.setDisponibleWeekend(employe.getDisponibleWeekend());
+                existingEmploye.setSeulementWeekend(employe.getSeulementWeekend());
+                existingEmploye.setActif(employe.getActif());
 
                 employeRepository.save(existingEmploye);
             } else {
@@ -314,26 +327,14 @@ public class DirectionController {
     @PostMapping("/req/users/save")
     @ResponseBody
     public ResponseEntity<?> saveUser(@RequestBody MyAppUser user) {
-        if (user.getId()!= null) {
-            // Update mode
-            Optional<MyAppUser> existing = myAppUserRepository.findById(user.getId());
-            if (existing.isPresent()) {
-                MyAppUser existingUser = existing.get();
-                // Update all fields including code_filiere if you want to allow changing it
-                existingUser.setUsername(user.getUsername());
-                existingUser.setPassword(passwordEncoder.encode(user.getPassword()));
-                existingUser.setRole(user.getRole());
-
-                myAppUserRepository.save(existingUser);
-            } else {
-                return ResponseEntity.badRequest().body("User not found for update");
-            }
+        if (user.getId() != null) {
+            myAppUserService.updateUser(user.getId(), user);
         } else {
-            // Create mode
-            myAppUserRepository.save(user);
+            myAppUserService.createUser(user);
         }
         return ResponseEntity.ok().build();
     }
+
 
     //supprimer un utilisateur
     @DeleteMapping("/req/users/delete/{id}")
@@ -350,50 +351,50 @@ public class DirectionController {
     
     
 
-    // ✅ Let Spring inject it via constructor
-    public DirectionController(excelService excelService) {
-        this.excelService = excelService;
-    }
+    // // ✅ Let Spring inject it via constructor
+    // public DirectionController(excelService excelService) {
+    //     this.excelService = excelService;
+    // }
 
-    @PostMapping("/req/upload-excel")
-    @ResponseBody
-    public ResponseEntity<?> uploadExcelFile(@RequestParam("file") MultipartFile file) {
-        try {
-            excelService.importExcelData(file);
-            return ResponseEntity.ok("✅ File uploaded and data imported successfully!");
-        } catch (Exception e) {
-            return ResponseEntity
-                    .badRequest()
-                    .body("❌ Error uploading file: " + e.getMessage());
-        }
-    }
+    // @PostMapping("/req/upload-excel")
+    // @ResponseBody
+    // public ResponseEntity<?> uploadExcelFile(@RequestParam("file") MultipartFile file) {
+    //     try {
+    //         excelService.importExcelData(file);
+    //         return ResponseEntity.ok("✅ File uploaded and data imported successfully!");
+    //     } catch (Exception e) {
+    //         return ResponseEntity
+    //                 .badRequest()
+    //                 .body("❌ Error uploading file: " + e.getMessage());
+    //     }
+    // }
 
-    ////
-    @PostMapping("/req/etat/toggle")
-    @ResponseBody
-    public ResponseEntity<String> toggleEtat(@RequestBody Map<String, Object> payload) {
-        try {
-            Long id = Long.valueOf(payload.get("id").toString());
-            // 1. Find the Etat by ID
-            EtatDavancement etat = etatDavancementRepository.findById(id)
-                    .orElseThrow(() -> new RuntimeException("Etat not found"));
+    // ////
+    // @PostMapping("/req/etat/toggle")
+    // @ResponseBody
+    // public ResponseEntity<String> toggleEtat(@RequestBody Map<String, Object> payload) {
+    //     try {
+    //         Long id = Long.valueOf(payload.get("id").toString());
+    //         // 1. Find the Etat by ID
+    //         EtatDavancement etat = etatDavancementRepository.findById(id)
+    //                 .orElseThrow(() -> new RuntimeException("Etat not found"));
 
-            // 2. Toggle the statut
-            if ("Rempli".equals(etat.getStatut())) {
-                etat.setStatut("A modifier");
-            } else if ("A modifier".equals(etat.getStatut())) {
-                etat.setStatut("Rempli");
-            }
+    //         // 2. Toggle the statut
+    //         if ("Rempli".equals(etat.getStatut())) {
+    //             etat.setStatut("A modifier");
+    //         } else if ("A modifier".equals(etat.getStatut())) {
+    //             etat.setStatut("Rempli");
+    //         }
 
-            // 3. Save changes
-            etatDavancementRepository.save(etat);
+    //         // 3. Save changes
+    //         etatDavancementRepository.save(etat);
 
-            // 4. Return the new statut as response
-            return ResponseEntity.ok(etat.getStatut());
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body("Erreur: " + e.getMessage());
-        }
-    }
+    //         // 4. Return the new statut as response
+    //         return ResponseEntity.ok(etat.getStatut());
+    //     } catch (Exception e) {
+    //         return ResponseEntity.badRequest().body("Erreur: " + e.getMessage());
+    //     }
+    // }
 
     
 }

@@ -3,6 +3,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import com.myschool.backend.Model.Employe;
+import com.myschool.backend.Projection.FormateurProjection;
 import com.myschool.backend.Repository.EmployeRepository;
 
 import java.util.List;
@@ -18,7 +19,7 @@ public class EmployeService {
         return employeRepository.findByCin(cin);
     }
 
-    public List<Employe> getFormateurs() {
+    public List<FormateurProjection> getFormateurs() {
         return employeRepository.findAllFormateurs();
     }
     
