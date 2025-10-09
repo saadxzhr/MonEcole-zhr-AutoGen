@@ -21,7 +21,7 @@ import lombok.AllArgsConstructor;
 public class MyAppUserService implements UserDetailsService {
 
     @Autowired
-    private MyAppUserRepository repository;
+    public MyAppUserRepository repository;
 
     @Autowired
     private org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
@@ -34,13 +34,22 @@ public class MyAppUserService implements UserDetailsService {
         List<GrantedAuthority> authorities = new ArrayList<>();
         authorities.add(new SimpleGrantedAuthority("ROLE_" + user.getRole()));
 
+        // Ici on crée un PasswordEncoder qui vérifie les deux cas
+        String password = user.getPassword();
+        if (!password.startsWith("$2a$")) {
+            // pas encore encodé
+            password = new org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder().encode(password);
+            user.setPassword(password);
+            repository.save(user); // on met à jour une fois
+        }
+
         return new org.springframework.security.core.userdetails.User(
                 user.getUsername(),
                 user.getPassword(),
                 authorities);
     }
 
-    public MyAppUser createUser(MyAppUser user) {
+    public MyAppUser createUser(MyAppUser user) {   
         user.setPassword(passwordEncoder.encode(user.getPassword()));
         return repository.save(user);
     }

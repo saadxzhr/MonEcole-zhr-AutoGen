@@ -14,47 +14,51 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.myschool.backend.Model.MyAppUser;
 import com.myschool.backend.Repository.MyAppUserRepository;
+import com.myschool.backend.Service.MyAppUserService;
 
 @RestController
 public class ChangePassController {
 
     @Autowired
-    private PasswordEncoder passwordEncoder;
+    private MyAppUserService userService;
 
     @Autowired
-    private MyAppUserRepository myAppUserRepository;
+    private PasswordEncoder passwordEncoder;
 
-    //Changer le mot de pass d'utilisateur en cours
-    @PostMapping(value = "/req/changepass", consumes = "application/json")
-    public ResponseEntity<String> changePassword(@RequestBody Map<String, String> payload, Principal principal) {
-        //charger valeurs
-        String currentPassword = payload.get("password");
-        String newPassword = payload.get("newpass");
+    @PostMapping("/req/changepass")
+    public ResponseEntity<Map<String, Object>> changePassword(
+            @RequestBody Map<String, String> payload,
+            Principal principal) {
 
-        //Obliger tt ls champs
-        if (currentPassword == null || newPassword == null || currentPassword.isBlank() || newPassword.isBlank()) {
-            return ResponseEntity.badRequest().body("Champs requis manquants.");
+        String currentPass = payload.get("password");
+        String newPass = payload.get("newpass");
+
+        if (currentPass == null || newPass == null || currentPass.isBlank() || newPass.isBlank()) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("success", false, "message", "Tous les champs sont obligatoires."));
         }
 
-        //nom d'utilisateur en cours
-        String username = principal.getName(); 
-        Optional<MyAppUser> optionalUser = myAppUserRepository.findByUsername(username);
-        if (optionalUser.isEmpty()) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Utilisateur introuvable.");
+        // Charger l'utilisateur actuel
+        MyAppUser user = userService.repository.findByUsername(principal.getName())
+                .orElseThrow(() -> new RuntimeException("Utilisateur introuvable."));
+
+        // Vérifier mot de passe actuel
+        if (!passwordEncoder.matches(currentPass, user.getPassword())) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("success", false, "message", "Mot de passe actuel incorrect."));
         }
 
-        //charger les details d'utilisateur
-        MyAppUser user = optionalUser.get();
-
-        //verifier mot de pass actuel
-        if (!passwordEncoder.matches(currentPassword, user.getPassword())) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Mot de passe actuel incorrect.");
+        // Optionnel : vérifier complexité du mot de passe
+        if (newPass.length() < 8) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("success", false, "message", "Le mot de passe doit contenir au moins 8 caractères."));
         }
 
-        //charger le nv mot de pass dans la table users
-        user.setPassword(passwordEncoder.encode(newPassword));
-        myAppUserRepository.save(user);
-        return ResponseEntity.ok("Mot de passe modifié.");
+        // Encoder et sauvegarder
+        user.setPassword(passwordEncoder.encode(newPass));
+        userService.repository.save(user);
+
+        return ResponseEntity.ok(Map.of("success", true, "message", "Mot de passe modifié avec succès."));
     }
 
 }

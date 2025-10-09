@@ -10,17 +10,15 @@ import org.springframework.security.core.userdetails.UserDetails;
 import jakarta.persistence.*;
 
 @Entity
-@Table(name = "users") // 🔹 correspond à ta table réelle
+@Table(name = "utilisateur")
 public class MyAppUser implements UserDetails {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id; // 🔹 SERIAL = Integer, pas Long
+    private Long id; 
     private String username;
     private String password;
-
     private String role;
-
     private String cin;
 
 

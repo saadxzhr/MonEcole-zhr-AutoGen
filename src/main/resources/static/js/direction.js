@@ -64,7 +64,7 @@ function loadContent(pageOrUrl) {
         trouverFiliere();
       }
       if (url.includes("changepass")) {
-        changerMotDePass();
+        changerMotDePasse();
       }
       if (url.includes("emplois")) {
         trouverEmploidt();

@@ -1,6 +1,7 @@
 package com.myschool.backend.Contoller;
 
 import java.security.Principal;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -15,25 +16,29 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.myschool.backend.DTO.FiliereDTO;
 import com.myschool.backend.Model.Employe;
+import com.myschool.backend.Model.Filiere;
 // import com.myschool.backend.Model.EtatDavancement;
 // import com.myschool.backend.Model.Filiere;
 import com.myschool.backend.Model.MyAppUser;
 import com.myschool.backend.Repository.EmployeRepository;
 // import com.myschool.backend.Repository.EtatDavancementRepository;
-// import com.myschool.backend.Repository.FiliereRepository;
+import com.myschool.backend.Repository.FiliereRepository;
 // import com.myschool.backend.Repository.MatiereRepository;
 import com.myschool.backend.Repository.MyAppUserRepository;
 // import com.myschool.backend.Service.CalculateProgress;
 import com.myschool.backend.Service.EmployeService;
 // import com.myschool.backend.Service.EtatDavancementService;
-// import com.myschool.backend.Service.FiliereService;
+import com.myschool.backend.Service.FiliereService;
 // import com.myschool.backend.Service.MatiereService;
 // import com.myschool.backend.Service.excelService;
 // import com.myschool.backend.Model.Matiere;
@@ -59,11 +64,11 @@ public class DirectionController {
     @Autowired
     private MyAppUserService myAppUserService;
 
-    // @Autowired
-    // private FiliereRepository filiereRepository;
+    @Autowired
+    private FiliereRepository filiereRepository;
 
-    // @Autowired
-    // private FiliereService filiereService;
+    @Autowired
+    private FiliereService filiereService;
 
     // @Autowired
     // private MatiereRepository matiereRepository;
@@ -150,54 +155,49 @@ public class DirectionController {
 
 
 
-    // //charger tout les filieres + charger les nom des formateurs
-    // @GetMapping("/req/filieres")
-    // public String getFilieres(Model model) {
-    //     List<Filiere> filieres = filiereRepository.findAll();
-    //     model.addAttribute("filieres", filieres);
-    //     model.addAttribute("formateurs", filiereService.getFormateurs());
-    //     model.addAttribute("niveaux", filiereRepository.getUniqueNiveau());
-    //     return "fragments/direction/filieres"; 
-    // }
-
-    // //ajouter une filiere
-    // @PostMapping("/req/filieres/save")
-    // @ResponseBody
-    // public ResponseEntity<?> saveFiliere(@RequestBody Filiere filiere) {
-    //     if (filiere.getId() != null) {
-    //         // Update mode
-    //         Optional<Filiere> existing = filiereRepository.findById(filiere.getId());
-    //         if (existing.isPresent()) {
-    //             Filiere existingFiliere = existing.get();
-    //             // Update all fields including code_filiere if you want to allow changing it
-    //             existingFiliere.setCode_filiere(filiere.getCode_filiere());
-    //             existingFiliere.setNom_filiere(filiere.getNom_filiere());
-    //             existingFiliere.setNiveau(filiere.getNiveau());
-    //             existingFiliere.setDuree_heures(filiere.getDuree_heures());
-    //             existingFiliere.setDescription(filiere.getDescription());
-    //             existingFiliere.setResponsable(filiere.getResponsable());
-
-    //             filiereRepository.save(existingFiliere);
-    //         } else {
-    //             return ResponseEntity.badRequest().body("Filiere not found for update");
-    //         }
-    //     } else {
-    //         // Create mode
-    //         filiereRepository.save(filiere);
-    //     }
-    //     return ResponseEntity.ok().build();
-    // }
+// Charger toutes les filières + formateurs + niveaux (DTO pour le front)
 
 
-    // //supprimer une filiere
-    // @DeleteMapping("/req/filieres/delete/{id}")
-    // @ResponseBody
-    // public ResponseEntity<?> deleteFiliere(@PathVariable("id") Long id) {
-    //     filiereRepository.deleteById(id);
-    //     return ResponseEntity.ok().build();
-    // }
+    public DirectionController(FiliereService filiereService) {
+            this.filiereService = filiereService;
+        }
 
+// Ajouter ou mettre à jour une filière (travaille directement avec Filiere)
+    @GetMapping("/req/filieres")
+    public String filieresPage(Model model) {
+        // Le fragment Thymeleaf
+        model.addAttribute("filieres", filiereService.getAllFilieres());
+        model.addAttribute("formateurs", filiereService.getFormateurs());
+        model.addAttribute("niveaux", filiereService.getUniqueNiveaux());
+        return "fragments/direction/filieres";
+    }
 
+    @PostMapping("/req/filieres/save")
+    @ResponseBody
+    public ResponseEntity<?> saveFiliere(@RequestBody Filiere filiere) {
+        try {
+            Filiere saved;
+            if (filiere.getId() != null) {
+                saved = filiereService.updateFiliere(filiere.getId(), filiere);
+            } else {
+                saved = filiereService.createFiliere(filiere);
+            }
+            return ResponseEntity.ok(saved);
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @DeleteMapping("/req/filieres/delete/{id}")
+    @ResponseBody
+    public ResponseEntity<?> deleteFiliere(@PathVariable Long id) {
+        try {
+            filiereService.deleteFiliere(id);
+            return ResponseEntity.ok(Map.of("message", "Filiere supprimée"));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
 
     // //////actions sur matiere
 

@@ -28,7 +28,7 @@ function loadContent(pageOrUrl) {
         .then(html => {
             document.getElementById("formateur-content").innerHTML = html;
             if (url.includes("changepass")) {
-                initChangePassScript(); //charger apres chargement de page
+                changerMotDePasse(); //charger apres chargement de page
             }
         })
         .catch(err => {
@@ -43,54 +43,57 @@ document.addEventListener("DOMContentLoaded", function () {
 
 
 // Charger mot de passe
-function initChangePassScript() {
-    const submitButton = document.getElementById("submit");
-    if (!submitButton) return;
+function changerMotDePasse() {
+  const submitBtn = document.getElementById("submit");
+  if (!submitBtn) return;
 
-    submitButton.addEventListener("click", () => {
-        const oldPassword = document.getElementById("password").value.trim();
-        const newPassword = document.getElementById("newpass").value.trim();
-        const confirmPassword = document.getElementById("newpassconf").value.trim();
+  submitBtn.addEventListener("click", async (e) => {
+    e.preventDefault();
 
-        const csrfToken = document.querySelector('meta[name="_csrf"]').content;
-        const csrfHeader = document.querySelector('meta[name="_csrf_header"]').content;
+    const oldPass = document.getElementById("password").value.trim();
+    const newPass = document.getElementById("newpass").value.trim();
+    const confirmPass = document.getElementById("newpassconf").value.trim();
 
-        if (!oldPassword || !newPassword || !confirmPassword) {
-            alert('Tous les champs sont obligatoires.');
-            return;
-        }
+    if (!oldPass || !newPass || !confirmPass) {
+      alert("Tous les champs sont obligatoires.");
+      return;
+    }
+    if (newPass !== confirmPass) {
+      alert("Les mots de passe ne correspondent pas.");
+      return;
+    }
 
-        if (newPassword !== confirmPassword) {
-            alert('Les nouveaux mots de passe ne correspondent pas.');
-            return;
-        }
+    const csrfToken = document.querySelector('meta[name="_csrf"]').content;
+    const csrfHeader = document.querySelector('meta[name="_csrf_header"]').content;
 
-        const data = {
-            password: oldPassword,
-            newpass: newPassword
-        };
+    submitBtn.disabled = true;
 
-        fetch('/req/changepass', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                [csrfHeader]: csrfToken,
-            },
-            body: JSON.stringify(data) //convert to string
-        })
-        .then(async response => {
-            if (!response.ok) {
-                const errorMessage = await response.text();
-                throw new Error(errorMessage);
-            }
-            console.log("Password changed successfully");
-            return response.json(); // or response.text() if your API returns text
-        })
-        .catch(error => {
-            // Catch and show backend error
-            alert("Erreur : " + error.message);
-        });
-    })
+    try {
+      const res = await fetch("/req/changepass", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          [csrfHeader]: csrfToken
+        },
+        body: JSON.stringify({ password: oldPass, newpass: newPass })
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        alert(data.message);
+        document.getElementById("password").value = "";
+        document.getElementById("newpass").value = "";
+        document.getElementById("newpassconf").value = "";
+      } else {
+        alert("Erreur : " + data.message);
+      }
+    } catch (err) {
+      alert("Erreur réseau : " + err);
+    } finally {
+      submitBtn.disabled = false;
+    }
+  });
 }
 
 

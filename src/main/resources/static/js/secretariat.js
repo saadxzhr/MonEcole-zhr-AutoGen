@@ -51,7 +51,7 @@ function loadContent(pageOrUrl) {
         setTimeout(() => createProgressCharts(), 150);
       }
       if (url.includes("changepass")) {
-        changerMotDePass();
+        changerMotDePasse();
       }
       if (url.includes("emplois")) {
         trouverEmploidt();

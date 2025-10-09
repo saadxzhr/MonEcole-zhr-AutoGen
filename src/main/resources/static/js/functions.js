@@ -1,66 +1,53 @@
 //Changer mot de pass
-function changerMotDePass() {
-  const submitButton = document.getElementById("submit");
-  if (!submitButton) return;
+function changerMotDePasse() {
+  const submitBtn = document.getElementById("submit");
+  if (!submitBtn) return;
 
-  // Remove existing listeners (in case fragment reloaded)
-  const newButton = submitButton.cloneNode(true);
-  submitButton.parentNode.replaceChild(newButton, submitButton);
-
-  newButton.addEventListener("click", async (e) => {
+  submitBtn.addEventListener("click", async (e) => {
     e.preventDefault();
 
-    const oldPassword = document.getElementById("password").value.trim();
-    const newPassword = document.getElementById("newpass").value.trim();
-    const confirmPassword = document.getElementById("newpassconf").value.trim();
+    const oldPass = document.getElementById("password").value.trim();
+    const newPass = document.getElementById("newpass").value.trim();
+    const confirmPass = document.getElementById("newpassconf").value.trim();
 
-    if (!oldPassword || !newPassword || !confirmPassword) {
+    if (!oldPass || !newPass || !confirmPass) {
       alert("Tous les champs sont obligatoires.");
       return;
     }
-
-    if (newPassword !== confirmPassword) {
-      alert("Les nouveaux mots de passe ne correspondent pas.");
+    if (newPass !== confirmPass) {
+      alert("Les mots de passe ne correspondent pas.");
       return;
     }
-
-    const data = {
-      password: oldPassword,
-      newpass: newPassword,
-    };
 
     const csrfToken = document.querySelector('meta[name="_csrf"]').content;
     const csrfHeader = document.querySelector('meta[name="_csrf_header"]').content;
 
-    // Disable button to prevent multiple clicks
-    newButton.disabled = true;
+    submitBtn.disabled = true;
 
     try {
-      const response = await fetch("/req/changepass", {
+      const res = await fetch("/req/changepass", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          [csrfHeader]: csrfToken,
+          [csrfHeader]: csrfToken
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify({ password: oldPass, newpass: newPass })
       });
 
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await res.json();
 
-      const result = await response.json(); // expecting JSON from server
-      if (result.success) {
-        alert("Mot de passe modifié avec succès !");
-        // Optionally, clear inputs
+      if (data.success) {
+        alert(data.message);
         document.getElementById("password").value = "";
         document.getElementById("newpass").value = "";
         document.getElementById("newpassconf").value = "";
       } else {
-        alert("Erreur: " + (result.message || "Impossible de changer le mot de passe."));
+        alert("Erreur : " + data.message);
       }
-    } catch (error) {
-      alert("Erreur réseau : " + error);
+    } catch (err) {
+      alert("Erreur réseau : " + err);
     } finally {
-      newButton.disabled = false;
+      submitBtn.disabled = false;
     }
   });
 }
@@ -484,33 +471,39 @@ function actionsEmploi() {
 function actionsFiliere() {
   const form = document.getElementById("filiereForm");
   const submitBtn = document.getElementById("submitBtn");
-  const modeField = form;
   const modal = document.getElementById("filiereModal");
   const closeBtn = document.querySelector(".close");
 
   const csrfToken = document.querySelector('meta[name="_csrf"]').content;
   const csrfHeader = document.querySelector('meta[name="_csrf_header"]').content;
-  
+
+  // === OUVERTURE DU MODAL ===
   document.getElementById("openModalBtn").addEventListener("click", () => {
     submitBtn.textContent = "Ajouter";
-    document.getElementById("filiereModal").style.display = "block";
-    document.querySelector(".modal-title").textContent = "Ajouter une filiere";
+    document.querySelector(".modal-title").textContent = "Ajouter une filière";
     form.reset();
     form.setAttribute("data-mode", "add");
     form.querySelector('[name="id"]').value = "";
     modal.style.display = "block";
   });
 
+  // === FERMETURE DU MODAL ===
   closeBtn.addEventListener("click", () => (modal.style.display = "none"));
 
-  // Form submission
-  document.getElementById("filiereForm").onsubmit = function (e) {
+  // === SOUMISSION DU FORMULAIRE ===
+  form.onsubmit = function (e) {
     e.preventDefault();
 
-    const formData = new FormData(this);
+    const formData = new FormData(form);
     const filiereObj = Object.fromEntries(formData.entries());
 
+    // Conversion du champ id
     filiereObj.id = filiereObj.id ? Number(filiereObj.id) : null;
+
+    // Conversion explicite du planningType pour l'enum
+    if (filiereObj.planninType) {
+      filiereObj.planninType = filiereObj.planninType.trim();
+    }
 
     fetch("/req/filieres/save", {
       method: "POST",
@@ -526,107 +519,110 @@ function actionsFiliere() {
       })
       .then(() => {
         modal.style.display = "none";
-
-        // Show confirmation alert based on mode
         const mode = form.getAttribute("data-mode");
         if (mode === "add") {
-          alert(`Filière "${filiereObj.nom_filiere}" ajoutée avec succès.`);
+          alert(`✅ Filière "${filiereObj.nomFiliere}" ajoutée avec succès.`);
         } else if (mode === "edit") {
-          alert(`Filière "${filiereObj.nom_filiere}" modifiée avec succès.`);
+          alert(`✏️ Filière "${filiereObj.nomFiliere}" modifiée avec succès.`);
         }
-
-        loadContent("filieres"); // reload table
+        loadContent("filieres");
       })
       .catch((err) => {
         console.error(err);
-        alert("Erreur lors de l'ajout.");
+        alert("❌ Erreur lors de l'enregistrement de la filière.");
       });
   };
 
-  //Modifier logique
+  // === MODIFIER FILIÈRE ===
   document.querySelectorAll(".modify-btn").forEach((btn) => {
     btn.addEventListener("click", (e) => {
       const row = e.target.closest("tr");
       const cells = row.querySelectorAll("td");
       const id = row.getAttribute("data-id");
-      document.querySelector(".modal-title").textContent = "Modifier filiere";
 
-      const code_filiere = cells[1].innerText.trim();
-      const nom_filiere = cells[2].innerText.trim();
-      const niveau = cells[3].innerText.trim();
-      const duree_heures = cells[4].innerText.trim();
-      const description = cells[5].innerText.trim();
-      const responsable = cells[6].innerText.trim(); // actual name
-
-      // Set fields
-
+      document.querySelector(".modal-title").textContent = "Modifier une filière";
       form.setAttribute("data-mode", "edit");
+
+      // Récupérer les valeurs de la ligne
+      const codeFiliere = cells[1].innerText.trim();
+      const nomFiliere = cells[2].innerText.trim();
+      const niveau = cells[3].innerText.trim();
+      const dureeHeures = cells[4].innerText.trim();
+      const description = cells[5].innerText.trim();
+      const responsableCin = cells[6]?.innerText.trim();
+      const planninType = cells[7]?.innerText.trim() || "Semaine";
+
+      // Remplir le formulaire
       form.querySelector('[name="id"]').value = id;
-      form.querySelector('[name="code_filiere"]').value = code_filiere;
-      form.querySelector('[name="nom_filiere"]').value = nom_filiere;
+      form.querySelector('[name="codeFiliere"]').value = codeFiliere;
+      form.querySelector('[name="nomFiliere"]').value = nomFiliere;
       form.querySelector('[name="niveau"]').value = niveau;
-      form.querySelector('[name="duree_heures"]').value = duree_heures;
+      form.querySelector('[name="dureeHeures"]').value = dureeHeures;
       form.querySelector('[name="description"]').value = description;
-      form.querySelector('[name="responsable"]').value = responsable;
+      form.querySelector('[name="responsableCin"]').value = responsableCin;
+      form.querySelector('[name="planninType"]').value = planninType;
 
       submitBtn.textContent = "Modifier";
       modal.style.display = "block";
     });
   });
 
-  //Supprimer logique
+  // === SUPPRIMER FILIÈRE ===
   document.querySelectorAll(".delete-btn").forEach((btn) => {
     btn.addEventListener("click", (e) => {
       const row = e.target.closest("tr");
       const id = row.getAttribute("data-id");
-      const nom_filiere = row.querySelectorAll("td")[2].innerText.trim();
+      const nomFiliere = row.querySelectorAll("td")[2].innerText.trim();
 
-      if (confirm(`Voulez-vous supprimer la filière ${nom_filiere} ?`)) {
+      if (confirm(`⚠️ Voulez-vous vraiment supprimer la filière "${nomFiliere}" ?`)) {
         fetch(`/req/filieres/delete/${id}`, {
           method: "DELETE",
-          headers: {
-              [csrfHeader]: csrfToken
-          }
+          headers: { [csrfHeader]: csrfToken },
         })
           .then((res) => {
             if (!res.ok) throw new Error("Erreur de suppression");
             return res;
           })
           .then(() => {
-            alert(`Filière "${nom_filiere}" supprimée avec succès.`);
-            loadContent("filieres"); // refresh after delete
+            alert(`🗑️ Filière "${nomFiliere}" supprimée avec succès.`);
+            loadContent("filieres");
           })
           .catch((err) => {
             console.error(err);
-            alert("Erreur lors de la suppression.");
+            alert("❌ Erreur lors de la suppression de la filière.");
           });
       }
     });
   });
 }
 
-//Trouver filiere by niveau
+// === FILTRER FILIÈRES PAR NIVEAU ===
 function trouverFiliere() {
   const niveauSelect = document.getElementById("filterNiveau");
   const rows = document.querySelectorAll("#filiereTable tbody tr");
 
   function filterRows() {
     const niveauValue = niveauSelect.value.toLowerCase();
-
     rows.forEach((row) => {
-      const cells = row.querySelectorAll("td");
-      const [, , , niveau, , ,] = Array.from(cells).map((td) =>
-        td.textContent.toLowerCase()
-      );
-
-      const matchNiveau = !niveauValue || niveau.includes(niveauValue);
-
-      row.style.display = matchNiveau ? "" : "none";
+      const niveau = row.querySelectorAll("td")[3].innerText.toLowerCase();
+      row.style.display = !niveauValue || niveau.includes(niveauValue) ? "" : "none";
     });
   }
 
   niveauSelect.addEventListener("change", filterRows);
 }
+
+
+
+
+// Charger les filières au démarrage
+
+
+
+
+
+
+
 
 //Actions sur table matiere
 function actionsMatiere() {
