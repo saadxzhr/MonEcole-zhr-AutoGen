@@ -1,30 +1,25 @@
 package com.myschool.backend.Mapper;
 
-import org.mapstruct.Mapper;
-import org.mapstruct.Mapping;
-import org.mapstruct.factory.Mappers;
-
+import org.mapstruct.*;
 import com.myschool.backend.DTO.ModulexDTO;
 import com.myschool.backend.Model.Modulex;
-
 
 
 @Mapper(componentModel = "spring")
 public interface ModulexMapper {
 
-    ModulexMapper INSTANCE = Mappers.getMapper(ModulexMapper.class);
-
     @Mapping(source = "filiere.codeFiliere", target = "codeFiliere")
     @Mapping(source = "filiere.nomFiliere", target = "nomFiliere")
     @Mapping(source = "coordonateur.cin", target = "coordonateurCin")
-    @Mapping(target = "coordonateurNomPrenom", expression = "java(modulex.getCoordonateur() != null ? modulex.getCoordonateur().getNom() + \" \" + modulex.getCoordonateur().getPrenom() : \"\")")  
+    @Mapping(target = "coordonateurNomPrenom",
+            expression = "java(modulex.getCoordonateur() != null ? modulex.getCoordonateur().getNom() + \" \" + modulex.getCoordonateur().getPrenom() : null)")
     ModulexDTO toDto(Modulex modulex);
 
-    // DTO -> Entity
     @Mapping(target = "filiere", ignore = true)
-    @Mapping(target = "coordonateur", ignore = true) // Will set in service
+    @Mapping(target = "coordonateur", ignore = true)
     Modulex toEntity(ModulexDTO dto);
 
+    @Mapping(target = "filiere", ignore = true)
+    @Mapping(target = "coordonateur", ignore = true)
+    void updateEntityFromDto(ModulexDTO dto, @MappingTarget Modulex entity);
 }
-
-

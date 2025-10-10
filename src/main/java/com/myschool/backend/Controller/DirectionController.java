@@ -195,67 +195,7 @@ public class DirectionController {
 
 
 
-
-
-    @Autowired
-    private ModulexService modulexService;
-
-
-    // ===================== Modulex MANAGEMENT =====================
-
-    // ---------------- THYMELEAF PAGE ----------------
-    @GetMapping("/req/modulex")
-    public String showModulexPage(Model model) {
-        List<ModulexDTO> modulexList = modulexService.getAllModules(); // returns DTOs
-        model.addAttribute("modulexList", modulexList);
-        return "fragments/direction/modulex :: content";
-    }
-
-
-
-    
-
-
-    // ---------------- JSON ENDPOINTS ----------------
-
-    // GET all modules
-    @GetMapping("/api/modulex")
-    @ResponseBody
-    public List<ModulexDTO> getAllModulexJson() {
-        return modulexService.getAllModules();
-    }
-
-    // GET one module
-    @GetMapping("/api/modulex/{id}")
-    @ResponseBody
-    public ModulexDTO getModulexByIdJson(@PathVariable Long id) {
-        return modulexService.getModuleById(id);
-    }
-
-    // CREATE module
-    @PostMapping("/api/modulex")
-    @ResponseBody
-    public ModulexDTO createModulexJson(@RequestBody ModulexDTO dto) {
-        Filiere filiere = filiereService.getByCode(dto.getCodeFiliere());
-        return modulexService.createModule(dto, filiere);
-    }
-
-    // UPDATE module
-    @PutMapping("/api/modulex/{id}")
-    @ResponseBody
-    public ModulexDTO updateModulexJson(@PathVariable Long id, @RequestBody ModulexDTO dto) {
-        Filiere filiere = filiereService.getByCode(dto.getCodeFiliere());
-        return modulexService.updateModule(id, dto, filiere);
-    }
-
-    // DELETE module
-    @DeleteMapping("/api/modulex/{id}")
-    @ResponseBody
-    public Map<String, String> deleteModulexJson(@PathVariable Long id) {
-        modulexService.deleteModule(id);
-        return Map.of("message", "Modulex deleted successfully");
-    }
-
+ 
 
 
 

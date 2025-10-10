@@ -16,5 +16,6 @@ public interface FiliereRepository extends JpaRepository<Filiere, Long> {
     List<String> getUniqueNiveau();
 
     Optional<Filiere> findByCodeFiliere(String codeFiliere);
+    
 
 }

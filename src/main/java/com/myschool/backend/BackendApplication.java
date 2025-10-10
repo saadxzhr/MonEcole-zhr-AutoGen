@@ -30,7 +30,7 @@ public class BackendApplication {
 
 
 //git add .
-//git commit -m "Filiere almost Done, when update responsableCin not loaded"
+//git commit -m "Module half done - read"
 //git push
 
 

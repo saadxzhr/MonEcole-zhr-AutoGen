@@ -609,93 +609,319 @@ function trouverFiliere() {
 
 
 
+
 function actionModulex() {
-    const form = document.getElementById("modulexForm");
-    const submitBtn = document.getElementById("submitBtn");
-    const modal = document.getElementById("modulexModal");
-    const closeBtn = modal.querySelector(".close");
+  const tableBody = document.querySelector("#modulexTable tbody");
+  const form = document.getElementById("modulexForm");
+  const submitBtn = document.getElementById("submitBtn");
+  const modal = document.getElementById("modulexModal");
+  const closeBtn = modal.querySelector(".close");
+  const paginationContainer = document.getElementById("modulexPagination");
 
-    const csrfToken = document.querySelector('meta[name="_csrf"]').content;
-    const csrfHeader = document.querySelector('meta[name="_csrf_header"]').content;
+  const csrfToken = document.querySelector('meta[name="_csrf"]')?.content || "";
+  const csrfHeader = document.querySelector('meta[name="_csrf_header"]')?.content || "X-CSRF-TOKEN";
 
-    // Open modal
-    document.getElementById("openModalBtn").addEventListener("click", () => {
-        form.reset();
-        form.setAttribute("data-mode", "add");
-        submitBtn.textContent = "Ajouter";
-        modal.style.display = "block";
+  let currentPage = 0;
+  const pageSize = 50;
+  let totalPages = 1;
+
+  // escape to avoid XSS
+  function escapeHtml(s) {
+    if (s === null || s === undefined) return "";
+    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  // ---------- render table rows using DocumentFragment ----------
+  function renderModuleTable(modules) {
+    const frag = document.createDocumentFragment();
+    modules.forEach(m => {
+      const tr = document.createElement("tr");
+
+      // store all useful values on dataset for reliable edit
+      tr.dataset.id = m.id ?? "";
+      tr.dataset.codeModule = m.codeModule ?? "";
+      tr.dataset.nomModule = m.nomModule ?? "";
+      tr.dataset.description = m.description ?? "";
+      tr.dataset.nombreHeures = m.nombreHeures ?? "";
+      tr.dataset.coefficient = m.coefficient ?? "";
+      tr.dataset.codeFiliere = m.codeFiliere ?? "";
+      tr.dataset.nomFiliere = m.nomFiliere ?? "";
+      tr.dataset.departementDattache = m.departementDattache ?? "";
+      tr.dataset.coordonateurCin = m.coordonateurCin ?? "";
+      tr.dataset.coordonateurNomPrenom = m.coordonateurNomPrenom ?? "";
+      tr.dataset.optionModule = m.optionModule ?? "";
+      tr.dataset.semestre = m.semestre ?? "";
+
+      tr.innerHTML = `
+        <td class="text-nowrap">
+          <button type="button" class="btn btn-mod btn-sm modify-btn">Modifier</button>
+          <button type="button" class="btn btn-danger btn-sm delete-btn">Supprimer</button>
+        </td>
+        <td>${escapeHtml(m.codeModule)}</td>
+        <td>${escapeHtml(m.nomModule)}</td>
+        <td>${escapeHtml(m.description ?? "")}</td>
+        <td>${escapeHtml(m.nombreHeures ?? "")}</td>
+        <td>${escapeHtml(m.coefficient ?? "")}</td>
+        <td>${escapeHtml(m.codeFiliere ?? "")} - ${escapeHtml(m.nomFiliere ?? "")}</td>
+        <td>${escapeHtml(m.departementDattache ?? "")}</td>
+        <td data-cin="${escapeHtml(m.coordonateurCin ?? "")}">${escapeHtml(m.coordonateurNomPrenom ?? "")}</td>
+        <td>${escapeHtml(m.optionModule ?? "")}</td>
+        <td>${escapeHtml(m.semestre ?? "")}</td>
+      `;
+
+      frag.appendChild(tr);
     });
 
-    // Close modal
-    closeBtn.addEventListener("click", () => modal.style.display = "none");
+    // single DOM update
+    tableBody.innerHTML = "";
+    tableBody.appendChild(frag);
+  }
 
-    // Submit form
-    form.onsubmit = async function(e) {
-        e.preventDefault();
-        const data = Object.fromEntries(new FormData(form).entries());
-        data.id = data.id ? Number(data.id) : null;
-        data.nombreHeures = Number(data.nombreHeures);
-        data.coefficient = Number(data.coefficient);
+  // ---------- pagination UI ----------
+  function renderPagination() {
+    if (!paginationContainer) return;
+    paginationContainer.innerHTML = "";
 
-        try {
-            const res = await fetch("/req/modulex/save", {
-                method: "POST",
-                headers: { "Content-Type": "application/json", [csrfHeader]: csrfToken },
-                body: JSON.stringify(data)
-            });
-            if (!res.ok) throw new Error("Erreur");
-            modal.style.display = "none";
-            alert(`${form.getAttribute("data-mode") === "add" ? "Module ajouté" : "Module modifié"}`);
-            loadContent("modulex");
-        } catch(err) {
-            console.error(err);
-            alert("Erreur lors de l'enregistrement");
-        }
+    // small UX: don't render pagination if only 1 page
+    if (totalPages <= 1) return;
+
+    const nav = document.createElement("nav");
+    const ul = document.createElement("ul");
+    ul.className = "pagination";
+
+    const makePageItem = (label, page, disabled = false, active = false) => {
+      const li = document.createElement("li");
+      li.className = "page-item" + (disabled ? " disabled" : "") + (active ? " active" : "");
+      const a = document.createElement("a");
+      a.className = "page-link";
+      a.href = "#";
+      a.dataset.page = page;
+      a.textContent = label;
+      li.appendChild(a);
+      return li;
     };
 
-    // Modify / Delete buttons
-    document.querySelectorAll(".modify-btn").forEach(btn => btn.addEventListener("click", e => {
-        const row = e.target.closest("tr");
-        const module = {
-            id: row.getAttribute("data-id"),
-            codeModule: row.cells[1].innerText,
-            nomModule: row.cells[2].innerText,
-            description: row.cells[3].innerText,
-            nombreHeures: row.cells[4].innerText,
-            coefficient: row.cells[5].innerText,
-            filiereCode: row.cells[6].innerText,
-            departementDattache: row.cells[7].innerText,
-            coordonateur: row.cells[8].innerText,
-            optionModule: row.cells[9].innerText,
-            semestre: row.cells[10].innerText,
-            
-        };
-        form.setAttribute("data-mode", "edit");
-        submitBtn.textContent = "Modifier";
-        modal.style.display = "block";
-        Object.keys(module).forEach(key => {
-            const input = form.querySelector(`[name="${key}"]`);
-            if(input) input.value = module[key];
-        });
-    }));
+    // Prev
+    ul.appendChild(makePageItem("«", Math.max(0, currentPage - 1), currentPage === 0));
 
-    document.querySelectorAll(".delete-btn").forEach(btn => btn.addEventListener("click", async e => {
-        const id = e.target.closest("tr").getAttribute("data-id");
-        if(!confirm("Supprimer ce module ?")) return;
-        try {
-            const res = await fetch(`/req/modulex/delete/${id}`, {
-                method: "DELETE",
-                headers: { [csrfHeader]: csrfToken }
-            });
-            if(!res.ok) throw new Error("Erreur");
-            alert("Module supprimé");
-            loadContent("modulex");
-        } catch(err) {
-            console.error(err);
-            alert("Erreur lors de la suppression");
-        }
-    }));
+    // Simple numeric pages: show a window around current page
+    const windowSize = 5;
+    const start = Math.max(0, currentPage - Math.floor(windowSize / 2));
+    const end = Math.min(totalPages - 1, start + windowSize - 1);
+
+    for (let p = start; p <= end; p++) {
+      ul.appendChild(makePageItem(String(p + 1), p, false, p === currentPage));
+    }
+
+    // Next
+    ul.appendChild(makePageItem("»", Math.min(totalPages - 1, currentPage + 1), currentPage === totalPages - 1));
+
+    nav.appendChild(ul);
+    paginationContainer.appendChild(nav);
+
+    // delegation for clicks
+    paginationContainer.querySelectorAll(".page-link").forEach(a => {
+      a.addEventListener("click", (ev) => {
+        ev.preventDefault();
+        const p = Number(a.dataset.page);
+        if (!isNaN(p) && p !== currentPage) loadTable(p);
+      });
+    });
+  }
+
+  // ---------- load table (supports Page<T> or List<T>) ----------
+  async function loadTable(page = 0) {
+    currentPage = page;
+
+    const filiere = (document.getElementById("filterFiliere")?.value || "").trim();
+    const coord = (document.getElementById("filterCoord")?.value || "").trim();
+    const depart = (document.getElementById("filterDepart")?.value || "").trim();
+
+    const params = new URLSearchParams();
+    params.set("page", String(currentPage));
+    params.set("size", String(pageSize));
+    if (filiere) params.set("filiereCode", filiere);
+    if (coord) params.set("coordonateurCin", coord);
+    if (depart) params.set("departement", depart);
+
+    const res = await fetch("/req/modulex/api?" + params.toString(), { method: "GET" });
+    if (!res.ok) {
+      console.error("Failed to load modules", res.status);
+      alert("Erreur lors du chargement des modules");
+      return;
+    }
+
+    const incoming = await res.json();
+
+    // Support both shapes:
+    // - Spring Page => { content: [...], totalPages, totalElements, ... }
+    // - plain List => [...]
+    let modules;
+    if (Array.isArray(incoming)) {
+      modules = incoming;
+      totalPages = 1;
+    } else if (incoming && incoming.content && Array.isArray(incoming.content)) {
+      modules = incoming.content;
+      totalPages = Number(incoming.totalPages ?? 1);
+    } else {
+      // fallback - handle when repository returns List but inside object
+      modules = incoming;
+      totalPages = 1;
+    }
+
+    renderModuleTable(modules);
+    renderPagination();
+  }
+
+  // ---------- event delegation for edit/delete ----------
+  tableBody.addEventListener("click", async (ev) => {
+    const btn = ev.target.closest("button");
+    if (!btn) return;
+
+    // EDIT
+    if (btn.classList.contains("modify-btn")) {
+      const tr = btn.closest("tr");
+      if (!tr) return;
+      form.setAttribute("data-mode", "edit");
+      submitBtn.textContent = "Modifier";
+
+      // set id + each input field found in dataset
+      form.querySelector('[name="id"]').value = tr.dataset.id || "";
+
+      // list of DTO/form fields to fill
+      const fields = [
+        "codeModule","nomModule","description","nombreHeures","coefficient",
+        "codeFiliere","departementDattache","coordonateurCin","optionModule","semestre"
+      ];
+
+      fields.forEach(k => {
+        const input = form.querySelector(`[name="${k}"]`);
+        if (!input) return;
+        // dataset uses camelCase keys
+        input.value = tr.dataset[k] ?? "";
+      });
+
+      modal.style.display = "block";
+      return;
+    }
+
+    // DELETE
+    if (btn.classList.contains("delete-btn")) {
+      const tr = btn.closest("tr");
+      if (!tr) return;
+      const id = tr.dataset.id;
+      if (!id) return alert("ID introuvable pour la suppression.");
+      if (!confirm("Voulez-vous vraiment supprimer ce module ?")) return;
+
+      try {
+        const r = await fetch(`/req/modulex/api/${id}`, {
+          method: "DELETE",
+          headers: { [csrfHeader]: csrfToken }
+        });
+        if (!r.ok) throw new Error("Delete failed " + r.status);
+        // reload current page (if last item on page removed, keep same page — server will return empty and pagination update)
+        await loadTable(currentPage);
+      } catch (err) {
+        console.error(err);
+        alert("Erreur lors de la suppression");
+      }
+      return;
+    }
+  });
+
+  // ---------- open modal (add) & close ----------
+  document.getElementById("openModalBtn")?.addEventListener("click", () => {
+    form.reset();
+    form.setAttribute("data-mode", "add");
+    submitBtn.textContent = "Ajouter";
+    modal.style.display = "block";
+  });
+
+  closeBtn?.addEventListener("click", () => modal.style.display = "none");
+
+  // ---------- submit form (create/update) ----------
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    // collect form data explicitly to avoid accidental extra fields
+    const payload = {
+      id: form.querySelector('[name="id"]').value || null,
+      codeModule: form.querySelector('[name="codeModule"]').value.trim(),
+      nomModule: form.querySelector('[name="nomModule"]').value.trim(),
+      description: form.querySelector('[name="description"]').value.trim(),
+      nombreHeures: Number(form.querySelector('[name="nombreHeures"]').value || null),
+      coefficient: Number(form.querySelector('[name="coefficient"]').value || null),
+      departementDattache: form.querySelector('[name="departementDattache"]').value.trim(),
+      semestre: form.querySelector('[name="semestre"]').value.trim(),
+      optionModule: form.querySelector('[name="optionModule"]').value.trim(),
+      codeFiliere: form.querySelector('[name="codeFiliere"]').value,
+      coordonateurCin: form.querySelector('[name="coordonateurCin"]').value
+    };
+
+    const mode = form.getAttribute("data-mode") || "add";
+    const method = mode === "add" ? "POST" : "PUT";
+    const url = mode === "add" ? "/req/modulex/api" : `/req/modulex/api/${payload.id}`;
+
+    try {
+      const res = await fetch(url, {
+        method,
+        headers: {
+          "Content-Type": "application/json",
+          [csrfHeader]: csrfToken
+        },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) {
+        const txt = await res.text().catch(()=>null);
+        console.error("Save failed", res.status, txt);
+        throw new Error("Erreur lors de l'enregistrement");
+      }
+      modal.style.display = "none";
+      // reload current page (if update changed ordering, you might want to reset to page 0)
+      await loadTable(currentPage);
+    } catch (err) {
+      console.error(err);
+      alert(err.message || "Erreur lors de l'enregistrement");
+    }
+  });
+
+  // ---------- debounced filters ----------
+  function debounce(fn, wait = 300) {
+    let t;
+    return (...args) => {
+      clearTimeout(t);
+      t = setTimeout(() => fn(...args), wait);
+    };
+  }
+  const debouncedReload = debounce(() => loadTable(0), 250);
+
+  const elF = document.getElementById("filterFiliere");
+  const elC = document.getElementById("filterCoord");
+  const elD = document.getElementById("filterDepart");
+
+  elF?.addEventListener("change", debouncedReload);
+  elC?.addEventListener("change", debouncedReload);
+  elD?.addEventListener("input", debouncedReload);
+
+  // initial load
+  loadTable(0);
 }
+
+
+
+
+
+// auto-init
+document.addEventListener("DOMContentLoaded", () => {
+  try { actionModulex(); } catch (e) { console.error(e); }
+});
+
+
+
+
+
+
+
 
 
 

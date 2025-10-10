@@ -77,8 +77,8 @@ public class FiliereService {
     }
 
     public Filiere getByCode(String codeFiliere) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'getByCode'");
+        return filiereRepository.findByCodeFiliere(codeFiliere)
+                .orElseThrow(() -> new RuntimeException("Filiere not found: " + codeFiliere));
     }
 
     

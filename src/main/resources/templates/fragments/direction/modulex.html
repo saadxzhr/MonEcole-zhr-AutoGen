@@ -2,20 +2,30 @@
   <fieldset>
     <legend>Modulex</legend>
 
-    <!-- Bouton d'ajout -->
-    <div class="mb-3 row gx-2 gy-2 align-items-center">
+    <!-- Filters -->
+    <div class="row mb-2">
       <div class="col-md">
-        <button id="openModalBtn" class="btn btn-primary mb-0">
-          Ajouter Module
-        </button>
+        <select id="filterFiliere" class="form-select">
+          <option value="">Toutes les filieres</option>
+          <option th:each="f : ${filieres}" th:value="${f.codeFiliere}" th:text="${f.nomFiliere}"></option>
+        </select>
+      </div>
+      <div class="col-md">
+        <select id="filterCoord" class="form-select">
+          <option value="">Tous les coordonateurs</option>
+          <option th:each="e : ${employes}" th:value="${e.cin}" th:text="${e.nom + ' ' + e.prenom}"></option>
+        </select>
+      </div>
+      <div class="col-md">
+        <input id="filterDepart" type="text" class="form-control" placeholder="Département">
       </div>
     </div>
 
-    <!-- Tableau des modules -->
-    <div th:if="${#lists.isEmpty(modulexList)}">
-      <p>Aucun module</p>
+    <div class="mb-3">
+      <button id="openModalBtn" class="btn btn-primary">Ajouter Module</button>
     </div>
-    <div th:if="${!#lists.isEmpty(modulexList)}" class="scrollable">
+
+    <div class="scrollable" id="modulexTableContainer">
       <table id="modulexTable" class="table table-striped table-hover">
         <thead>
           <tr>
@@ -28,118 +38,44 @@
             <th>Filiere</th>
             <th>Département</th>
             <th>Coordonateur</th>
-            <th>Option Filiere</th>
+            <th>Option</th>
             <th>Semestre</th>
-            
           </tr>
         </thead>
-        <tbody>
-            <tr th:each="module : ${modulexList}" th:attr="data-id=${module.id}">
-                <td>
-                    <button class="btn btn-mod btn-sm modify-btn">Modifier</button>
-                    <button class="btn btn-danger btn-sm delete-btn">
-                    Supprimer
-                    </button>
-                </td>
-                <td th:text="${module.codeModule}"></td>
-                <td th:text="${module.nomModule}"></td>
-                <td th:text="${module.description}"></td>
-                <td th:text="${module.nombreHeures}"></td>
-                <td th:text="${module.coefficient}"></td>
-                <td th:text="${module.codeFiliere} + ' - ' + ${module.nomFiliere}"></td>
-                <td th:text="${module.departementDattache}"></td>
-                <td th:text="${module.coordonateurNomPrenom}"></td>
-                <td th:text="${module.optionModule}"></td>
-                <td th:text="${module.semestre}"></td>                
-            </tr>
-        </tbody>
+        <tbody></tbody>
       </table>
     </div>
+    <!-- Add this right after the table (or table container) -->
+    <nav id="modulexPagination" class="mt-2" aria-label="Modulex pagination"></nav>
 
-    <!-- Modal ajout/modification -->
-    <div id="modulexModal" class="modal" style="display: none">
+    <!-- Modal skeleton -->
+    <div id="modulexModal" class="modal" style="display:none">
       <div class="modal-content">
         <div class="modal-header">
-          <h4 class="modal-title">Ajouter un module</h4>
-          <span class="close" style="cursor: pointer">&times;</span>
+          <h4 class="modal-title">Ajouter/Modifier Module</h4>
+          <span class="close" style="cursor:pointer">&times;</span>
         </div>
         <form id="modulexForm" data-mode="add">
-          <input type="hidden" name="id" />
-
-          <div class="mb-2">
-            <label>Code Module:</label>
-            <input
-              type="text"
-              name="codeModule"
-              class="form-control"
-              required />
-          </div>
-
-          <div class="mb-2">
-            <label>Nom Module:</label>
-            <input type="text" name="nomModule" class="form-control" required />
-          </div>
-
-          <div class="mb-2">
-            <label>Filiere:</label>
+          <input type="hidden" name="id"/>
+          <div><label>Code Module:</label><input type="text" name="codeModule" class="form-control" required/></div>
+          <div><label>Nom Module:</label><input type="text" name="nomModule" class="form-control" required/></div>
+          <div><label>Filiere:</label>
             <select name="codeFiliere" class="form-select">
-              <option
-                th:each="f : ${filieres}"
-                th:value="${f.codeFiliere}"
-                th:text="${f.nomFiliere}"></option>
+              <option th:each="f : ${filieres}" th:value="${f.codeFiliere}" th:text="${f.nomFiliere}"></option>
             </select>
           </div>
-
-          <div class="mb-2">
-            <label>Coordonateur:</label>
-            <select name="coordonateur" class="form-select">
-              <option
-                th:each="e : ${employes}"
-                th:value="${e.cin}"
-                th:text="${e.nom + ' ' + e.prenom}"></option>
+          <div><label>Coordonateur:</label>
+            <select name="coordonateurCin" class="form-select">
+              <option th:each="e : ${employes}" th:value="${e.cin}" th:text="${e.nom + ' ' + e.prenom}"></option>
             </select>
           </div>
-
-          <div class="mb-2">
-            <label>Description:</label>
-            <input type="text" name="description" class="form-control" />
-          </div>
-
-          <div class="mb-2">
-            <label>Nombre Heures:</label>
-            <input type="number" name="nombreHeures" class="form-control" />
-          </div>
-
-          <div class="mb-2">
-            <label>Coefficient:</label>
-            <input
-              type="number"
-              step="0.01"
-              name="coefficient"
-              class="form-control" />
-          </div>
-
-          <div class="mb-2">
-            <label>Département:</label>
-            <input
-              type="text"
-              name="departementdattache"
-              class="form-control" />
-          </div>
-
-          <div class="mb-2">
-            <label>Semestre:</label>
-            <input type="number" name="semestre" class="form-control" />
-          </div>
-
-          <div class="mb-2">
-            <label>Option:</label>
-            <input type="text" name="optionModule" class="form-control" />
-          </div>
-
-          <button type="submit" class="btn btn-success mt-2" id="submitBtn">
-            Enregistrer
-          </button>
+          <div><label>Description:</label><input type="text" name="description" class="form-control"/></div>
+          <div><label>Nombre Heures:</label><input type="number" name="nombreHeures" class="form-control"/></div>
+          <div><label>Coefficient:</label><input type="number" step="0.01" name="coefficient" class="form-control"/></div>
+          <div><label>Département:</label><input type="text" name="departementDattache" class="form-control"/></div>
+          <div><label>Semestre:</label><input type="number" name="semestre" class="form-control"/></div>
+          <div><label>Option:</label><input type="text" name="optionModule" class="form-control"/></div>
+          <button type="submit" class="btn btn-success mt-2" id="submitBtn">Enregistrer</button>
         </form>
       </div>
     </div>
