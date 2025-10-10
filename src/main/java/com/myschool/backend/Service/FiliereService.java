@@ -7,7 +7,7 @@ import org.springframework.stereotype.Service;
 
 import com.myschool.backend.DTO.FiliereDTO;
 import com.myschool.backend.Model.Filiere;
-import com.myschool.backend.Projection.FormateurProjection;
+import com.myschool.backend.Projection.EmployeProjection;
 import com.myschool.backend.Repository.EmployeRepository;
 import com.myschool.backend.Repository.FiliereRepository;
 
@@ -68,11 +68,18 @@ public class FiliereService {
         filiereRepository.deleteById(id);
     }
 
-    public List<FormateurProjection> getFormateurs() {
-        return employeRepository.findAllFormateurs();
+    public List<EmployeProjection> getEmployesProjection() {
+        return employeRepository.findAllEmployes();
     }
 
     public List<String> getUniqueNiveaux() {
         return filiereRepository.getUniqueNiveau();
     }
+
+    public Filiere getByCode(String codeFiliere) {
+        // TODO Auto-generated method stub
+        throw new UnsupportedOperationException("Unimplemented method 'getByCode'");
+    }
+
+    
 }

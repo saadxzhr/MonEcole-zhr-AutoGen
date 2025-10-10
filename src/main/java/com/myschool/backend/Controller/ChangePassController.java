@@ -1,8 +1,8 @@
-package com.myschool.backend.Contoller;
+package com.myschool.backend.Controller;
 
 import java.security.Principal;
 import java.util.Map;
-import java.util.Optional;
+
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.myschool.backend.Model.MyAppUser;
-import com.myschool.backend.Repository.MyAppUserRepository;
+
 import com.myschool.backend.Service.MyAppUserService;
 
 @RestController

@@ -91,7 +91,7 @@
           <div class="mb-2">
             <label>Responsable:</label>
             <select name="responsableCin" class="form-select">
-              <option th:each="f : ${formateurs}" th:value="${f.cin}" th:text="${f.nom + ' ' + f.prenom}"></option>
+              <option th:each="e : ${employes}" th:value="${e.cin}" th:text="${e.nom + ' ' + e.prenom}"></option>
             </select>
           </div>
 

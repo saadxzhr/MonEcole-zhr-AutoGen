@@ -1,20 +1,26 @@
-package com.myschool.backend.Contoller;
+package com.myschool.backend.Controller;
 
 import java.security.Principal;
+import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -25,28 +31,27 @@ import org.springframework.web.multipart.MultipartFile;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.myschool.backend.DTO.FiliereDTO;
+import com.myschool.backend.DTO.ModulexDTO;
 import com.myschool.backend.Model.Employe;
 import com.myschool.backend.Model.Filiere;
-// import com.myschool.backend.Model.EtatDavancement;
-// import com.myschool.backend.Model.Filiere;
+
 import com.myschool.backend.Model.MyAppUser;
+import com.myschool.backend.Projection.EmployeProjection;
+// import com.myschool.backend.Projection.ModulexProjection;
 import com.myschool.backend.Repository.EmployeRepository;
-// import com.myschool.backend.Repository.EtatDavancementRepository;
 import com.myschool.backend.Repository.FiliereRepository;
-// import com.myschool.backend.Repository.MatiereRepository;
 import com.myschool.backend.Repository.MyAppUserRepository;
-// import com.myschool.backend.Service.CalculateProgress;
 import com.myschool.backend.Service.EmployeService;
-// import com.myschool.backend.Service.EtatDavancementService;
 import com.myschool.backend.Service.FiliereService;
-// import com.myschool.backend.Service.MatiereService;
-// import com.myschool.backend.Service.excelService;
-// import com.myschool.backend.Model.Matiere;
-// import com.myschool.backend.Service.excelService;
+import com.myschool.backend.Service.ModulexService;
+
 import com.myschool.backend.Service.MyAppUserService;
+
+import lombok.RequiredArgsConstructor;
 
 
 @Controller
+@RequiredArgsConstructor
 public class DirectionController {
     
     // @Autowired
@@ -64,26 +69,17 @@ public class DirectionController {
     @Autowired
     private MyAppUserService myAppUserService;
 
-    @Autowired
-    private FiliereRepository filiereRepository;
 
     @Autowired
     private FiliereService filiereService;
-
-    // @Autowired
-    // private MatiereRepository matiereRepository;
-
-    // @Autowired
-    // private MatiereService matiereService;
+    
 
     @Autowired
     private EmployeRepository employeRepository;
 
     @Autowired
     private EmployeService employeService;
-
-    @Autowired
-    private PasswordEncoder passwordEncoder;
+    
 
     // @Autowired
     // private CalculateProgress CalculateProgress;
@@ -158,16 +154,14 @@ public class DirectionController {
 // Charger toutes les filières + formateurs + niveaux (DTO pour le front)
 
 
-    public DirectionController(FiliereService filiereService) {
-            this.filiereService = filiereService;
-        }
+
 
 // Ajouter ou mettre à jour une filière (travaille directement avec Filiere)
     @GetMapping("/req/filieres")
     public String filieresPage(Model model) {
         // Le fragment Thymeleaf
         model.addAttribute("filieres", filiereService.getAllFilieres());
-        model.addAttribute("formateurs", filiereService.getFormateurs());
+        model.addAttribute("employes", filiereService.getEmployesProjection());
         model.addAttribute("niveaux", filiereService.getUniqueNiveaux());
         return "fragments/direction/filieres";
     }
@@ -199,58 +193,74 @@ public class DirectionController {
         }
     }
 
-    // //////actions sur matiere
 
 
 
-    // //charger tout les filieres + charger les nom des formateurs
-    // @GetMapping("/req/matieres")
-    // public String getmatieres(Model model) {
-    //     List<Matiere> matieres = matiereRepository.findAll();
-    //     model.addAttribute("matieres", matieres);
-    //     model.addAttribute("filieres", matiereService.getFilieres());
-    //     return "fragments/direction/matieres"; 
-    // }
- 
-    // //ajouter une matiere
-    // @PostMapping("/req/matieres/save")
-    // @ResponseBody
-    // public ResponseEntity<?> saveMatiere(@RequestBody Matiere matiere) {
-    //     if (matiere.getId()!= null) {
-    //         // Update mode
-    //         Optional<Matiere> existing = matiereRepository.findById(matiere.getId());
-    //         if (existing.isPresent()) {
-    //             Matiere existingMatiere = existing.get();
-    //             // Update all fields including code_filiere if you want to allow changing it
-    //             existingMatiere.setCode_matiere(matiere.getCode_matiere());
-    //             existingMatiere.setNom_matiere(matiere.getNom_matiere());
-    //             existingMatiere.setDescription(matiere.getDescription());
-    //             existingMatiere.setNombre_heures(matiere.getNombre_heures());
-    //             existingMatiere.setCoefficient(matiere.getCoefficient());
-    //             existingMatiere.setCode_filiere(matiere.getCode_filiere());
 
-    //             matiereRepository.save(existingMatiere);
-    //         } else {
-    //             return ResponseEntity.badRequest().body("Filiere not found for update");
-    //         }
-    //     } else {
-    //         // Create mode
-    //         matiereRepository.save(matiere);
-    //     }
-    //     return ResponseEntity.ok().build();
-    // }
+    @Autowired
+    private ModulexService modulexService;
 
 
-    // //supprimer une filiere
-    // @DeleteMapping("/req/matieres/delete/{id}")
-    // @ResponseBody
-    // public ResponseEntity<?> deleteMatiere(@PathVariable("id") Long id) {
-    //     matiereRepository.deleteById(id);
-    //     return ResponseEntity.ok().build();
-    // }
+    // ===================== Modulex MANAGEMENT =====================
+
+    // ---------------- THYMELEAF PAGE ----------------
+    @GetMapping("/req/modulex")
+    public String showModulexPage(Model model) {
+        List<ModulexDTO> modulexList = modulexService.getAllModules(); // returns DTOs
+        model.addAttribute("modulexList", modulexList);
+        return "fragments/direction/modulex :: content";
+    }
 
 
-    //////actions sur matiere
+
+    
+
+
+    // ---------------- JSON ENDPOINTS ----------------
+
+    // GET all modules
+    @GetMapping("/api/modulex")
+    @ResponseBody
+    public List<ModulexDTO> getAllModulexJson() {
+        return modulexService.getAllModules();
+    }
+
+    // GET one module
+    @GetMapping("/api/modulex/{id}")
+    @ResponseBody
+    public ModulexDTO getModulexByIdJson(@PathVariable Long id) {
+        return modulexService.getModuleById(id);
+    }
+
+    // CREATE module
+    @PostMapping("/api/modulex")
+    @ResponseBody
+    public ModulexDTO createModulexJson(@RequestBody ModulexDTO dto) {
+        Filiere filiere = filiereService.getByCode(dto.getCodeFiliere());
+        return modulexService.createModule(dto, filiere);
+    }
+
+    // UPDATE module
+    @PutMapping("/api/modulex/{id}")
+    @ResponseBody
+    public ModulexDTO updateModulexJson(@PathVariable Long id, @RequestBody ModulexDTO dto) {
+        Filiere filiere = filiereService.getByCode(dto.getCodeFiliere());
+        return modulexService.updateModule(id, dto, filiere);
+    }
+
+    // DELETE module
+    @DeleteMapping("/api/modulex/{id}")
+    @ResponseBody
+    public Map<String, String> deleteModulexJson(@PathVariable Long id) {
+        modulexService.deleteModule(id);
+        return Map.of("message", "Modulex deleted successfully");
+    }
+
+
+
+
+
+    
   
     //charger tout les employes
     @GetMapping("/req/employes")

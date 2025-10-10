@@ -1,4 +1,4 @@
-package com.myschool.backend.Contoller;
+package com.myschool.backend.Controller;
 
 
 

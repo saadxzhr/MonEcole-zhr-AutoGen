@@ -1,6 +1,6 @@
 package com.myschool.backend.Projection;
 
-public interface FormateurProjection {
+public interface EmployeProjection {
 
     String getCin();
     String getNom();

@@ -468,132 +468,127 @@ function actionsEmploi() {
 }
 
 //Actions sur table filiere
-function actionsFiliere() {
+function actionFiliere() {
   const form = document.getElementById("filiereForm");
   const submitBtn = document.getElementById("submitBtn");
   const modal = document.getElementById("filiereModal");
-  const closeBtn = document.querySelector(".close");
+  const closeBtn = modal.querySelector(".close");
 
   const csrfToken = document.querySelector('meta[name="_csrf"]').content;
   const csrfHeader = document.querySelector('meta[name="_csrf_header"]').content;
 
-  // === OUVERTURE DU MODAL ===
+  // Ouvrir le modal pour ajout
   document.getElementById("openModalBtn").addEventListener("click", () => {
-    submitBtn.textContent = "Ajouter";
-    document.querySelector(".modal-title").textContent = "Ajouter une filière";
     form.reset();
     form.setAttribute("data-mode", "add");
-    form.querySelector('[name="id"]').value = "";
+    submitBtn.textContent = "Ajouter";
     modal.style.display = "block";
   });
 
-  // === FERMETURE DU MODAL ===
+  // Fermer le modal
   closeBtn.addEventListener("click", () => (modal.style.display = "none"));
 
-  // === SOUMISSION DU FORMULAIRE ===
-  form.onsubmit = function (e) {
+  // Soumission du formulaire
+  form.onsubmit = async function (e) {
     e.preventDefault();
-
     const formData = new FormData(form);
     const filiereObj = Object.fromEntries(formData.entries());
-
-    // Conversion du champ id
     filiereObj.id = filiereObj.id ? Number(filiereObj.id) : null;
+    filiereObj.dureeHeures = Number(filiereObj.dureeHeures);
+    filiereObj.actif = filiereObj.actif === "on" || filiereObj.actif === true;
 
-    // Conversion explicite du planningType pour l'enum
-    if (filiereObj.planninType) {
-      filiereObj.planninType = filiereObj.planninType.trim();
-    }
-
-    fetch("/req/filieres/save", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        [csrfHeader]: csrfToken,
-      },
-      body: JSON.stringify(filiereObj),
-    })
-      .then((res) => {
-        if (!res.ok) throw new Error("Erreur d'enregistrement");
-        return res;
-      })
-      .then(() => {
-        modal.style.display = "none";
-        const mode = form.getAttribute("data-mode");
-        if (mode === "add") {
-          alert(`✅ Filière "${filiereObj.nomFiliere}" ajoutée avec succès.`);
-        } else if (mode === "edit") {
-          alert(`✏️ Filière "${filiereObj.nomFiliere}" modifiée avec succès.`);
-        }
-        loadContent("filieres");
-      })
-      .catch((err) => {
-        console.error(err);
-        alert("❌ Erreur lors de l'enregistrement de la filière.");
+    try {
+      const res = await fetch("/req/filieres/save", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          [csrfHeader]: csrfToken,
+        },
+        body: JSON.stringify(filiereObj),
       });
+      if (!res.ok) throw new Error("Erreur lors de l'enregistrement");
+      modal.style.display = "none";
+
+      alert(
+        form.getAttribute("data-mode") === "add"
+          ? `Filière "${filiereObj.nomFiliere}" ajoutée.`
+          : `Filière "${filiereObj.nomFiliere}" modifiée.`
+      );
+      loadContent("filieres");
+    } catch (err) {
+      console.error(err);
+      alert("Erreur lors de l'enregistrement.");
+    }
   };
 
-  // === MODIFIER FILIÈRE ===
-  document.querySelectorAll(".modify-btn").forEach((btn) => {
+  // Modifier
+  document.querySelectorAll(".modify-btn").forEach((btn) =>
     btn.addEventListener("click", (e) => {
       const row = e.target.closest("tr");
-      const cells = row.querySelectorAll("td");
-      const id = row.getAttribute("data-id");
+      const filiere = {
+        id: row.getAttribute("data-id"),
+        codeFiliere: row.cells[1].innerText.trim(),
+        nomFiliere: row.cells[2].innerText.trim(),
+        niveau: row.cells[3].innerText.trim(),
+        dureeHeures: row.cells[4].innerText.trim(),
+        description: row.cells[5].innerText.trim(),
+        responsableCin: row.querySelector("td[data-cin]").getAttribute("data-cin"),
+        planninType: row.cells[7].innerText.trim(),
+        actif: row.cells[8].innerText.trim() === "true",
+      };
 
-      document.querySelector(".modal-title").textContent = "Modifier une filière";
       form.setAttribute("data-mode", "edit");
-
-      // Récupérer les valeurs de la ligne
-      const codeFiliere = cells[1].innerText.trim();
-      const nomFiliere = cells[2].innerText.trim();
-      const niveau = cells[3].innerText.trim();
-      const dureeHeures = cells[4].innerText.trim();
-      const description = cells[5].innerText.trim();
-      const responsableCin = cells[6]?.innerText.trim();
-      const planninType = cells[7]?.innerText.trim() || "Semaine";
-
-      // Remplir le formulaire
-      form.querySelector('[name="id"]').value = id;
-      form.querySelector('[name="codeFiliere"]').value = codeFiliere;
-      form.querySelector('[name="nomFiliere"]').value = nomFiliere;
-      form.querySelector('[name="niveau"]').value = niveau;
-      form.querySelector('[name="dureeHeures"]').value = dureeHeures;
-      form.querySelector('[name="description"]').value = description;
-      form.querySelector('[name="responsableCin"]').value = responsableCin;
-      form.querySelector('[name="planninType"]').value = planninType;
-
       submitBtn.textContent = "Modifier";
       modal.style.display = "block";
-    });
-  });
 
-  // === SUPPRIMER FILIÈRE ===
-  document.querySelectorAll(".delete-btn").forEach((btn) => {
-    btn.addEventListener("click", (e) => {
+      Object.keys(filiere).forEach((key) => {
+        const input = form.querySelector(`[name="${key}"]`);
+        if (input) {
+          if (input.type === "checkbox") {
+            input.checked = filiere[key];
+          } else {
+            input.value = filiere[key];
+          }
+        }
+      });
+    })
+  );
+
+  // Supprimer
+  document.querySelectorAll(".delete-btn").forEach((btn) =>
+    btn.addEventListener("click", async (e) => {
       const row = e.target.closest("tr");
       const id = row.getAttribute("data-id");
-      const nomFiliere = row.querySelectorAll("td")[2].innerText.trim();
+      const nomFiliere = row.cells[2].innerText.trim();
 
-      if (confirm(`⚠️ Voulez-vous vraiment supprimer la filière "${nomFiliere}" ?`)) {
-        fetch(`/req/filieres/delete/${id}`, {
+      if (!confirm(`Voulez-vous supprimer la filière "${nomFiliere}" ?`)) return;
+
+      try {
+        const res = await fetch(`/req/filieres/delete/${id}`, {
           method: "DELETE",
           headers: { [csrfHeader]: csrfToken },
-        })
-          .then((res) => {
-            if (!res.ok) throw new Error("Erreur de suppression");
-            return res;
-          })
-          .then(() => {
-            alert(`🗑️ Filière "${nomFiliere}" supprimée avec succès.`);
-            loadContent("filieres");
-          })
-          .catch((err) => {
-            console.error(err);
-            alert("❌ Erreur lors de la suppression de la filière.");
-          });
+        });
+        if (!res.ok) throw new Error("Erreur lors de la suppression");
+        alert(`Filière "${nomFiliere}" supprimée.`);
+        loadContent("filieres");
+      } catch (err) {
+        console.error(err);
+        alert("Erreur lors de la suppression.");
       }
+    })
+  );
+
+  // Filtrer par niveau
+  const niveauSelect = document.getElementById("filterNiveau");
+  if (niveauSelect) {
+    niveauSelect.addEventListener("change", () => {
+      const val = niveauSelect.value.toLowerCase();
+      document.querySelectorAll("#filiereTable tbody tr").forEach((row) => {
+        const niveau = row.cells[3].innerText.toLowerCase();
+        row.style.display = !val || niveau.includes(val) ? "" : "none";
+      });
     });
-  });
+  }
 }
 
 // === FILTRER FILIÈRES PAR NIVEAU ===
@@ -611,6 +606,99 @@ function trouverFiliere() {
 
   niveauSelect.addEventListener("change", filterRows);
 }
+
+
+
+function actionModulex() {
+    const form = document.getElementById("modulexForm");
+    const submitBtn = document.getElementById("submitBtn");
+    const modal = document.getElementById("modulexModal");
+    const closeBtn = modal.querySelector(".close");
+
+    const csrfToken = document.querySelector('meta[name="_csrf"]').content;
+    const csrfHeader = document.querySelector('meta[name="_csrf_header"]').content;
+
+    // Open modal
+    document.getElementById("openModalBtn").addEventListener("click", () => {
+        form.reset();
+        form.setAttribute("data-mode", "add");
+        submitBtn.textContent = "Ajouter";
+        modal.style.display = "block";
+    });
+
+    // Close modal
+    closeBtn.addEventListener("click", () => modal.style.display = "none");
+
+    // Submit form
+    form.onsubmit = async function(e) {
+        e.preventDefault();
+        const data = Object.fromEntries(new FormData(form).entries());
+        data.id = data.id ? Number(data.id) : null;
+        data.nombreHeures = Number(data.nombreHeures);
+        data.coefficient = Number(data.coefficient);
+
+        try {
+            const res = await fetch("/req/modulex/save", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", [csrfHeader]: csrfToken },
+                body: JSON.stringify(data)
+            });
+            if (!res.ok) throw new Error("Erreur");
+            modal.style.display = "none";
+            alert(`${form.getAttribute("data-mode") === "add" ? "Module ajouté" : "Module modifié"}`);
+            loadContent("modulex");
+        } catch(err) {
+            console.error(err);
+            alert("Erreur lors de l'enregistrement");
+        }
+    };
+
+    // Modify / Delete buttons
+    document.querySelectorAll(".modify-btn").forEach(btn => btn.addEventListener("click", e => {
+        const row = e.target.closest("tr");
+        const module = {
+            id: row.getAttribute("data-id"),
+            codeModule: row.cells[1].innerText,
+            nomModule: row.cells[2].innerText,
+            description: row.cells[3].innerText,
+            nombreHeures: row.cells[4].innerText,
+            coefficient: row.cells[5].innerText,
+            filiereCode: row.cells[6].innerText,
+            departementDattache: row.cells[7].innerText,
+            coordonateur: row.cells[8].innerText,
+            optionModule: row.cells[9].innerText,
+            semestre: row.cells[10].innerText,
+            
+        };
+        form.setAttribute("data-mode", "edit");
+        submitBtn.textContent = "Modifier";
+        modal.style.display = "block";
+        Object.keys(module).forEach(key => {
+            const input = form.querySelector(`[name="${key}"]`);
+            if(input) input.value = module[key];
+        });
+    }));
+
+    document.querySelectorAll(".delete-btn").forEach(btn => btn.addEventListener("click", async e => {
+        const id = e.target.closest("tr").getAttribute("data-id");
+        if(!confirm("Supprimer ce module ?")) return;
+        try {
+            const res = await fetch(`/req/modulex/delete/${id}`, {
+                method: "DELETE",
+                headers: { [csrfHeader]: csrfToken }
+            });
+            if(!res.ok) throw new Error("Erreur");
+            alert("Module supprimé");
+            loadContent("modulex");
+        } catch(err) {
+            console.error(err);
+            alert("Erreur lors de la suppression");
+        }
+    }));
+}
+
+
+
 
 
 

@@ -1,4 +1,4 @@
-package com.myschool.backend.Contoller;
+package com.myschool.backend.Controller;
 
 import java.security.Principal;
 import java.util.List;

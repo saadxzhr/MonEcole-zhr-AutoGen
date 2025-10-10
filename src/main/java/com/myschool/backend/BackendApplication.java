@@ -14,17 +14,24 @@ public class BackendApplication {
 }	
 
 // Crée la table en SQL dans Flyway (Vx__table_module.sql).
-
 // Crée l’entité correspondante.
-
 // Crée le repository + service.
-
 // Crée le DTO si nécessaire (colonnes provenant d’autres tables).
-
 // Crée les endpoints REST pour CRUD.
-
 // JS/Thymeleaf pour afficher et gérer les formulaires.
 
+
+// ✅ Entities (JPA classiques)
+// ✅ Record DTOs (Java 17+)
+// ✅ MapStruct (mapping auto)
+// ✅ Services (logique métier)
+// ✅ Controllers (REST + Thymeleaf)
+
+
+
 //git add .
-//git commit -m "Employe et utilisateurs done"
+//git commit -m "Filiere almost Done, when update responsableCin not loaded"
 //git push
+
+
+

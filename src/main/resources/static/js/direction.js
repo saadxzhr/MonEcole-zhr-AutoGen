@@ -7,6 +7,7 @@ function loadContent(pageOrUrl) {
     filieres: "/req/filieres",
     matieres: "/req/matieres",
     employes: "/req/employes",
+    modulex: "/req/modulex",
     users: "/req/users",
     accueildirection: "/req/accueildirection",
   };
@@ -60,8 +61,11 @@ function loadContent(pageOrUrl) {
         trouverMatiere();
       }
       if (url.includes("filieres")) {
-        actionsFiliere();
+        actionFiliere();
         trouverFiliere();
+      }
+      if (url.includes("modulex")) {
+        actionModulex();
       }
       if (url.includes("changepass")) {
         changerMotDePasse();

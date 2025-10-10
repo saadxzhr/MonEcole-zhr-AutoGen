@@ -1,6 +1,6 @@
 
 
-package com.myschool.backend.Contoller;
+package com.myschool.backend.Controller;
 
 // import com.myschool.backend.Model.EmploiDuTemps;
 
