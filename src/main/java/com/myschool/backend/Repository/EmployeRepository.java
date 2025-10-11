@@ -17,6 +17,8 @@ public interface EmployeRepository extends JpaRepository<Employe, Long> {
     @Query("SELECT e.cin AS cin, e.nom AS nom, e.prenom AS prenom FROM Employe e")
     List<EmployeProjection> findAllEmployes();
 
+    
+
 
     @Query("SELECT DISTINCT e.role FROM Employe e")
     List<String> getUniqueRole();

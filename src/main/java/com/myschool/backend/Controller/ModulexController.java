@@ -77,6 +77,7 @@ public class ModulexController {
                 .toList();
     }
 
+
     @GetMapping("/api/departements")
     @ResponseBody
     public List<String> departements() {

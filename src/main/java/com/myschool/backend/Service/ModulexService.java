@@ -87,5 +87,5 @@ public class ModulexService {
     public List<String> getDistinctDepartements() {
         return modulexRepository.findDistinctDepartements();
     }
-    
+ 
 }

@@ -36,5 +36,5 @@ CREATE TABLE IF NOT EXISTS modulex (
   optionmodule VARCHAR(100),
   codefiliere VARCHAR(50),
   CONSTRAINT fk_modulex_filiere FOREIGN KEY (codefiliere) REFERENCES filiere(codefiliere),
-  CONSTRAINT fk_modulex_filiere FOREIGN KEY (coordonateur) REFERENCES employe(cin)
+  CONSTRAINT fk_modulex_employe FOREIGN KEY (coordonateur) REFERENCES employe(cin)
 );

@@ -640,7 +640,7 @@ async function actionModulex() {
       sel.innerHTML = "";
       const def = document.createElement("option");
       def.value = "";
-      def.textContent = sel.id === "filterDepart" ? "Tous les départements" : (sel.id === "filterCoord" ? "Tous les coordonateurs" : "Toutes les filières");
+      def.textContent = sel.id === "filterDepart" ? "Tous les départements" : sel.id === "filterCoordx" ? "Tous les coordonateurs" : (sel.id === "filterCoord" ? "Tous les coordonateurs" : "Toutes les filières");
       sel.appendChild(def);
       options.forEach(o => {
         const opt = document.createElement("option");
@@ -658,7 +658,6 @@ async function actionModulex() {
 
     const deptOptions = departements.map(d => ({code: d, label: d}));
     fillSelect(filterDepart, deptOptions, "code", "label");
-    fillSelect(document.querySelector('select[name="departementDattache"]'), deptOptions, "code", "label");
   }
 
   async function loadPage(reset = false) {
@@ -696,7 +695,7 @@ async function actionModulex() {
           <td>${m.nombreHeures ?? ""}</td>
           <td>${m.coefficient ?? ""}</td>
           <td>${escapeHtml(m.codeFiliere ?? "")} - ${escapeHtml(m.nomFiliere ?? "")}</td>
-          <td>${escapeHtml(m.departementDattache ?? "")}</td>
+          <td>${escapeHtml(m.departementDattache)}</td>
           <td>${escapeHtml(m.coordonateurNomPrenom ?? "")}</td>
           <td>${escapeHtml(m.optionModule ?? "")}</td>
           <td>${escapeHtml(m.semestre ?? "")}</td>
@@ -771,7 +770,7 @@ async function actionModulex() {
         });
         if (res.ok) {
           await loadPage(true);
-          showAlert("Erreur réseau lors de l'enregistrement", "error");
+          alert("Module supprimé avec succès!");
         } else {
           alert("Erreur lors de la suppression");
         }

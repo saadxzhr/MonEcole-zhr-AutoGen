@@ -50,9 +50,9 @@ public interface ModulexRepository extends JpaRepository<Modulex, Long> {
     @Query("SELECT DISTINCT m.departementDattache FROM Modulex m WHERE m.departementDattache IS NOT NULL")
     java.util.List<String> findDistinctDepartements();
 
+    
 
     
+    
 }
-
-
 
