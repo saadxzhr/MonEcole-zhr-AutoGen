@@ -609,303 +609,282 @@ function trouverFiliere() {
 
 
 
-
-function actionModulex() {
-  const tableBody = document.querySelector("#modulexTable tbody");
+async function actionModulex() {
+  const container = document.getElementById("modulexTableContainer");
+  const tbody = document.querySelector("#modulexTable tbody");
   const form = document.getElementById("modulexForm");
-  const submitBtn = document.getElementById("submitBtn");
   const modal = document.getElementById("modulexModal");
+  const submitBtn = document.getElementById("submitBtn");
+  const openBtn = document.getElementById("openModalBtn");
   const closeBtn = modal.querySelector(".close");
-  const paginationContainer = document.getElementById("modulexPagination");
+  const csrfToken = document.querySelector('meta[name="_csrf"]').content;
+  const csrfHeader = document.querySelector('meta[name="_csrf_header"]').content;
 
-  const csrfToken = document.querySelector('meta[name="_csrf"]')?.content || "";
-  const csrfHeader = document.querySelector('meta[name="_csrf_header"]')?.content || "X-CSRF-TOKEN";
+  const filterFiliere = document.getElementById("filterFiliere");
+  const filterCoord = document.getElementById("filterCoord");
+  const filterDepart = document.getElementById("filterDepart");
 
-  let currentPage = 0;
-  const pageSize = 50;
-  let totalPages = 1;
+  let page = 0;
+  const size = 30;
+  let last = false;
+  let loading = false;
 
-  // escape to avoid XSS
-  function escapeHtml(s) {
-    if (s === null || s === undefined) return "";
-    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  }
+  async function loadSelects() {
+    const [filieres, employes, departements] = await Promise.all([
+      fetch("/req/modulex/api/filieres").then(r => r.json()),
+      fetch("/req/modulex/api/employes").then(r => r.json()),
+      fetch("/req/modulex/api/departements").then(r => r.json())
+    ]);
 
-  // ---------- render table rows using DocumentFragment ----------
-  function renderModuleTable(modules) {
-    const frag = document.createDocumentFragment();
-    modules.forEach(m => {
-      const tr = document.createElement("tr");
-
-      // store all useful values on dataset for reliable edit
-      tr.dataset.id = m.id ?? "";
-      tr.dataset.codeModule = m.codeModule ?? "";
-      tr.dataset.nomModule = m.nomModule ?? "";
-      tr.dataset.description = m.description ?? "";
-      tr.dataset.nombreHeures = m.nombreHeures ?? "";
-      tr.dataset.coefficient = m.coefficient ?? "";
-      tr.dataset.codeFiliere = m.codeFiliere ?? "";
-      tr.dataset.nomFiliere = m.nomFiliere ?? "";
-      tr.dataset.departementDattache = m.departementDattache ?? "";
-      tr.dataset.coordonateurCin = m.coordonateurCin ?? "";
-      tr.dataset.coordonateurNomPrenom = m.coordonateurNomPrenom ?? "";
-      tr.dataset.optionModule = m.optionModule ?? "";
-      tr.dataset.semestre = m.semestre ?? "";
-
-      tr.innerHTML = `
-        <td class="text-nowrap">
-          <button type="button" class="btn btn-mod btn-sm modify-btn">Modifier</button>
-          <button type="button" class="btn btn-danger btn-sm delete-btn">Supprimer</button>
-        </td>
-        <td>${escapeHtml(m.codeModule)}</td>
-        <td>${escapeHtml(m.nomModule)}</td>
-        <td>${escapeHtml(m.description ?? "")}</td>
-        <td>${escapeHtml(m.nombreHeures ?? "")}</td>
-        <td>${escapeHtml(m.coefficient ?? "")}</td>
-        <td>${escapeHtml(m.codeFiliere ?? "")} - ${escapeHtml(m.nomFiliere ?? "")}</td>
-        <td>${escapeHtml(m.departementDattache ?? "")}</td>
-        <td data-cin="${escapeHtml(m.coordonateurCin ?? "")}">${escapeHtml(m.coordonateurNomPrenom ?? "")}</td>
-        <td>${escapeHtml(m.optionModule ?? "")}</td>
-        <td>${escapeHtml(m.semestre ?? "")}</td>
-      `;
-
-      frag.appendChild(tr);
-    });
-
-    // single DOM update
-    tableBody.innerHTML = "";
-    tableBody.appendChild(frag);
-  }
-
-  // ---------- pagination UI ----------
-  function renderPagination() {
-    if (!paginationContainer) return;
-    paginationContainer.innerHTML = "";
-
-    // small UX: don't render pagination if only 1 page
-    if (totalPages <= 1) return;
-
-    const nav = document.createElement("nav");
-    const ul = document.createElement("ul");
-    ul.className = "pagination";
-
-    const makePageItem = (label, page, disabled = false, active = false) => {
-      const li = document.createElement("li");
-      li.className = "page-item" + (disabled ? " disabled" : "") + (active ? " active" : "");
-      const a = document.createElement("a");
-      a.className = "page-link";
-      a.href = "#";
-      a.dataset.page = page;
-      a.textContent = label;
-      li.appendChild(a);
-      return li;
+    const fillSelect = (sel, options, valueKey = "code", labelKey = "label") => {
+      sel.innerHTML = "";
+      const def = document.createElement("option");
+      def.value = "";
+      def.textContent = sel.id === "filterDepart" ? "Tous les départements" : (sel.id === "filterCoord" ? "Tous les coordonateurs" : "Toutes les filières");
+      sel.appendChild(def);
+      options.forEach(o => {
+        const opt = document.createElement("option");
+        opt.value = o[valueKey];
+        opt.textContent = o[labelKey];
+        sel.appendChild(opt);
+      });
     };
 
-    // Prev
-    ul.appendChild(makePageItem("«", Math.max(0, currentPage - 1), currentPage === 0));
+    fillSelect(filterFiliere, filieres, "code", "label");
+    fillSelect(document.querySelector('select[name="codeFiliere"]'), filieres, "code", "label");
 
-    // Simple numeric pages: show a window around current page
-    const windowSize = 5;
-    const start = Math.max(0, currentPage - Math.floor(windowSize / 2));
-    const end = Math.min(totalPages - 1, start + windowSize - 1);
+    fillSelect(filterCoord, employes, "cin", "label");
+    fillSelect(document.querySelector('select[name="coordonateurCin"]'), employes, "cin", "label");
 
-    for (let p = start; p <= end; p++) {
-      ul.appendChild(makePageItem(String(p + 1), p, false, p === currentPage));
-    }
-
-    // Next
-    ul.appendChild(makePageItem("»", Math.min(totalPages - 1, currentPage + 1), currentPage === totalPages - 1));
-
-    nav.appendChild(ul);
-    paginationContainer.appendChild(nav);
-
-    // delegation for clicks
-    paginationContainer.querySelectorAll(".page-link").forEach(a => {
-      a.addEventListener("click", (ev) => {
-        ev.preventDefault();
-        const p = Number(a.dataset.page);
-        if (!isNaN(p) && p !== currentPage) loadTable(p);
-      });
-    });
+    const deptOptions = departements.map(d => ({code: d, label: d}));
+    fillSelect(filterDepart, deptOptions, "code", "label");
+    fillSelect(document.querySelector('select[name="departementDattache"]'), deptOptions, "code", "label");
   }
 
-  // ---------- load table (supports Page<T> or List<T>) ----------
-  async function loadTable(page = 0) {
-    currentPage = page;
-
-    const filiere = (document.getElementById("filterFiliere")?.value || "").trim();
-    const coord = (document.getElementById("filterCoord")?.value || "").trim();
-    const depart = (document.getElementById("filterDepart")?.value || "").trim();
+  async function loadPage(reset = false) {
+    if (loading) return;
+    if (reset) {
+      page = 0;
+      last = false;
+      tbody.innerHTML = "";
+    }
+    if (last) return;
+    loading = true;
 
     const params = new URLSearchParams();
-    params.set("page", String(currentPage));
-    params.set("size", String(pageSize));
-    if (filiere) params.set("filiereCode", filiere);
-    if (coord) params.set("coordonateurCin", coord);
-    if (depart) params.set("departement", depart);
+    if (filterFiliere.value) params.append("filiereCode", filterFiliere.value);
+    if (filterCoord.value) params.append("coordonateurCin", filterCoord.value);
+    if (filterDepart.value) params.append("departement", filterDepart.value);
+    params.append("page", page);
+    params.append("size", size);
 
-    const res = await fetch("/req/modulex/api?" + params.toString(), { method: "GET" });
-    if (!res.ok) {
-      console.error("Failed to load modules", res.status);
-      alert("Erreur lors du chargement des modules");
-      return;
-    }
-
-    const incoming = await res.json();
-
-    // Support both shapes:
-    // - Spring Page => { content: [...], totalPages, totalElements, ... }
-    // - plain List => [...]
-    let modules;
-    if (Array.isArray(incoming)) {
-      modules = incoming;
-      totalPages = 1;
-    } else if (incoming && incoming.content && Array.isArray(incoming.content)) {
-      modules = incoming.content;
-      totalPages = Number(incoming.totalPages ?? 1);
-    } else {
-      // fallback - handle when repository returns List but inside object
-      modules = incoming;
-      totalPages = 1;
-    }
-
-    renderModuleTable(modules);
-    renderPagination();
-  }
-
-  // ---------- event delegation for edit/delete ----------
-  tableBody.addEventListener("click", async (ev) => {
-    const btn = ev.target.closest("button");
-    if (!btn) return;
-
-    // EDIT
-    if (btn.classList.contains("modify-btn")) {
-      const tr = btn.closest("tr");
-      if (!tr) return;
-      form.setAttribute("data-mode", "edit");
-      submitBtn.textContent = "Modifier";
-
-      // set id + each input field found in dataset
-      form.querySelector('[name="id"]').value = tr.dataset.id || "";
-
-      // list of DTO/form fields to fill
-      const fields = [
-        "codeModule","nomModule","description","nombreHeures","coefficient",
-        "codeFiliere","departementDattache","coordonateurCin","optionModule","semestre"
-      ];
-
-      fields.forEach(k => {
-        const input = form.querySelector(`[name="${k}"]`);
-        if (!input) return;
-        // dataset uses camelCase keys
-        input.value = tr.dataset[k] ?? "";
+    try {
+      const res = await fetch("/req/modulex/api?" + params.toString());
+      if (!res.ok) throw new Error("Load failed");
+      const data = await res.json();
+      data.content.forEach(m => {
+        const tr = document.createElement("tr");
+        tr.dataset.id = m.id;
+        tr.innerHTML = `
+          <td>
+            <button class="btn btn-mod btn-sm modify-btn">Modifier</button>
+            <button class="btn btn-danger btn-sm delete-btn">Supprimer</button>
+          </td>
+          <td>${escapeHtml(m.codeModule)}</td>
+          <td>${escapeHtml(m.nomModule)}</td>
+          <td>${escapeHtml(m.description ?? "")}</td>
+          <td>${m.nombreHeures ?? ""}</td>
+          <td>${m.coefficient ?? ""}</td>
+          <td>${escapeHtml(m.codeFiliere ?? "")} - ${escapeHtml(m.nomFiliere ?? "")}</td>
+          <td>${escapeHtml(m.departementDattache ?? "")}</td>
+          <td>${escapeHtml(m.coordonateurNomPrenom ?? "")}</td>
+          <td>${escapeHtml(m.optionModule ?? "")}</td>
+          <td>${escapeHtml(m.semestre ?? "")}</td>
+        `;
+        tbody.appendChild(tr);
       });
 
-      modal.style.display = "block";
-      return;
+      attachButtons();
+
+      last = data.last;
+      page = data.number + 1;
+    } catch (err) {
+      console.error(err);
+      alert("Erreur de chargement");
+    } finally {
+      loading = false;
     }
+  }
 
-    // DELETE
-    if (btn.classList.contains("delete-btn")) {
-      const tr = btn.closest("tr");
-      if (!tr) return;
-      const id = tr.dataset.id;
-      if (!id) return alert("ID introuvable pour la suppression.");
-      if (!confirm("Voulez-vous vraiment supprimer ce module ?")) return;
+  function attachButtons() {
+    tbody.querySelectorAll(".modify-btn").forEach(btn => {
+      btn.onclick = () => {
+        const row = btn.closest("tr");
+        const cells = row.querySelectorAll("td");
+        const codeModule = cells[1].innerText.trim();
+        const nomModule = cells[2].innerText.trim();
+        const description = cells[3].innerText.trim();
+        const nombreHeures = cells[4].innerText.trim();
+        const coefficient = cells[5].innerText.trim();
+        const filiereText = cells[6].innerText.trim();
+        const depart = cells[7].innerText.trim();
+        const coordName = cells[8].innerText.trim();
+        const option = cells[9].innerText.trim();
+        const semestre = cells[10].innerText.trim();
 
-      try {
-        const r = await fetch(`/req/modulex/api/${id}`, {
+        form.setAttribute("data-mode", "edit");
+        form.querySelector('[name="id"]').value = row.dataset.id;
+        form.querySelector('[name="codeModule"]').value = codeModule;
+        form.querySelector('[name="nomModule"]').value = nomModule;
+        form.querySelector('[name="description"]').value = description;
+        form.querySelector('[name="nombreHeures"]').value = nombreHeures;
+        form.querySelector('[name="coefficient"]').value = coefficient;
+        form.querySelector('[name="departementDattache"]').value = depart;
+        form.querySelector('[name="optionModule"]').value = option;
+        form.querySelector('[name="semestre"]').value = semestre;
+
+        const codeF = filiereText.split(" - ")[0] || "";
+        const selF = form.querySelector('[name="codeFiliere"]');
+        if (selF) selF.value = codeF;
+
+        const selC = form.querySelector('[name="coordonateurCin"]');
+        if (selC) {
+          for (const opt of selC.options) {
+            if (opt.text === coordName || opt.text.trim() === coordName) {
+              selC.value = opt.value; break;
+            }
+          }
+        }
+
+        submitBtn.textContent = "Modifier";
+        modal.style.display = "block";
+      };
+    });
+
+    tbody.querySelectorAll(".delete-btn").forEach(btn => {
+      btn.onclick = async () => {
+        const id = btn.closest("tr").dataset.id;
+        if (!confirm("Supprimer ce module ?")) return;
+        const res = await fetch("/req/modulex/api/" + id, {
           method: "DELETE",
           headers: { [csrfHeader]: csrfToken }
         });
-        if (!r.ok) throw new Error("Delete failed " + r.status);
-        // reload current page (if last item on page removed, keep same page — server will return empty and pagination update)
-        await loadTable(currentPage);
-      } catch (err) {
-        console.error(err);
-        alert("Erreur lors de la suppression");
-      }
-      return;
-    }
-  });
+        if (res.ok) {
+          await loadPage(true);
+          showAlert("Erreur réseau lors de l'enregistrement", "error");
+        } else {
+          alert("Erreur lors de la suppression");
+        }
+      };
+    });
+  }
 
-  // ---------- open modal (add) & close ----------
-  document.getElementById("openModalBtn")?.addEventListener("click", () => {
+  form.onsubmit = async e => {
+      e.preventDefault();
+      const formData = Object.fromEntries(new FormData(form).entries());
+      const mode = form.getAttribute("data-mode") || "add";
+
+      const payload = {
+          codeModule: formData.codeModule,
+          nomModule: formData.nomModule,
+          description: formData.description,
+          nombreHeures: formData.nombreHeures ? Number(formData.nombreHeures) : null,
+          coefficient: formData.coefficient ? parseFloat(formData.coefficient) : null,
+          departementDattache: formData.departementDattache,
+          optionModule: formData.optionModule,
+          semestre: formData.semestre,
+          codeFiliere: formData.codeFiliere,
+          coordonateurCin: formData.coordonateurCin
+      };
+
+      if (mode === "edit") {
+          payload.id = formData.id ? Number(formData.id) : null;
+      }
+
+      const url = mode === "add" ? "/req/modulex/api" : "/req/modulex/api/" + payload.id;
+      const method = mode === "add" ? "POST" : "PUT";
+
+      try {
+          const res = await fetch(url, {
+              method,
+              headers: { "Content-Type": "application/json", [csrfHeader]: csrfToken },
+              body: JSON.stringify(payload)
+          });
+
+          if (res.ok) {
+              modal.style.display = "none";
+              await loadPage(true);
+
+              showAlert(mode === "add" ? "Module ajouté avec succès !" : "Module modifié avec succès !", "success");
+          } else {
+              const txt = await res.text();
+              showAlert("Erreur lors de l'enregistrement: " + txt, "error");
+          }
+      } catch (err) {
+          console.error(err);
+          showAlert("Erreur réseau lors de l'enregistrement", "error");
+      }
+  };
+
+  // --- Alert helper ---
+  function showAlert(message, type = "success") {
+      let alertEl = document.getElementById("modulexAlert");
+      if (!alertEl) {
+          alertEl = document.createElement("div");
+          alertEl.id = "modulexAlert";
+          alertEl.style.position = "fixed";
+          alertEl.style.top = "10px";
+          alertEl.style.right = "10px";
+          alertEl.style.padding = "10px 20px";
+          alertEl.style.borderRadius = "5px";
+          alertEl.style.color = "white";
+          alertEl.style.zIndex = "9999";
+          alertEl.style.transition = "opacity 0.5s";
+          document.body.appendChild(alertEl);
+      }
+
+      alertEl.textContent = message;
+      alertEl.style.backgroundColor = type === "success" ? "#28a745" : "#dc3545";
+      alertEl.style.opacity = "1";
+
+      setTimeout(() => {
+          alertEl.style.opacity = "0";
+      }, 2500); // fades out after 2.5s
+  };
+
+
+  openBtn.onclick = () => {
     form.reset();
     form.setAttribute("data-mode", "add");
     submitBtn.textContent = "Ajouter";
+    form.querySelector('[name="id"]').value = "";
     modal.style.display = "block";
+  };
+  closeBtn.onclick = () => modal.style.display = "none";
+
+  [filterFiliere, filterCoord, filterDepart].forEach(sel => {
+    sel.onchange = () => loadPage(true);
   });
 
-  closeBtn?.addEventListener("click", () => modal.style.display = "none");
-
-  // ---------- submit form (create/update) ----------
-  form.addEventListener("submit", async (e) => {
-    e.preventDefault();
-
-    // collect form data explicitly to avoid accidental extra fields
-    const payload = {
-      id: form.querySelector('[name="id"]').value || null,
-      codeModule: form.querySelector('[name="codeModule"]').value.trim(),
-      nomModule: form.querySelector('[name="nomModule"]').value.trim(),
-      description: form.querySelector('[name="description"]').value.trim(),
-      nombreHeures: Number(form.querySelector('[name="nombreHeures"]').value || null),
-      coefficient: Number(form.querySelector('[name="coefficient"]').value || null),
-      departementDattache: form.querySelector('[name="departementDattache"]').value.trim(),
-      semestre: form.querySelector('[name="semestre"]').value.trim(),
-      optionModule: form.querySelector('[name="optionModule"]').value.trim(),
-      codeFiliere: form.querySelector('[name="codeFiliere"]').value,
-      coordonateurCin: form.querySelector('[name="coordonateurCin"]').value
-    };
-
-    const mode = form.getAttribute("data-mode") || "add";
-    const method = mode === "add" ? "POST" : "PUT";
-    const url = mode === "add" ? "/req/modulex/api" : `/req/modulex/api/${payload.id}`;
-
-    try {
-      const res = await fetch(url, {
-        method,
-        headers: {
-          "Content-Type": "application/json",
-          [csrfHeader]: csrfToken
-        },
-        body: JSON.stringify(payload)
-      });
-      if (!res.ok) {
-        const txt = await res.text().catch(()=>null);
-        console.error("Save failed", res.status, txt);
-        throw new Error("Erreur lors de l'enregistrement");
-      }
-      modal.style.display = "none";
-      // reload current page (if update changed ordering, you might want to reset to page 0)
-      await loadTable(currentPage);
-    } catch (err) {
-      console.error(err);
-      alert(err.message || "Erreur lors de l'enregistrement");
+  container.onscroll = () => {
+    if (container.scrollTop + container.clientHeight >= container.scrollHeight - 20) {
+      loadPage(false);
     }
-  });
+  };
 
-  // ---------- debounced filters ----------
-  function debounce(fn, wait = 300) {
-    let t;
-    return (...args) => {
-      clearTimeout(t);
-      t = setTimeout(() => fn(...args), wait);
-    };
+  function escapeHtml(s) {
+    if (!s) return "";
+    return s.replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;");
   }
-  const debouncedReload = debounce(() => loadTable(0), 250);
 
-  const elF = document.getElementById("filterFiliere");
-  const elC = document.getElementById("filterCoord");
-  const elD = document.getElementById("filterDepart");
-
-  elF?.addEventListener("change", debouncedReload);
-  elC?.addEventListener("change", debouncedReload);
-  elD?.addEventListener("input", debouncedReload);
-
-  // initial load
-  loadTable(0);
+  await loadSelects();
+  await loadPage(true);
 }
+
+
+
+
+
 
 
 

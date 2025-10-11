@@ -1,12 +1,16 @@
 package com.myschool.backend.Repository;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import com.myschool.backend.Model.Modulex;
 import com.myschool.backend.DTO.ModulexDTO;
 import java.util.List;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+
 
 
 
@@ -37,8 +41,18 @@ public interface ModulexRepository extends JpaRepository<Modulex, Long> {
           AND (:departement IS NULL OR :departement = '' OR m.departementDattache = :departement)
         ORDER BY f.nomFiliere, m.nomModule
         """)
-    List<ModulexDTO> findAllWithFilters(
+    Page<ModulexDTO> findFiltered(
             @Param("filiereCode") String filiereCode,
             @Param("coordonateurCin") String coordonateurCin,
-            @Param("departement") String departement);
+            @Param("departement") String departement,
+            Pageable pageable);
+
+    @Query("SELECT DISTINCT m.departementDattache FROM Modulex m WHERE m.departementDattache IS NOT NULL")
+    java.util.List<String> findDistinctDepartements();
+
+
+    
 }
+
+
+

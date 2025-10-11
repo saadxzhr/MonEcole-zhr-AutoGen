@@ -19,3 +19,22 @@ CREATE TABLE IF NOT EXISTS filiere (
     planninType planningtypeenum DEFAULT 'Semaine',
     actif BOOLEAN DEFAULT TRUE
 );
+
+
+-- Flyway migration: create modulex table (adjust types to your DB if needed)
+
+CREATE TABLE IF NOT EXISTS modulex (
+  id SERIAL PRIMARY KEY,
+  codemodule VARCHAR(50) UNIQUE NOT NULL,
+  nommodule VARCHAR(150) NOT NULL,
+  description TEXT,
+  nombreheures INT,
+  coefficient FLOAT,
+  departementdattache VARCHAR(50),
+  coordonateur VARCHAR(20),
+  semestre VARCHAR(20),
+  optionmodule VARCHAR(100),
+  codefiliere VARCHAR(50),
+  CONSTRAINT fk_modulex_filiere FOREIGN KEY (codefiliere) REFERENCES filiere(codefiliere),
+  CONSTRAINT fk_modulex_filiere FOREIGN KEY (coordonateur) REFERENCES employe(cin)
+);

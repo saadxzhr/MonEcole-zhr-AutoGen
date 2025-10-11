@@ -1,7 +1,10 @@
 package com.myschool.backend.Service;
 
+import java.util.ArrayList;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.myschool.backend.DTO.ModulexDTO;
@@ -13,6 +16,16 @@ import com.myschool.backend.Repository.ModulexRepository;
 import com.myschool.backend.Repository.EmployeRepository;
 import com.myschool.backend.Projection.EmployeProjection;
 import java.util.stream.Collectors;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.PageRequest;
+
+import jakarta.persistence.criteria.Predicate;
+import jakarta.persistence.criteria.Root;
+import jakarta.persistence.criteria.CriteriaQuery;
+import jakarta.persistence.criteria.CriteriaBuilder;
+
 
 
 
@@ -25,39 +38,41 @@ public class ModulexService {
     private final ModulexMapper mapper;
     private final EmployeRepository employeRepository;
 
-    public List<ModulexDTO> getAllModules(String filiereCode, String coordonateurCin, String departement) {
-        return modulexRepository.findAllWithFilters(filiereCode, coordonateurCin, departement);
-    }
-
-    public ModulexDTO getModuleById(Long id) {
-        Modulex m = modulexRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Modulex not found"));
-        return mapper.toDto(m);
+    public Page<ModulexDTO> getModulesPage(String filiereCode, String coordonateurCin, String departement, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by("id").ascending());
+        return modulexRepository.findFiltered(
+                (filiereCode == null || filiereCode.isBlank()) ? null : filiereCode.trim(),
+                (coordonateurCin == null || coordonateurCin.isBlank()) ? null : coordonateurCin.trim(),
+                (departement == null || departement.isBlank()) ? null : departement.trim(),
+                pageable
+        );
     }
 
     public ModulexDTO createModule(ModulexDTO dto, Filiere filiere) {
         Modulex entity = mapper.toEntity(dto);
         entity.setFiliere(filiere);
-        if (dto.getCoordonateurCin() != null) {
-            Employe coord = employeRepository.findByCin(dto.getCoordonateurCin())
-                    .orElseThrow(() -> new RuntimeException("Coordonateur not found"));
-            entity.setCoordonateur(coord);
+        if (dto.getCoordonateurCin() != null && !dto.getCoordonateurCin().isBlank()) {
+            Employe e = employeRepository.findByCin(dto.getCoordonateurCin())
+                    .orElseThrow(() -> new RuntimeException("Coordonateur not found: " + dto.getCoordonateurCin()));
+            entity.setCoordonateur(e);
         }
         Modulex saved = modulexRepository.save(entity);
         return mapper.toDto(saved);
     }
 
     public ModulexDTO updateModule(Long id, ModulexDTO dto, Filiere filiere) {
-        Modulex entity = modulexRepository.findById(id)
+        Modulex ent = modulexRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Modulex not found"));
-        mapper.updateEntityFromDto(dto, entity);
-        entity.setFiliere(filiere);
-        if (dto.getCoordonateurCin() != null) {
-            Employe coord = employeRepository.findByCin(dto.getCoordonateurCin())
-                    .orElseThrow(() -> new RuntimeException("Coordonateur not found"));
-            entity.setCoordonateur(coord);
+        mapper.updateEntityFromDto(dto, ent);
+        ent.setFiliere(filiere);
+        if (dto.getCoordonateurCin() != null && !dto.getCoordonateurCin().isBlank()) {
+            Employe e = employeRepository.findByCin(dto.getCoordonateurCin())
+                    .orElseThrow(() -> new RuntimeException("Coordonateur not found: " + dto.getCoordonateurCin()));
+            ent.setCoordonateur(e);
+        } else {
+            ent.setCoordonateur(null);
         }
-        Modulex saved = modulexRepository.save(entity);
+        Modulex saved = modulexRepository.save(ent);
         return mapper.toDto(saved);
     }
 
@@ -65,7 +80,12 @@ public class ModulexService {
         modulexRepository.deleteById(id);
     }
 
-    public List<EmployeProjection> getEmployesProjection() {
+    public List<com.myschool.backend.Projection.EmployeProjection> getEmployesProjection() {
         return employeRepository.findAllEmployes();
     }
+
+    public List<String> getDistinctDepartements() {
+        return modulexRepository.findDistinctDepartements();
+    }
+    
 }

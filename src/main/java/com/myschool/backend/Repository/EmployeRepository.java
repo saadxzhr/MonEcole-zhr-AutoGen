@@ -21,7 +21,7 @@ public interface EmployeRepository extends JpaRepository<Employe, Long> {
     @Query("SELECT DISTINCT e.role FROM Employe e")
     List<String> getUniqueRole();
 
-
+    
     
 }
 

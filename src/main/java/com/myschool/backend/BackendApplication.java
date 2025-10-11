@@ -30,7 +30,7 @@ public class BackendApplication {
 
 
 //git add .
-//git commit -m "Module half done - read"
+//git commit -m "Module 80% done - read"
 //git push
 
 
