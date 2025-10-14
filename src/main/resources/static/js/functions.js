@@ -636,12 +636,22 @@ async function actionModulex() {
       fetch("/req/modulex/api/departements").then(r => r.json())
     ]);
 
+    // Helper to fill <select> with options
     const fillSelect = (sel, options, valueKey = "code", labelKey = "label") => {
       sel.innerHTML = "";
+
+      // Default "all" option
       const def = document.createElement("option");
       def.value = "";
-      def.textContent = sel.id === "filterDepart" ? "Tous les départements" : sel.id === "filterCoordx" ? "Tous les coordonateurs" : (sel.id === "filterCoord" ? "Tous les coordonateurs" : "Toutes les filières");
+      def.textContent =
+        sel.id === "filterDepart"
+          ? "Tous les départements"
+          : sel.id === "filterCoordx" || sel.id === "filterCoord"
+          ? "Tous les coordinateurs"
+          : "Toutes les filières";
       sel.appendChild(def);
+
+      // Add actual options
       options.forEach(o => {
         const opt = document.createElement("option");
         opt.value = o[valueKey];
@@ -650,13 +660,24 @@ async function actionModulex() {
       });
     };
 
-    fillSelect(filterFiliere, filieres, "code", "label");
-    fillSelect(document.querySelector('select[name="codeFiliere"]'), filieres, "code", "label");
+    // --- Filieres ---
+      const filiereOptions = filieres.map(f => ({
+          code: f.codeFiliere,
+      label: f.nomFiliere
+    }));
+    fillSelect(filterFiliere, filiereOptions, "code", "label");
+    fillSelect(document.querySelector('select[name="codeFiliere"]'), filiereOptions, "code", "label");
 
-    fillSelect(filterCoord, employes, "cin", "label");
-    fillSelect(document.querySelector('select[name="coordonateurCin"]'), employes, "cin", "label");
+    // --- Employes ---
+    const employeOptions = employes.map(e => ({
+      cin: e.cin,
+      label: `${e.nom} ${e.prenom}`
+    }));
+    fillSelect(filterCoord, employeOptions, "cin", "label");
+    fillSelect(document.querySelector('select[name="coordinateurCin"]'), employeOptions, "cin", "label");
 
-    const deptOptions = departements.map(d => ({code: d, label: d}));
+    // --- Departements ---
+    const deptOptions = departements.map(d => ({ code: d, label: d }));
     fillSelect(filterDepart, deptOptions, "code", "label");
   }
 
@@ -672,7 +693,7 @@ async function actionModulex() {
 
     const params = new URLSearchParams();
     if (filterFiliere.value) params.append("filiereCode", filterFiliere.value);
-    if (filterCoord.value) params.append("coordonateurCin", filterCoord.value);
+    if (filterCoord.value) params.append("coordinateurCin", filterCoord.value);
     if (filterDepart.value) params.append("departement", filterDepart.value);
     params.append("page", page);
     params.append("size", size);
@@ -696,9 +717,9 @@ async function actionModulex() {
           <td>${m.coefficient ?? ""}</td>
           <td>${escapeHtml(m.codeFiliere ?? "")} - ${escapeHtml(m.nomFiliere ?? "")}</td>
           <td>${escapeHtml(m.departementDattache)}</td>
-          <td>${escapeHtml(m.coordonateurNomPrenom ?? "")}</td>
+          <td>${escapeHtml(m.coordinateurNomPrenom ?? "")}</td>
           <td>${escapeHtml(m.optionModule ?? "")}</td>
-          <td>${escapeHtml(m.semestre ?? "")}</td>
+          <td>${(m.semestre ?? "")}</td>
         `;
         tbody.appendChild(tr);
       });
@@ -746,7 +767,7 @@ async function actionModulex() {
         const selF = form.querySelector('[name="codeFiliere"]');
         if (selF) selF.value = codeF;
 
-        const selC = form.querySelector('[name="coordonateurCin"]');
+        const selC = form.querySelector('[name="coordinateurCin"]');
         if (selC) {
           for (const opt of selC.options) {
             if (opt.text === coordName || opt.text.trim() === coordName) {
@@ -763,7 +784,7 @@ async function actionModulex() {
     tbody.querySelectorAll(".delete-btn").forEach(btn => {
       btn.onclick = async () => {
         const id = btn.closest("tr").dataset.id;
-        if (!confirm("Supprimer ce module ?")) return;
+        if (!confirm("Supprimer ce module ?\n\nAttention! La suppression de ce module supprimera aussi les matières, emplois du temps et état d'avancement correspondants!")) return;
         const res = await fetch("/req/modulex/api/" + id, {
           method: "DELETE",
           headers: { [csrfHeader]: csrfToken }
@@ -787,13 +808,13 @@ async function actionModulex() {
           codeModule: formData.codeModule,
           nomModule: formData.nomModule,
           description: formData.description,
-          nombreHeures: formData.nombreHeures ? Number(formData.nombreHeures) : null,
+          nombreHeures: formData.nombreHeures ? parseFloat(formData.nombreHeures) : null,
           coefficient: formData.coefficient ? parseFloat(formData.coefficient) : null,
           departementDattache: formData.departementDattache,
           optionModule: formData.optionModule,
-          semestre: formData.semestre,
+          semestre: formData.semestre ? Number(formData.semestre) : null,
           codeFiliere: formData.codeFiliere,
-          coordonateurCin: formData.coordonateurCin
+          coordinateurCin: formData.coordinateurCin
       };
 
       if (mode === "edit") {

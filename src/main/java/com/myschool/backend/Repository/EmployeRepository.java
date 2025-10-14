@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.Query;
 
 import com.myschool.backend.Model.Employe;
 import com.myschool.backend.Projection.EmployeProjection;
+import com.myschool.backend.Projection.FiliereProjection;
 
 import java.util.List;
 import java.util.Optional;
@@ -15,7 +16,7 @@ public interface EmployeRepository extends JpaRepository<Employe, Long> {
     Optional<Employe> findByCin(String cin);
 
     @Query("SELECT e.cin AS cin, e.nom AS nom, e.prenom AS prenom FROM Employe e")
-    List<EmployeProjection> findAllEmployes();
+    List<EmployeProjection> findEmployesByP();
 
     
 
@@ -23,7 +24,7 @@ public interface EmployeRepository extends JpaRepository<Employe, Long> {
     @Query("SELECT DISTINCT e.role FROM Employe e")
     List<String> getUniqueRole();
 
-    
+
     
 }
 

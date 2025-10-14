@@ -1,12 +1,10 @@
-package com.myschool.backend.Repository;
+package com.myschool.backend.Modulex;
 
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
-import com.myschool.backend.Model.Modulex;
-import com.myschool.backend.DTO.ModulexDTO;
+
 import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -17,8 +15,9 @@ import org.springframework.data.domain.Pageable;
 @Repository
 public interface ModulexRepository extends JpaRepository<Modulex, Long> {
 
+    //Charger table modulex utilisant DTO
     @Query("""
-        SELECT new com.myschool.backend.DTO.ModulexDTO(
+        SELECT new com.myschool.backend.Modulex.ModulexDTO(
             m.id,
             m.codeModule,
             m.nomModule,
@@ -26,8 +25,8 @@ public interface ModulexRepository extends JpaRepository<Modulex, Long> {
             m.nombreHeures,
             m.coefficient,
             m.departementDattache,
-            m.coordonateur.cin,
-            CONCAT(m.coordonateur.nom, ' ', m.coordonateur.prenom),
+            m.coordinateur.cin,
+            CONCAT(m.coordinateur.nom, ' ', m.coordinateur.prenom),
             m.semestre,
             m.optionModule,
             f.codeFiliere,
@@ -35,24 +34,25 @@ public interface ModulexRepository extends JpaRepository<Modulex, Long> {
         )
         FROM Modulex m
         LEFT JOIN m.filiere f
-        LEFT JOIN m.coordonateur c
+        LEFT JOIN m.coordinateur c
         WHERE (:filiereCode IS NULL OR :filiereCode = '' OR f.codeFiliere = :filiereCode)
-          AND (:coordonateurCin IS NULL OR :coordonateurCin = '' OR c.cin = :coordonateurCin)
+          AND (:coordinateurCin IS NULL OR :coordinateurCin = '' OR c.cin = :coordinateurCin)
           AND (:departement IS NULL OR :departement = '' OR m.departementDattache = :departement)
         ORDER BY f.nomFiliere, m.nomModule
         """)
+    // countQuery = ("SELECT count(m.id) FROM Modulex m LEFT JOIN m.filiere f WHERE (:filiereCode IS NULL OR :filiereCode = '' OR f.codeFiliere = :filiereCode) AND (:departement IS NULL OR :departement = '' OR m.departementDattache = :departement)")
     Page<ModulexDTO> findFiltered(
             @Param("filiereCode") String filiereCode,
-            @Param("coordonateurCin") String coordonateurCin,
+            @Param("coordinateurCin") String coordinateurCin,
             @Param("departement") String departement,
             Pageable pageable);
 
+    //Charger juste les noms des departement
     @Query("SELECT DISTINCT m.departementDattache FROM Modulex m WHERE m.departementDattache IS NOT NULL")
-    java.util.List<String> findDistinctDepartements();
+    List<String> findDistinctDepartements();
 
-    
-
-    
+    //Verifier si module existe
+    boolean existsByCodeModule(String codeModule);
     
 }
 

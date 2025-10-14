@@ -27,7 +27,11 @@ public class BackendApplication {
 // ✅ Services (logique métier)
 // ✅ Controllers (REST + Thymeleaf)
 
+// spring.jpa.properties.hibernate.default_batch_fetch_size=50
+// spring.jpa.open-in-view=false
 
+///Pageable pageable = PageRequest.of(page, size, Sort.by("nomModule").ascending());
+/// 
 
 //git add .
 //git commit -m "Module 95% done"

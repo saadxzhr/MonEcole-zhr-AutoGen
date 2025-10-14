@@ -31,11 +31,12 @@ import org.springframework.web.multipart.MultipartFile;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.myschool.backend.DTO.FiliereDTO;
-import com.myschool.backend.DTO.ModulexDTO;
 import com.myschool.backend.Model.Employe;
 import com.myschool.backend.Model.Filiere;
 
 import com.myschool.backend.Model.MyAppUser;
+import com.myschool.backend.Modulex.ModulexDTO;
+import com.myschool.backend.Modulex.ModulexService;
 import com.myschool.backend.Projection.EmployeProjection;
 // import com.myschool.backend.Projection.ModulexProjection;
 import com.myschool.backend.Repository.EmployeRepository;
@@ -43,8 +44,6 @@ import com.myschool.backend.Repository.FiliereRepository;
 import com.myschool.backend.Repository.MyAppUserRepository;
 import com.myschool.backend.Service.EmployeService;
 import com.myschool.backend.Service.FiliereService;
-import com.myschool.backend.Service.ModulexService;
-
 import com.myschool.backend.Service.MyAppUserService;
 
 import lombok.RequiredArgsConstructor;
@@ -111,6 +110,8 @@ public class DirectionController {
 
 
 
+
+    
     // //accueil de direction
     // @GetMapping("/req/accueildirection")
     // public String getAccueil(Model model, Principal principal) throws JsonProcessingException {
@@ -155,13 +156,14 @@ public class DirectionController {
 
 
 
+    
 
 // Ajouter ou mettre à jour une filière (travaille directement avec Filiere)
     @GetMapping("/req/filieres")
     public String filieresPage(Model model) {
         // Le fragment Thymeleaf
         model.addAttribute("filieres", filiereService.getAllFilieres());
-        model.addAttribute("employes", filiereService.getEmployesProjection());
+        model.addAttribute("employes", employeService.getEmployesProjection());
         model.addAttribute("niveaux", filiereService.getUniqueNiveaux());
         return "fragments/direction/filieres";
     }

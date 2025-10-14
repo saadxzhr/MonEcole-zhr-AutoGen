@@ -3,8 +3,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import com.myschool.backend.Model.Employe;
+import com.myschool.backend.Model.Filiere;
 import com.myschool.backend.Projection.EmployeProjection;
 import com.myschool.backend.Repository.EmployeRepository;
+import jakarta.persistence.EntityNotFoundException;
 
 import java.util.List;
 import java.util.Optional;
@@ -15,12 +17,16 @@ public class EmployeService {
     @Autowired
     private EmployeRepository employeRepository;
 
+    public Employe getEmployeByCinEx(String cin) {
+        return employeRepository.findByCin(cin)
+            .orElseThrow(() -> new EntityNotFoundException("Filière non trouvée: " + cin));
+    }
+
     public Optional<Employe> getEmployeByCin(String cin) {
         return employeRepository.findByCin(cin);
     }
 
-    public List<EmployeProjection> getEmployes() {
-        return employeRepository.findAllEmployes();
+    public List<EmployeProjection> getEmployesProjection() {
+        return employeRepository.findEmployesByP();
     }
-    
 }

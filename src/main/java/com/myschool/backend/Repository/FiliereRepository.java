@@ -5,17 +5,27 @@ import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import com.myschool.backend.DTO.FiliereDTO;
-import com.myschool.backend.Model.Employe;
 import com.myschool.backend.Model.Filiere;
+import com.myschool.backend.Projection.FiliereProjection;
 
 public interface FiliereRepository extends JpaRepository<Filiere, Long> {
 
     @Query("SELECT DISTINCT f.niveau FROM Filiere f")
-    List<String> getUniqueNiveau();
+    List<String> findUniqueNiveau();
 
+    @Query("SELECT f.codeFiliere AS codeFiliere, f.nomFiliere AS nomFiliere FROM Filiere f WHERE f.codeFiliere = :codeFiliere")
+    Optional<FiliereProjection> findFiliereDTOByCode(@Param("codeFiliere") String codeFiliere);
+
+    
     Optional<Filiere> findByCodeFiliere(String codeFiliere);
+    
+    @Query("SELECT DISTINCT f.codeFiliere AS codeFiliere, f.nomFiliere AS nomFiliere FROM Filiere f")
+    List<FiliereProjection> findFilieresProjection();
+
+
     
 
 }

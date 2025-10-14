@@ -1,6 +1,7 @@
 package com.myschool.backend.Service;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
@@ -8,8 +9,11 @@ import org.springframework.stereotype.Service;
 import com.myschool.backend.DTO.FiliereDTO;
 import com.myschool.backend.Model.Filiere;
 import com.myschool.backend.Projection.EmployeProjection;
+import com.myschool.backend.Projection.FiliereProjection;
 import com.myschool.backend.Repository.EmployeRepository;
 import com.myschool.backend.Repository.FiliereRepository;
+
+import jakarta.persistence.EntityNotFoundException;
 
 @Service
 public class FiliereService {
@@ -69,18 +73,24 @@ public class FiliereService {
         filiereRepository.deleteById(id);
     }
 
-    public List<EmployeProjection> getEmployesProjection() {
-        return employeRepository.findAllEmployes();
-    }
+    // public List<EmployeProjection> getEmployesProjection() {
+    //     return employeRepository.findEmployesByP();
+    // }
 
     public List<String> getUniqueNiveaux() {
-        return filiereRepository.getUniqueNiveau();
+        return filiereRepository.findUniqueNiveau();
     }
 
-    public Filiere getByCode(String codeFiliere) {
-        return filiereRepository.findByCodeFiliere(codeFiliere)
-                .orElseThrow(() -> new RuntimeException("Filiere not found: " + codeFiliere));
+
+    public List<FiliereProjection> getFilieresProjection() {
+        return filiereRepository.findFilieresProjection();
     }
+
+    public Filiere getByCodeFiliere(String code) {
+        return filiereRepository.findByCodeFiliere(code)
+                .orElseThrow(() -> new EntityNotFoundException("Filière non trouvée: " + code));
+    }
+
 
     
 }
