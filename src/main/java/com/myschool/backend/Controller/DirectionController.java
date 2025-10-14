@@ -93,7 +93,7 @@ public class DirectionController {
     public String getSecretairePage(Model model, Principal principal) {
         String cin = principal.getName(); // This is the current user's CIN
 
-        employeService.getEmployeByCin(cin).ifPresent(employe -> {
+        employeService.getEmployeByCinO(cin).ifPresent(employe -> {
             String fullName = employe.getNom() + " " + employe.getPrenom();
             model.addAttribute("employeName", fullName);
 

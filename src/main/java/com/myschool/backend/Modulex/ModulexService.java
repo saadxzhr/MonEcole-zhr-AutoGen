@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.myschool.backend.Config.DuplicateResourceException;
 import com.myschool.backend.Model.Employe;
+import com.myschool.backend.Model.Filiere;
 import com.myschool.backend.Service.EmployeService;
 import com.myschool.backend.Service.FiliereService;
 import org.springframework.cache.annotation.Cacheable;
@@ -97,9 +98,38 @@ public class ModulexService {
             return modulexMapper.toDto(saved);
         }
 
+        //gestion des filieres et coordinateur
+        private void setModuleRelationships(Modulex module, ModulexDTO dto) {
+            // === Gestion de la Filiere ===
+            if (dto.getCodeFiliere() == null || dto.getCodeFiliere().isBlank()) {
+                throw new ConstraintViolationException("Ajouter une filière!", null);
+            }
+            // Charger seulement si différente
+            if (module.getFiliere() == null ||
+                !dto.getCodeFiliere().equals(module.getFiliere().getCodeFiliere())) {
+                Filiere filiere = filiereService.getByCodeFiliere(dto.getCodeFiliere());
+                module.setFiliere(filiere);
+            }
+
+            // === Gestion du Coordinateur ===
+            if (dto.getCoordinateurCin() == null || dto.getCoordinateurCin().isBlank()) {
+                throw new ConstraintViolationException("Ajouter un coordinateur!", null);
+            }
+            // Charger seulement si différent
+            if (module.getCoordinateur() == null ||
+                !dto.getCoordinateurCin().equals(module.getCoordinateur().getCin())) {
+                Employe coord = employeService.getEmployeByCin(dto.getCoordinateurCin());
+                module.setCoordinateur(coord);
+            }
+        }
 
 
-        //supprimer un module
+        //charger pour select/filtre
+        public List<String> getDistinctDepartements() {
+            return modulexRepository.findDistinctDepartements();
+        }
+
+         //supprimer un module
         @Transactional
         public void deleteModule(Long id) {
             // Vérifier si le module existe
@@ -111,28 +141,6 @@ public class ModulexService {
             modulexRepository.deleteById(id);
 
             log.info("Module deleted successfully with id: {}", id);
-        }
-
-
-        //gestion des filieres et coordinateur
-        private void setModuleRelationships(Modulex module, ModulexDTO dto) {
-            if (dto.getCodeFiliere() != null && !dto.getCodeFiliere().isBlank()) {
-                module.setFiliere(filiereService.getByCodeFiliere(dto.getCodeFiliere()));
-            } else {
-                throw new ConstraintViolationException("Ajouter Filiere!", null);
-            }
-            
-            if (dto.getCoordinateurCin() != null && !dto.getCoordinateurCin().isBlank()) {
-                Employe e = employeService.getEmployeByCinEx(dto.getCoordinateurCin());
-                module.setCoordinateur(e);
-            } else {
-                throw new ConstraintViolationException("Ajouter Coordenateur!", null);
-            }
-        }
-
-        //charger pour select/filtre
-        public List<String> getDistinctDepartements() {
-            return modulexRepository.findDistinctDepartements();
         }
 
 }

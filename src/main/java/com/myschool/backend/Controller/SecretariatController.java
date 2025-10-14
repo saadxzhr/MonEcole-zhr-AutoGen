@@ -51,7 +51,7 @@ public class SecretariatController {
     public String getsecretariatPage(Model model, Principal principal) {
         String cin = principal.getName();
 
-        employeService.getEmployeByCin(cin).ifPresent(employe -> {
+        employeService.getEmployeByCinO(cin).ifPresent(employe -> {
             String fullName = employe.getNom() + " " + employe.getPrenom();
             model.addAttribute("employeName", fullName);
         }); 

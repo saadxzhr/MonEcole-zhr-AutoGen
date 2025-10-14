@@ -1,5 +1,7 @@
 package com.myschool.backend.Modulex;
 
+import org.hibernate.annotations.BatchSize;
+
 import com.myschool.backend.Model.Employe;
 import com.myschool.backend.Model.Filiere;
 

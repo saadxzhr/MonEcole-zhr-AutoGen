@@ -22,11 +22,16 @@ public class EmployeService {
             .orElseThrow(() -> new EntityNotFoundException("Filière non trouvée: " + cin));
     }
 
-    public Optional<Employe> getEmployeByCin(String cin) {
+    public Optional<Employe> getEmployeByCinO(String cin) {
         return employeRepository.findByCin(cin);
     }
 
     public List<EmployeProjection> getEmployesProjection() {
         return employeRepository.findEmployesByP();
+    }
+
+    public Employe getEmployeByCin(String cin) {
+        return employeRepository.findByCin(cin)
+                .orElseThrow(() -> new EntityNotFoundException("Employe non trouvée: " + cin));
     }
 }
