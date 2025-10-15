@@ -27,6 +27,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.ModelAndView;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -51,6 +52,7 @@ import lombok.RequiredArgsConstructor;
 
 @Controller
 @RequiredArgsConstructor
+@RequestMapping("/req")
 public class DirectionController {
     
     // @Autowired
@@ -89,7 +91,7 @@ public class DirectionController {
     }
 
     //charger l'interface direction en affichant le nom de l'utilisateur
-    @GetMapping("/req/direction")
+    @GetMapping("/direction")
     public String getSecretairePage(Model model, Principal principal) {
         String cin = principal.getName(); // This is the current user's CIN
 
@@ -102,18 +104,19 @@ public class DirectionController {
     }
 
     //charger sidebar 'fragment'
-    @GetMapping("/req/direction/sidebar")
+    @GetMapping("/direction/sidebar")
     public String SecSidebar(Model model) {
         return "fragments/direction/sidebar :: content";
     }
 
 
 
+    
 
 
     
     // //accueil de direction
-    // @GetMapping("/req/accueildirection")
+    // @GetMapping("/accueildirection")
     // public String getAccueil(Model model, Principal principal) throws JsonProcessingException {
     //     //Donnee etat d'avacement
     //     List<EtatDavancement> amodifier = etatDavancementService.getByStatut("A modifier");
@@ -159,7 +162,7 @@ public class DirectionController {
     
 
 // Ajouter ou mettre à jour une filière (travaille directement avec Filiere)
-    @GetMapping("/req/filieres")
+    @GetMapping("/filieres")
     public String filieresPage(Model model) {
         // Le fragment Thymeleaf
         model.addAttribute("filieres", filiereService.getAllFilieres());
@@ -168,7 +171,7 @@ public class DirectionController {
         return "fragments/direction/filieres";
     }
 
-    @PostMapping("/req/filieres/save")
+    @PostMapping("/filieres/save")
     @ResponseBody
     public ResponseEntity<?> saveFiliere(@RequestBody Filiere filiere) {
         try {
@@ -184,7 +187,7 @@ public class DirectionController {
         }
     }
 
-    @DeleteMapping("/req/filieres/delete/{id}")
+    @DeleteMapping("/filieres/delete/{id}")
     @ResponseBody
     public ResponseEntity<?> deleteFiliere(@PathVariable Long id) {
         try {
@@ -205,7 +208,7 @@ public class DirectionController {
     
   
     //charger tout les employes
-    @GetMapping("/req/employes")
+    @GetMapping("/employes")
     public String getEmploye(Model model) {
         List<Employe> employes = employeRepository.findAll();
         model.addAttribute("employes", employes);
@@ -215,7 +218,7 @@ public class DirectionController {
     }
 
     //ajouter une employe
-    @PostMapping("/req/employes/save")
+    @PostMapping("/employes/save")
     @ResponseBody
     public ResponseEntity<?> saveEmploye(@RequestBody Employe employe) {
         if (employe.getId()!= null) {
@@ -254,7 +257,7 @@ public class DirectionController {
     }
 
     //supprimer un employe
-    @DeleteMapping("/req/employes/delete/{id}")
+    @DeleteMapping("/employes/delete/{id}")
     @ResponseBody
     public ResponseEntity<?> deleteEmploye(@PathVariable("id") Long id) {
         employeRepository.deleteById(id);
@@ -267,7 +270,7 @@ public class DirectionController {
     //////actions sur users
   
     //charger tout les utilisateurs
-    @GetMapping("/req/users")
+    @GetMapping("/users")
     public String getUsers(Model model) {
         List<MyAppUser> users = myAppUserRepository.findAll();
         model.addAttribute("utilisateurs", users);
@@ -276,7 +279,7 @@ public class DirectionController {
     }
 
     //ajouter une employe
-    @PostMapping("/req/users/save")
+    @PostMapping("/users/save")
     @ResponseBody
     public ResponseEntity<?> saveUser(@RequestBody MyAppUser user) {
         if (user.getId() != null) {
@@ -289,7 +292,7 @@ public class DirectionController {
 
 
     //supprimer un utilisateur
-    @DeleteMapping("/req/users/delete/{id}")
+    @DeleteMapping("/users/delete/{id}")
     @ResponseBody
     public ResponseEntity<?> deleteUser(@PathVariable("id") Long id) {
         myAppUserRepository.deleteById(id);
@@ -308,7 +311,7 @@ public class DirectionController {
     //     this.excelService = excelService;
     // }
 
-    // @PostMapping("/req/upload-excel")
+    // @PostMapping("/upload-excel")
     // @ResponseBody
     // public ResponseEntity<?> uploadExcelFile(@RequestParam("file") MultipartFile file) {
     //     try {
@@ -322,7 +325,7 @@ public class DirectionController {
     // }
 
     // ////
-    // @PostMapping("/req/etat/toggle")
+    // @PostMapping("/etat/toggle")
     // @ResponseBody
     // public ResponseEntity<String> toggleEtat(@RequestBody Map<String, Object> payload) {
     //     try {

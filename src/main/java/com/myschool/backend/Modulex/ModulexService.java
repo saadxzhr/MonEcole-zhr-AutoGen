@@ -8,6 +8,9 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.myschool.backend.Config.DuplicateResourceException;
+import com.myschool.backend.DTO.PageResponseDTO;
+import com.myschool.backend.Exception.BusinessValidationException;
+import com.myschool.backend.Exception.ResourceNotFoundException;
 import com.myschool.backend.Model.Employe;
 import com.myschool.backend.Model.Filiere;
 import com.myschool.backend.Service.EmployeService;
@@ -15,6 +18,8 @@ import com.myschool.backend.Service.FiliereService;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.ConstraintViolationException;
 
@@ -26,12 +31,17 @@ import jakarta.validation.ConstraintViolationException;
 @Slf4j
 public class ModulexService {
 
+    private static final String ENTITY_NAME = "Module";
+
     private final ModulexRepository modulexRepository;
     private final ModulexMapper modulexMapper;
     private final EmployeService employeService;
     private final FiliereService filiereService;
     
 
+        // private static final String ENTITY_NAME = "Module";
+        // log.info("Creating new {}: {}", ENTITY_NAME, dto.getCodeModule());
+    
 
         //@CacheEvict(value = "modulesPage", allEntries = true)
         // @Cacheable(
@@ -39,22 +49,24 @@ public class ModulexService {
         //     key = "T(java.util.Objects).hash(#filiereCode, #coordinateurCin, #departement, #page, #size)"
         // )
         @Transactional(readOnly = true)
-        public Page<ModulexDTO> getModulesPage(
-                String filiereCode, 
-                String coordinateurCin, 
-                String departement, 
-                int page, 
-                int size) {
+        public PageResponseDTO<ModulexDTO> getModulesPage(
+            String filiereCode, 
+            String coordinateurCin, 
+            String departement, 
+            int page, 
+            int size) {
 
-            //Validation basique
-            if (page < 0 || size < 1 || size > 100) {
-                throw new IllegalArgumentException("Invalid pagination parameters");
-            }
-            //Pas besoin de Sort ici : le tri est déjà fait dans le JPQL(query Repo)
-            Pageable pageable = PageRequest.of(page, size);
+            Pageable pageable = PageRequest.of(page, size, Sort.by("filiere.codeFiliere").ascending().and(Sort.by("codeModule")));
+            Page<ModulexDTO> result = modulexRepository.findFiltered(filiereCode, coordinateurCin, departement, pageable);
 
-            //Appel direct à la requête optimisée
-            return modulexRepository.findFiltered(filiereCode, coordinateurCin, departement, pageable);
+            return new PageResponseDTO<>(
+                result.getContent(),
+                result.getNumber(),
+                result.getSize(),
+                result.getTotalElements(),
+                result.getTotalPages(),
+                result.isLast()
+            );
         }
 
         
@@ -75,7 +87,7 @@ public class ModulexService {
 
             //Sauvegarder en base
             Modulex saved = modulexRepository.save(module);
-
+            log.info("Creation nouvelle {}: {}", ENTITY_NAME, dto.getCodeModule());
             //Mapper Entity → DTO
             return modulexMapper.toDto(saved);
         }
@@ -86,7 +98,7 @@ public class ModulexService {
         public ModulexDTO updateModule(Long id, ModulexDTO dto) {
             //1. Récupérer le module existant
             Modulex ent = modulexRepository.findById(id)
-                    .orElseThrow(() -> new EntityNotFoundException("Module non trouvé avec id : " + id));
+                    .orElseThrow(() -> new ResourceNotFoundException("Module non trouvé avec id : " + id));
             //2. Mettre à jour les champs simples via MapStruct
             modulexMapper.updateEntityFromDto(dto, ent);
 
@@ -95,15 +107,18 @@ public class ModulexService {
 
             //5. Sauvegarder et renvoyer
             Modulex saved = modulexRepository.save(ent);
+
+            log.info("Modification de {}: {}", ENTITY_NAME, id);
             return modulexMapper.toDto(saved);
         }
 
         //gestion des filieres et coordinateur
         private void setModuleRelationships(Modulex module, ModulexDTO dto) {
             // === Gestion de la Filiere ===
-            if (dto.getCodeFiliere() == null || dto.getCodeFiliere().isBlank()) {
-                throw new ConstraintViolationException("Ajouter une filière!", null);
-            }
+            //verificatin null sur dto
+            // if (dto.getCodeFiliere() == null || dto.getCodeFiliere().isBlank()) {
+            //     throw new BusinessValidationException("Selectionner une filière!");
+            // }
             // Charger seulement si différente
             if (module.getFiliere() == null ||
                 !dto.getCodeFiliere().equals(module.getFiliere().getCodeFiliere())) {
@@ -112,9 +127,7 @@ public class ModulexService {
             }
 
             // === Gestion du Coordinateur ===
-            if (dto.getCoordinateurCin() == null || dto.getCoordinateurCin().isBlank()) {
-                throw new ConstraintViolationException("Ajouter un coordinateur!", null);
-            }
+            //verificatin null sur dto
             // Charger seulement si différent
             if (module.getCoordinateur() == null ||
                 !dto.getCoordinateurCin().equals(module.getCoordinateur().getCin())) {
@@ -134,14 +147,16 @@ public class ModulexService {
         public void deleteModule(Long id) {
             // Vérifier si le module existe
             if (!modulexRepository.existsById(id)) {
-                throw new EntityNotFoundException("Module not found with id: " + id);
+                throw new ResourceNotFoundException("Module not found with id: " + id);
             }
 
             // Supprimer rapidement
             modulexRepository.deleteById(id);
 
-            log.info("Module deleted successfully with id: {}", id);
+            log.info("Supprimer {} avec id: {}", ENTITY_NAME, id);
         }
+
+        
 
 }
         // private void checkModuleDependencies(Modulex module) {

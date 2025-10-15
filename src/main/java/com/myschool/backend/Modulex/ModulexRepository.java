@@ -5,6 +5,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import com.myschool.backend.DTO.PageResponseDTO;
+
 import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -36,7 +38,6 @@ public interface ModulexRepository extends JpaRepository<Modulex, Long> {
             WHERE (:filiereCode IS NULL OR :filiereCode = '' OR f.codeFiliere = :filiereCode)
             AND (:coordinateurCin IS NULL OR :coordinateurCin = '' OR c.cin = :coordinateurCin)
             AND (:departement IS NULL OR :departement = '' OR m.departementDattache = :departement)
-            ORDER BY f.nomFiliere, m.nomModule
         """,
         countQuery = """
             SELECT count(m.id)

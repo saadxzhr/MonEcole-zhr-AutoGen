@@ -1,5 +1,7 @@
 package com.myschool.backend.Model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 import jakarta.persistence.*;
 
 @Entity

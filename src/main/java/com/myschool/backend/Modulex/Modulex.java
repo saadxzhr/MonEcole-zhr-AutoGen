@@ -2,6 +2,7 @@ package com.myschool.backend.Modulex;
 
 import org.hibernate.annotations.BatchSize;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.myschool.backend.Model.Employe;
 import com.myschool.backend.Model.Filiere;
 
@@ -57,9 +58,11 @@ public class Modulex {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "coordinateur", referencedColumnName = "cin", nullable = false)
+    @JsonIgnore
     private Employe coordinateur;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "codefiliere", referencedColumnName = "codefiliere", nullable = false)
+    @JsonIgnore
     private Filiere filiere;
 }

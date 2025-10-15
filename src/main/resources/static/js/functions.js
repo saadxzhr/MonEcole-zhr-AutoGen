@@ -609,6 +609,11 @@ function trouverFiliere() {
 
 
 
+ 
+
+
+
+
 async function actionModulex() {
   const container = document.getElementById("modulexTableContainer");
   const tbody = document.querySelector("#modulexTable tbody");
@@ -629,6 +634,42 @@ async function actionModulex() {
   let last = false;
   let loading = false;
 
+  // --- Helper pour échapper le HTML ---
+  function escapeHtml(s) {
+    if (!s) return "";
+    return s.replaceAll("&","&amp;")
+            .replaceAll("<","&lt;")
+            .replaceAll(">","&gt;")
+            .replaceAll('"',"&quot;");
+  }
+
+  // --- Alert helper ---
+  function showAlert(message, type = "success") {
+    let alertEl = document.getElementById("modulexAlert");
+    if (!alertEl) {
+      alertEl = document.createElement("div");
+      alertEl.id = "modulexAlert";
+      alertEl.style.position = "fixed";
+      alertEl.style.top = "10px";
+      alertEl.style.right = "10px";
+      alertEl.style.padding = "10px 20px";
+      alertEl.style.borderRadius = "5px";
+      alertEl.style.color = "white";
+      alertEl.style.zIndex = "9999";
+      alertEl.style.transition = "opacity 0.5s";
+      document.body.appendChild(alertEl);
+    }
+
+    alertEl.textContent = message;
+    alertEl.style.backgroundColor = type === "success" ? "#28a745" : "#dc3545";
+    alertEl.style.opacity = "1";
+
+    setTimeout(() => {
+      alertEl.style.opacity = "0";
+    }, 2500);
+  }
+
+  // --- Chargement des selects ---
   async function loadSelects() {
     const [filieres, employes, departements] = await Promise.all([
       fetch("/req/modulex/api/filieres").then(r => r.json()),
@@ -636,22 +677,17 @@ async function actionModulex() {
       fetch("/req/modulex/api/departements").then(r => r.json())
     ]);
 
-    // Helper to fill <select> with options
     const fillSelect = (sel, options, valueKey = "code", labelKey = "label") => {
       sel.innerHTML = "";
-
-      // Default "all" option
       const def = document.createElement("option");
       def.value = "";
-      def.textContent =
-        sel.id === "filterDepart"
-          ? "Tous les départements"
-          : sel.id === "filterCoordx" || sel.id === "filterCoord"
+      def.textContent = sel.id === "filterDepart"
+        ? "Tous les départements"
+        : sel.id === "filterCoord"
           ? "Tous les coordinateurs"
           : "Toutes les filières";
       sel.appendChild(def);
 
-      // Add actual options
       options.forEach(o => {
         const opt = document.createElement("option");
         opt.value = o[valueKey];
@@ -660,27 +696,19 @@ async function actionModulex() {
       });
     };
 
-    // --- Filieres ---
-      const filiereOptions = filieres.map(f => ({
-          code: f.codeFiliere,
-      label: f.nomFiliere
-    }));
-    fillSelect(filterFiliere, filiereOptions, "code", "label");
-    fillSelect(document.querySelector('select[name="codeFiliere"]'), filiereOptions, "code", "label");
+    const filiereOptions = filieres.map(f => ({ code: f.codeFiliere, label: f.nomFiliere }));
+    fillSelect(filterFiliere, filiereOptions);
+    fillSelect(document.querySelector('select[name="codeFiliere"]'), filiereOptions);
 
-    // --- Employes ---
-    const employeOptions = employes.map(e => ({
-      cin: e.cin,
-      label: `${e.nom} ${e.prenom}`
-    }));
+    const employeOptions = employes.map(e => ({ cin: e.cin, label: `${e.nom} ${e.prenom}` }));
     fillSelect(filterCoord, employeOptions, "cin", "label");
     fillSelect(document.querySelector('select[name="coordinateurCin"]'), employeOptions, "cin", "label");
 
-    // --- Departements ---
     const deptOptions = departements.map(d => ({ code: d, label: d }));
-    fillSelect(filterDepart, deptOptions, "code", "label");
+    fillSelect(filterDepart, deptOptions);
   }
 
+  // --- Chargement de la page ---
   async function loadPage(reset = false) {
     if (loading) return;
     if (reset) {
@@ -700,9 +728,20 @@ async function actionModulex() {
 
     try {
       const res = await fetch("/req/modulex/api?" + params.toString());
-      if (!res.ok) throw new Error("Load failed");
       const data = await res.json();
-      data.content.forEach(m => {
+
+      if (!res.ok) {
+        const msg = data?.message || "Erreur serveur inconnue";
+        showAlert(msg, "error");
+        return; // on arrête le chargement
+      }
+
+      if (!data.data) {
+        showAlert("Aucune donnée reçue du serveur.", "error");
+        return;
+      }
+
+      data.data.content.forEach(m => {
         const tr = document.createElement("tr");
         tr.dataset.id = m.id;
         tr.innerHTML = `
@@ -726,54 +765,44 @@ async function actionModulex() {
 
       attachButtons();
 
-      last = data.last;
-      page = data.number + 1;
+      last = data.data.last;
+      page = data.data.number + 1;
     } catch (err) {
       console.error(err);
-      alert("Erreur de chargement");
+      showAlert(err.message, "error");
     } finally {
       loading = false;
     }
   }
 
+  // --- Boutons modifier / supprimer ---
   function attachButtons() {
+    // Modifier
     tbody.querySelectorAll(".modify-btn").forEach(btn => {
       btn.onclick = () => {
         const row = btn.closest("tr");
         const cells = row.querySelectorAll("td");
-        const codeModule = cells[1].innerText.trim();
-        const nomModule = cells[2].innerText.trim();
-        const description = cells[3].innerText.trim();
-        const nombreHeures = cells[4].innerText.trim();
-        const coefficient = cells[5].innerText.trim();
         const filiereText = cells[6].innerText.trim();
-        const depart = cells[7].innerText.trim();
         const coordName = cells[8].innerText.trim();
-        const option = cells[9].innerText.trim();
-        const semestre = cells[10].innerText.trim();
 
         form.setAttribute("data-mode", "edit");
         form.querySelector('[name="id"]').value = row.dataset.id;
-        form.querySelector('[name="codeModule"]').value = codeModule;
-        form.querySelector('[name="nomModule"]').value = nomModule;
-        form.querySelector('[name="description"]').value = description;
-        form.querySelector('[name="nombreHeures"]').value = nombreHeures;
-        form.querySelector('[name="coefficient"]').value = coefficient;
-        form.querySelector('[name="departementDattache"]').value = depart;
-        form.querySelector('[name="optionModule"]').value = option;
-        form.querySelector('[name="semestre"]').value = semestre;
+        form.querySelector('[name="codeModule"]').value = cells[1].innerText.trim();
+        form.querySelector('[name="nomModule"]').value = cells[2].innerText.trim();
+        form.querySelector('[name="description"]').value = cells[3].innerText.trim();
+        form.querySelector('[name="nombreHeures"]').value = cells[4].innerText.trim();
+        form.querySelector('[name="coefficient"]').value = cells[5].innerText.trim();
+        form.querySelector('[name="departementDattache"]').value = cells[7].innerText.trim();
+        form.querySelector('[name="optionModule"]').value = cells[9].innerText.trim();
+        form.querySelector('[name="semestre"]').value = cells[10].innerText.trim();
 
         const codeF = filiereText.split(" - ")[0] || "";
-        const selF = form.querySelector('[name="codeFiliere"]');
-        if (selF) selF.value = codeF;
+        form.querySelector('[name="codeFiliere"]').value = codeF;
 
         const selC = form.querySelector('[name="coordinateurCin"]');
         if (selC) {
-          for (const opt of selC.options) {
-            if (opt.text === coordName || opt.text.trim() === coordName) {
-              selC.value = opt.value; break;
-            }
-          }
+          const opt = Array.from(selC.options).find(o => o.text.trim() === coordName);
+          if (opt) selC.value = opt.value;
         }
 
         submitBtn.textContent = "Modifier";
@@ -781,98 +810,77 @@ async function actionModulex() {
       };
     });
 
+    // Supprimer
     tbody.querySelectorAll(".delete-btn").forEach(btn => {
       btn.onclick = async () => {
         const id = btn.closest("tr").dataset.id;
-        if (!confirm("Supprimer ce module ?\n\nAttention! La suppression de ce module supprimera aussi les matières, emplois du temps et état d'avancement correspondants!")) return;
-        const res = await fetch("/req/modulex/api/" + id, {
-          method: "DELETE",
-          headers: { [csrfHeader]: csrfToken }
-        });
-        if (res.ok) {
-          await loadPage(true);
-          alert("Module supprimé avec succès!");
-        } else {
-          alert("Erreur lors de la suppression");
+        if (!confirm("Supprimer ce module ?\nAttention! La suppression supprimera matières, emplois du temps et suivi d'avancement.")) return;
+
+        try {
+          const res = await fetch("/req/modulex/api/" + id, {
+            method: "DELETE",
+            headers: { [csrfHeader]: csrfToken }
+          });
+          const data = await res.json();
+          if (res.ok) {
+            await loadPage(true);
+            showAlert(data?.message || "Module supprimé", "success");
+          } else {
+            showAlert(data?.message || "Erreur lors de la suppression", "error");
+          }
+        } catch (err) {
+          console.error(err);
+          showAlert("Erreur réseau lors de la suppression", "error");
         }
       };
     });
   }
 
+  // --- Formulaire add/edit ---
   form.onsubmit = async e => {
-      e.preventDefault();
-      const formData = Object.fromEntries(new FormData(form).entries());
-      const mode = form.getAttribute("data-mode") || "add";
+    e.preventDefault();
+    const formData = Object.fromEntries(new FormData(form).entries());
+    const mode = form.getAttribute("data-mode") || "add";
 
-      const payload = {
-          codeModule: formData.codeModule,
-          nomModule: formData.nomModule,
-          description: formData.description,
-          nombreHeures: formData.nombreHeures ? parseFloat(formData.nombreHeures) : null,
-          coefficient: formData.coefficient ? parseFloat(formData.coefficient) : null,
-          departementDattache: formData.departementDattache,
-          optionModule: formData.optionModule,
-          semestre: formData.semestre ? Number(formData.semestre) : null,
-          codeFiliere: formData.codeFiliere,
-          coordinateurCin: formData.coordinateurCin
-      };
+    const payload = {
+      codeModule: formData.codeModule,
+      nomModule: formData.nomModule,
+      description: formData.description,
+      nombreHeures: formData.nombreHeures ? parseFloat(formData.nombreHeures) : null,
+      coefficient: formData.coefficient ? parseFloat(formData.coefficient) : null,
+      departementDattache: formData.departementDattache,
+      optionModule: formData.optionModule,
+      semestre: formData.semestre ? Number(formData.semestre) : null,
+      codeFiliere: formData.codeFiliere,
+      coordinateurCin: formData.coordinateurCin
+    };
+    if (mode === "edit") payload.id = formData.id ? Number(formData.id) : null;
 
-      if (mode === "edit") {
-          payload.id = formData.id ? Number(formData.id) : null;
+    const url = mode === "add" ? "/req/modulex/api" : "/req/modulex/api/" + payload.id;
+    const method = mode === "add" ? "POST" : "PUT";
+
+    try {
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json", [csrfHeader]: csrfToken },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+
+      if (res.ok) {
+        modal.style.display = "none";
+        await loadPage(true);
+        showAlert(mode === "add" ? "Module ajouté avec succès !" : "Module modifié avec succès !", "success");
+      } else {
+        showAlert(data?.message || "Erreur lors de l'enregistrement", "error");
       }
-
-      const url = mode === "add" ? "/req/modulex/api" : "/req/modulex/api/" + payload.id;
-      const method = mode === "add" ? "POST" : "PUT";
-
-      try {
-          const res = await fetch(url, {
-              method,
-              headers: { "Content-Type": "application/json", [csrfHeader]: csrfToken },
-              body: JSON.stringify(payload)
-          });
-
-          if (res.ok) {
-              modal.style.display = "none";
-              await loadPage(true);
-
-              showAlert(mode === "add" ? "Module ajouté avec succès !" : "Module modifié avec succès !", "success");
-          } else {
-              const txt = await res.text();
-              showAlert("Erreur lors de l'enregistrement: " + txt, "error");
-          }
-      } catch (err) {
-          console.error(err);
-          showAlert("Erreur réseau lors de l'enregistrement", "error");
-      }
+    } catch (err) {
+      console.error(err);
+      showAlert("Erreur réseau lors de l'enregistrement", "error");
+    }
   };
 
-  // --- Alert helper ---
-  function showAlert(message, type = "success") {
-      let alertEl = document.getElementById("modulexAlert");
-      if (!alertEl) {
-          alertEl = document.createElement("div");
-          alertEl.id = "modulexAlert";
-          alertEl.style.position = "fixed";
-          alertEl.style.top = "10px";
-          alertEl.style.right = "10px";
-          alertEl.style.padding = "10px 20px";
-          alertEl.style.borderRadius = "5px";
-          alertEl.style.color = "white";
-          alertEl.style.zIndex = "9999";
-          alertEl.style.transition = "opacity 0.5s";
-          document.body.appendChild(alertEl);
-      }
-
-      alertEl.textContent = message;
-      alertEl.style.backgroundColor = type === "success" ? "#28a745" : "#dc3545";
-      alertEl.style.opacity = "1";
-
-      setTimeout(() => {
-          alertEl.style.opacity = "0";
-      }, 2500); // fades out after 2.5s
-  };
-
-
+  // --- Modal open/close ---
   openBtn.onclick = () => {
     form.reset();
     form.setAttribute("data-mode", "add");
@@ -882,28 +890,22 @@ async function actionModulex() {
   };
   closeBtn.onclick = () => modal.style.display = "none";
 
+  // --- Filtres ---
   [filterFiliere, filterCoord, filterDepart].forEach(sel => {
     sel.onchange = () => loadPage(true);
   });
 
+  // --- Scroll infini ---
   container.onscroll = () => {
     if (container.scrollTop + container.clientHeight >= container.scrollHeight - 20) {
       loadPage(false);
     }
   };
 
-  function escapeHtml(s) {
-    if (!s) return "";
-    return s.replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;");
-  }
-
+  // --- Init ---
   await loadSelects();
   await loadPage(true);
 }
-
-
-
-
 
 
 

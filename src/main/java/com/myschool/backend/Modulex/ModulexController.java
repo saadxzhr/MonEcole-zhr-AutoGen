@@ -13,6 +13,8 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.ModelAndView;
 
+import com.myschool.backend.DTO.PageResponseDTO;
+import com.myschool.backend.Exception.ResponseDTO;
 import com.myschool.backend.Projection.EmployeProjection;
 import com.myschool.backend.Projection.FiliereProjection;
 import com.myschool.backend.Service.EmployeService;
@@ -36,9 +38,11 @@ public class ModulexController {
     private final EmployeService employeService;
 
 
-    //Charger page module
-    @GetMapping
-    public ModelAndView page(Model model) {
+    
+
+//Charger page module
+    @GetMapping()
+    public ModelAndView modulex(Model model) {
         return new ModelAndView("fragments/direction/modulex :: content");
     }
 
@@ -46,53 +50,56 @@ public class ModulexController {
     //charger table modulex
     @GetMapping("/api")
     @ResponseBody
-    public ResponseEntity<Page<ModulexDTO>> getModules(
+    public ResponseEntity<ResponseDTO<PageResponseDTO<ModulexDTO>>> getModules(
             @RequestParam(required=false) String filiereCode,
             @RequestParam(required=false) String coordinateurCin,
             @RequestParam(required=false) String departement,
             @RequestParam(defaultValue="0") int page,
             @RequestParam(defaultValue="20") int size) {
-        
-            log.debug("Fetching modules with filters - filiere: {}, coord: {}, dept: {}", 
-                  filiereCode, coordinateurCin, departement);
 
-            Page<ModulexDTO> result = modulexService.getModulesPage(
-                filiereCode, coordinateurCin, departement, page, size
-            );
-     return ResponseEntity.ok(result);
-    }
+         
+        PageResponseDTO<ModulexDTO> result = modulexService.getModulesPage(
+            filiereCode, coordinateurCin, departement, page, size
+        );
+        return ResponseEntity.ok(ResponseDTO.success("Page de modules chargée avec succès", result));
+    }                       
+
 
 
     //Ajouter module
     @PostMapping("/api")
     @ResponseBody
     @PreAuthorize("hasRole('DIRECTOR')")
-    public ResponseEntity<ModulexDTO> createModule(@Valid @RequestBody ModulexDTO dto) {
+    public ResponseEntity<ResponseDTO<ModulexDTO>> createModule(@Valid @RequestBody ModulexDTO dto) {
         log.info("Creating new module: {}", dto.getCodeModule());
         ModulexDTO created = modulexService.createModule(dto);
-        return ResponseEntity.status(HttpStatus.CREATED).body(created);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ResponseDTO.success("Module créé avec succès", created));
     }
 
     //Modifer un module
     @PutMapping("/api/{id}")
     @ResponseBody
     @PreAuthorize("hasRole('DIRECTOR')")
-    public ResponseEntity<ModulexDTO> updateModule(
+    public ResponseEntity<ResponseDTO<ModulexDTO>> updateModule(
             @PathVariable @NotNull Long id, 
             @Valid @RequestBody ModulexDTO dto) {
+
+                
+        // Nettoyage des codes
         log.info("Updating module with id: {}", id);
         ModulexDTO updated = modulexService.updateModule(id, dto);
-        return ResponseEntity.ok(updated);
+        return ResponseEntity.ok(ResponseDTO.success("Module mis à jour avec succès", updated));
     }
 
     //Supprimer un module
     @DeleteMapping("/api/{id}")
     @ResponseBody
     @PreAuthorize("hasRole('DIRECTOR')")
-    public ResponseEntity<Map<String, String>> deleteModule(@PathVariable @NotNull @Valid Long id) {
+    public ResponseEntity<ResponseDTO<Void>> deleteModule(@PathVariable @NotNull @Valid Long id) {
         log.info("Deleting module with id: {}", id);
         modulexService.deleteModule(id);
-        return ResponseEntity.ok(Map.of("message", "Module deleted successfully"));
+        return ResponseEntity.ok(ResponseDTO.success("Module supprimé avec succès", null));
     }
 
 

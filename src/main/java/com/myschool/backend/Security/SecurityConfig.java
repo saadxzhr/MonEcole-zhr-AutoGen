@@ -49,7 +49,7 @@ public class SecurityConfig {
                 .permitAll()
             )
             .authorizeHttpRequests(auth -> {
-                auth.requestMatchers("/login", "/css/**", "/js/**").permitAll();
+                auth.requestMatchers("/login", "/css/**", "/js/**", "/v3/api-docs/**", "/swagger-ui/**").permitAll();
                 auth.requestMatchers("/direction/**").hasRole("Direction");
                 auth.requestMatchers("/secretariat/**").hasRole("Secretariat");
                 auth.requestMatchers("/generate-recurring/**").hasAnyRole("Direction", "Secretariat");
