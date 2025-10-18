@@ -7,7 +7,7 @@ function loadContent(pageOrUrl) {
     filieres: "/req/filieres",
     matieres: "/req/matieres",
     employes: "/req/employes",
-    modulex: "/req/modulex",
+    modulex: "/api/v1/modulex",
     users: "/req/users",
     accueildirection: "/req/accueildirection",
   };

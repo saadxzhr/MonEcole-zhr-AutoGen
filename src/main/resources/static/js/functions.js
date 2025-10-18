@@ -668,13 +668,14 @@ async function actionModulex() {
       alertEl.style.opacity = "0";
     }, 2500);
   }
-
+  
   // --- Chargement des selects ---
-  async function loadSelects() {
-    const [filieres, employes, departements] = await Promise.all([
-      fetch("/req/modulex/api/filieres").then(r => r.json()),
-      fetch("/req/modulex/api/employes").then(r => r.json()),
-      fetch("/req/modulex/api/departements").then(r => r.json())
+    async function loadSelects() {
+
+  const [filieres, employes, departements] = await Promise.all([
+      fetch("/api/v1/modulex/filieres").then(r => r.json()),
+      fetch("/api/v1/modulex/employes").then(r => r.json()),
+      fetch("/api/v1/modulex/departements").then(r => r.json())
     ]);
 
     const fillSelect = (sel, options, valueKey = "code", labelKey = "label") => {
@@ -706,8 +707,8 @@ async function actionModulex() {
 
     const deptOptions = departements.map(d => ({ code: d, label: d }));
     fillSelect(filterDepart, deptOptions);
+  
   }
-
   // --- Chargement de la page ---
   async function loadPage(reset = false) {
     if (loading) return;
@@ -727,7 +728,7 @@ async function actionModulex() {
     params.append("size", size);
 
     try {
-      const res = await fetch("/req/modulex/api?" + params.toString());
+      const res = await fetch("/api/v1/modulex/list?" + params.toString());
       const data = await res.json();
 
       if (!res.ok) {
@@ -817,10 +818,10 @@ async function actionModulex() {
         if (!confirm("Supprimer ce module ?\nAttention! La suppression supprimera matières, emplois du temps et suivi d'avancement.")) return;
 
         try {
-          const res = await fetch("/req/modulex/api/" + id, {
-            method: "DELETE",
-            headers: { [csrfHeader]: csrfToken }
-          });
+          const res = await fetch("/api/v1/modulex/" + id, {
+          method: "DELETE",
+          headers: { [csrfHeader]: csrfToken }
+        });
           const data = await res.json();
           if (res.ok) {
             await loadPage(true);
@@ -856,7 +857,7 @@ async function actionModulex() {
     };
     if (mode === "edit") payload.id = formData.id ? Number(formData.id) : null;
 
-    const url = mode === "add" ? "/req/modulex/api" : "/req/modulex/api/" + payload.id;
+    const url = mode === "add" ? "/api/v1/modulex" : "/api/v1/modulex/" + payload.id;
     const method = mode === "add" ? "POST" : "PUT";
 
     try {

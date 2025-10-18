@@ -1,11 +1,15 @@
 package com.myschool.backend.Modulex;
 
 import com.myschool.backend.Config.DuplicateResourceException;
-import com.myschool.backend.DTO.PageResponseDTO;
+import com.myschool.backend.Exception.BusinessValidationException;
+import com.myschool.backend.Exception.PageResponseDTO;
 import com.myschool.backend.Exception.ResourceNotFoundException;
 
 import com.myschool.backend.Service.EmployeService;
 import com.myschool.backend.Service.FiliereService;
+
+import jakarta.persistence.OptimisticLockException;
+
 import org.springframework.transaction.annotation.Transactional;
 
 import lombok.RequiredArgsConstructor;
@@ -61,32 +65,39 @@ public class ModulexService {
     // ======================================
     // CREATE MODULE
     // ======================================
-    public ModulexDTO createModule(ModulexDTO dto) {
-        validateModulex(dto, false);
+        public ModulexDTO createModule(ModulexDTO dto) {
+            //Vérifier l’unicité du code
+            if (modulexRepository.existsByCodeModule(dto.getCodeModule())) {
+                throw new DuplicateResourceException(
+                    "Module avec code " + dto.getCodeModule() + " existe déjà!"
+                );
+            }
+            //Mapper DTO → Entity
+            Modulex module = modulexMapper.toEntity(dto);
+            //Gerrer Filiere et coordinteur
+            setModuleRelationships(module, dto);
 
-        Modulex module = modulexMapper.toEntity(dto);
-        setModuleRelationships(module, dto);
-
-        Modulex saved = modulexRepository.save(module);
-        return modulexMapper.toDto(saved);
-    }
+            //Sauvegarder en base
+            Modulex saved = modulexRepository.save(module);
+            //Mapper Entity → DTO
+            return modulexMapper.toDto(saved);
+        }
 
     // ======================================
     // UPDATE MODULE
     // ======================================
     public ModulexDTO updateModule(Long id, ModulexDTO dto) {
-        Modulex existing = modulexRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        ENTITY_NAME + " non trouvé avec id : " + id));
+            //1. Récupérer le module existant
+            Modulex ent = modulexRepository.findById(id)
+                    .orElseThrow(() -> new ResourceNotFoundException("Module non trouvé avec id : " + id));
+            //2. Mettre à jour les champs simples via MapStruct
+            modulexMapper.updateEntityFromDto(dto, ent);
 
-        validateModulex(dto, true);
+            //5. Sauvegarder et renvoyer
+            Modulex saved = modulexRepository.save(ent);
+            return modulexMapper.toDto(saved);
+        }
 
-        modulexMapper.updateEntityFromDto(dto, existing);
-        setModuleRelationships(existing, dto);
-
-        Modulex saved = modulexRepository.save(existing);
-        return modulexMapper.toDto(saved);
-    }
 
     // ======================================
     // DELETE MODULE
@@ -105,32 +116,6 @@ public class ModulexService {
     @Transactional(readOnly = true)
     public List<String> getDistinctDepartements() {
         return modulexRepository.findDistinctDepartements();
-    }
-
-    // ======================================
-    // PRIVATE: VALIDATION MÉTIER
-    // ======================================
-    private void validateModulex(ModulexDTO dto, boolean isUpdate) {
-        // Vérifie unicité du code (création seulement)
-        if (!isUpdate && modulexRepository.existsByCodeModule(dto.getCodeModule())) {
-            throw new DuplicateResourceException(
-                    "Module avec code " + dto.getCodeModule() + " existe déjà!"
-            );
-        }
-
-        // Vérifie existence filière
-        if (!filiereService.existsByCodeFiliere(dto.getCodeFiliere())) {
-            throw new ResourceNotFoundException(
-                    "Filière non trouvée : " + dto.getCodeFiliere()
-            );
-        }
-
-        // Vérifie existence coordinateur
-        if (!employeService.existsByCin(dto.getCoordinateurCin())) {
-            throw new ResourceNotFoundException(
-                    "Coordinateur non trouvé : " + dto.getCoordinateurCin()
-            );
-        }
     }
 
     // ======================================

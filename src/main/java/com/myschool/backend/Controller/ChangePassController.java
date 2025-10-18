@@ -39,7 +39,7 @@ public class ChangePassController {
         }
 
         // Charger l'utilisateur actuel
-        MyAppUser user = userService.repository.findByUsername(principal.getName())
+        MyAppUser user = userService.myAppUserRepository.findByUsername(principal.getName())
                 .orElseThrow(() -> new RuntimeException("Utilisateur introuvable."));
 
         // Vérifier mot de passe actuel
@@ -56,7 +56,7 @@ public class ChangePassController {
 
         // Encoder et sauvegarder
         user.setPassword(passwordEncoder.encode(newPass));
-        userService.repository.save(user);
+        userService.myAppUserRepository.save(user);
 
         return ResponseEntity.ok(Map.of("success", true, "message", "Mot de passe modifié avec succès."));
     }

@@ -15,11 +15,16 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * 🌍 GlobalExceptionHandler
+ * Centralise toutes les exceptions pour fournir des réponses API cohérentes.
+ * Chaque erreur renvoie un objet ResponseDTO standardisé.
+ */
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    // --- Duplicate ---
+    // 🔁 Doublon (ex: code déjà existant)
     @ExceptionHandler(DuplicateResourceException.class)
     public ResponseEntity<ResponseDTO<Void>> handleDuplicate(DuplicateResourceException ex) {
         log.warn("Duplicate error: {}", ex.getMessage());
@@ -27,7 +32,7 @@ public class GlobalExceptionHandler {
                 .body(new ResponseDTO<>("DUPLICATE_RESOURCE", ex.getMessage(), null));
     }
 
-    // --- Not found ---
+    // 🚫 Ressource non trouvée
     @ExceptionHandler({ResourceNotFoundException.class, EntityNotFoundException.class})
     public ResponseEntity<ResponseDTO<Void>> handleNotFound(RuntimeException ex) {
         log.warn("Resource not found: {}", ex.getMessage());
@@ -35,51 +40,49 @@ public class GlobalExceptionHandler {
                 .body(new ResponseDTO<>("NOT_FOUND", ex.getMessage(), null));
     }
 
-    // --- Validation / contrainte ---
-   @ExceptionHandler(MethodArgumentNotValidException.class)
+    // ⚠️ Erreurs de validation DTO (ex: @NotNull, @Size...)
+    @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ResponseDTO<Map<String, String>>> handleValidation(MethodArgumentNotValidException ex) {
 
         Map<String, String> errors = new HashMap<>();
-
         ex.getBindingResult().getFieldErrors().forEach(err ->
-            errors.put(err.getField(), err.getDefaultMessage())
+                errors.put(err.getField(), err.getDefaultMessage())
         );
 
-        // ✅ Récupère le premier message d’erreur lisible
-        String message = errors.values().stream().findFirst().orElse("Les données envoyées sont invalides.");
+        // ✅ Message utilisateur principal
+        String message = errors.values().stream()
+                .findFirst()
+                .orElse("Les données envoyées sont invalides.");
 
         log.warn("Validation error: {}", errors);
 
-        ResponseDTO<Map<String, String>> response = new ResponseDTO<>(
-                "VALIDATION_ERROR",
-                message,   // <-- ici on renvoie le vrai message utilisateur
-                errors     // tu peux afficher tous les champs invalides si tu veux
+        return ResponseEntity.badRequest().body(
+                new ResponseDTO<>("VALIDATION_ERROR", message, errors)
         );
-
-        return ResponseEntity.badRequest().body(response);
     }
 
-
-    // --- Mauvais type (ex: id non numérique) ---
+    // 🧩 Mauvais type (ex: ID non numérique dans l’URL)
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<ResponseDTO<Void>> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
         String message = "Type de paramètre invalide pour '" + ex.getName() + "'";
+        log.warn("Type mismatch: {}", message);
         return ResponseEntity.badRequest()
                 .body(new ResponseDTO<>("TYPE_MISMATCH", message, null));
     }
 
-    // --- Autres erreurs inattendues ---
-    @ExceptionHandler(Exception.class)
-    public ResponseEntity<ResponseDTO<Void>> handleGeneric(Exception ex) {
-        log.error("Unexpected error: ", ex);
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(new ResponseDTO<>("INTERNAL_ERROR", "Erreur interne du serveur.", null));
-    }
-
-
+    // 🧠 Erreurs de validation métier (Business rules)
     @ExceptionHandler(BusinessValidationException.class)
     public ResponseEntity<ResponseDTO<Void>> handleBusinessValidation(BusinessValidationException ex) {
+        log.warn("Business validation error: {}", ex.getMessage());
         return ResponseEntity.badRequest()
                 .body(new ResponseDTO<>("VALIDATION_ERROR", ex.getMessage(), null));
+    }
+
+    // 💣 Cas inattendu (NullPointerException, SQL, etc.)
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<ResponseDTO<Void>> handleGeneric(Exception ex) {
+        log.error("Unexpected error:", ex);
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(new ResponseDTO<>("INTERNAL_ERROR", "Erreur interne du serveur.", null));
     }
 }

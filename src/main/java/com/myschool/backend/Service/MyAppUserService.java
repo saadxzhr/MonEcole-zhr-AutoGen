@@ -10,25 +10,27 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import com.myschool.backend.Model.MyAppUser;
 import com.myschool.backend.Repository.MyAppUserRepository;
 
 import lombok.AllArgsConstructor;
+import lombok.RequiredArgsConstructor;
 
 @Service
+@RequiredArgsConstructor
+
 public class MyAppUserService implements UserDetailsService {
 
-    @Autowired
-    public MyAppUserRepository repository;
+    public final MyAppUserRepository myAppUserRepository;
 
-    @Autowired
-    private org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
+    private final PasswordEncoder passwordEncoder;
 
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        var user = repository.findByUsername(username)
+        var user = myAppUserRepository.findByUsername(username)
                 .orElseThrow(() -> new UsernameNotFoundException(username));
 
         List<GrantedAuthority> authorities = new ArrayList<>();
@@ -40,7 +42,7 @@ public class MyAppUserService implements UserDetailsService {
             // pas encore encodé
             password = new org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder().encode(password);
             user.setPassword(password);
-            repository.save(user); // on met à jour une fois
+            myAppUserRepository.save(user); // on met à jour une fois
         }
 
         return new org.springframework.security.core.userdetails.User(
@@ -51,18 +53,18 @@ public class MyAppUserService implements UserDetailsService {
 
     public MyAppUser createUser(MyAppUser user) {   
         user.setPassword(passwordEncoder.encode(user.getPassword()));
-        return repository.save(user);
+        return myAppUserRepository.save(user);
     }
 
     public MyAppUser updateUser(Long id, MyAppUser user) {
-        return repository.findById(id).map(existing -> {
+        return myAppUserRepository.findById(id).map(existing -> {
             existing.setUsername(user.getUsername());
             if (user.getPassword() != null && !user.getPassword().isBlank()) {
                 existing.setPassword(passwordEncoder.encode(user.getPassword()));
             }
             existing.setRole(user.getRole());
             existing.setCin(user.getCin());
-            return repository.save(existing);
+            return myAppUserRepository.save(existing);
         }).orElseThrow(() -> new RuntimeException("User not found"));
     }
 

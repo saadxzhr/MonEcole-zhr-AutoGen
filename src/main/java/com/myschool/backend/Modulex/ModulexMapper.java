@@ -9,7 +9,7 @@ import org.mapstruct.MappingTarget;
 import org.mapstruct.Named;
 import org.mapstruct.NullValuePropertyMappingStrategy;
 
-import com.myschool.backend.DTO.PageResponseDTO;
+import com.myschool.backend.Exception.PageResponseDTO;
 import com.myschool.backend.Model.Employe;
 
 

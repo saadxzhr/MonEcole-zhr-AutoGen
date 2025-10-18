@@ -1,4 +1,4 @@
-package com.myschool.backend.DTO;
+package com.myschool.backend.Exception;
 
 import java.util.List;
 
