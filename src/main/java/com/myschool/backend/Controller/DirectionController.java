@@ -85,11 +85,7 @@ public class DirectionController {
     // @Autowired
     // private CalculateProgress CalculateProgress;
 
-    @GetMapping("/")
-    public String redirectToDirection() {
-        return "fragments/direction/accueildirection :: content";
-    }
-
+     
     //charger l'interface direction en affichant le nom de l'utilisateur
     @GetMapping("/direction")
     public String getSecretairePage(Model model, Principal principal) {
