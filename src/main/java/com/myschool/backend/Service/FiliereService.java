@@ -26,6 +26,7 @@ public class FiliereService {
         this.employeRepository = employeRepository;
     }
     
+    
 
     public List<FiliereDTO> getAllFilieres() {
         return filiereRepository.findAll().stream().map(f -> {
@@ -91,6 +92,10 @@ public class FiliereService {
                 .orElseThrow(() -> new EntityNotFoundException("Filière non trouvée: " + code));
     }
 
+
+    public boolean existsByCodeFiliere(String codeFiliere) {
+        return filiereRepository.existsByCodeFiliere(codeFiliere);
+    }
 
     
 }

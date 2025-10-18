@@ -34,7 +34,7 @@ public class BackendApplication {
 /// 
 
 //git add .
-//git commit -m "Modulex before final optimization 2"
+//git commit -m "Modulex before final optimization 4 mapperstruct and login fixed"
 //git push
 
 

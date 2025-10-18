@@ -25,6 +25,8 @@ public interface EmployeRepository extends JpaRepository<Employe, Long> {
     List<String> getUniqueRole();
 
 
+    boolean existsByCin(String cin);
+
     
 }
 

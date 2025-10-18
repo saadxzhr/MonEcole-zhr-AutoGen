@@ -35,4 +35,8 @@ public class EmployeService {
         return employeRepository.findByCin(cin)
                 .orElseThrow(() -> new EntityNotFoundException("Employe non trouvée: " + cin));
     }
+
+    public boolean existsByCin(String cin) {
+        return employeRepository.existsByCin(cin);
+    }
 }

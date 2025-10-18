@@ -25,6 +25,8 @@ public interface FiliereRepository extends JpaRepository<Filiere, Long> {
     @Query("SELECT DISTINCT f.codeFiliere AS codeFiliere, f.nomFiliere AS nomFiliere FROM Filiere f")
     List<FiliereProjection> findFilieresProjection();
 
+    boolean existsByCodeFiliere(String codeFiliere);
+
 
     
 
