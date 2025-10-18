@@ -69,7 +69,7 @@ public class ModulexController {
     //Ajouter module
     @PostMapping("/api")
     @ResponseBody
-    @PreAuthorize("hasRole('DIRECTOR')")
+    @PreAuthorize("hasRole('Direction')")
     public ResponseEntity<ResponseDTO<ModulexDTO>> createModule(@Valid @RequestBody ModulexDTO dto) {
         log.info("Creating new module: {}", dto.getCodeModule());
         ModulexDTO created = modulexService.createModule(dto);
@@ -80,7 +80,7 @@ public class ModulexController {
     //Modifer un module
     @PutMapping("/api/{id}")
     @ResponseBody
-    @PreAuthorize("hasRole('DIRECTOR')")
+    @PreAuthorize("hasRole('Direction')")
     public ResponseEntity<ResponseDTO<ModulexDTO>> updateModule(
             @PathVariable @NotNull Long id, 
             @Valid @RequestBody ModulexDTO dto) {
@@ -95,7 +95,7 @@ public class ModulexController {
     //Supprimer un module
     @DeleteMapping("/api/{id}")
     @ResponseBody
-    @PreAuthorize("hasRole('DIRECTOR')")
+    @PreAuthorize("hasRole('Direction')")
     public ResponseEntity<ResponseDTO<Void>> deleteModule(@PathVariable @NotNull @Valid Long id) {
         log.info("Deleting module with id: {}", id);
         modulexService.deleteModule(id);

@@ -17,7 +17,9 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
+import lombok.ToString;
 
 
 
@@ -59,10 +61,14 @@ public class Modulex {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "coordinateur", referencedColumnName = "cin", nullable = false)
     @JsonIgnore
+    @EqualsAndHashCode.Exclude
+    @ToString.Exclude
     private Employe coordinateur;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "codefiliere", referencedColumnName = "codefiliere", nullable = false)
     @JsonIgnore
+    @EqualsAndHashCode.Exclude
+    @ToString.Exclude
     private Filiere filiere;
 }
