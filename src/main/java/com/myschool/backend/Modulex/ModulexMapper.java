@@ -36,12 +36,18 @@ public interface ModulexMapper {
     @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
     @Mapping(target = "filiere", ignore = true)
     @Mapping(target = "coordinateur", ignore = true)
+    @Mapping(target = "createdAt", ignore = true)
+    @Mapping(target = "updatedAt", ignore = true)
+    @Mapping(target = "version", ignore = true)
     Modulex toEntity(ModulexDTO dto);
 
     // === Mise à jour partielle d'une entité existante ===
     @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
     @Mapping(target = "filiere", ignore = true)
     @Mapping(target = "coordinateur", ignore = true)
+    @Mapping(target = "createdAt", ignore = true)
+    @Mapping(target = "updatedAt", ignore = true)
+    @Mapping(target = "version", ignore = true)
     void updateEntityFromDto(ModulexDTO dto, @MappingTarget Modulex ent);
 
 

@@ -4,7 +4,8 @@ import com.myschool.backend.Config.DuplicateResourceException;
 import com.myschool.backend.Exception.BusinessValidationException;
 import com.myschool.backend.Exception.PageResponseDTO;
 import com.myschool.backend.Exception.ResourceNotFoundException;
-
+import com.myschool.backend.Model.Employe;
+import com.myschool.backend.Model.Filiere;
 import com.myschool.backend.Service.EmployeService;
 import com.myschool.backend.Service.FiliereService;
 
@@ -92,7 +93,8 @@ public class ModulexService {
                     .orElseThrow(() -> new ResourceNotFoundException("Module non trouvé avec id : " + id));
             //2. Mettre à jour les champs simples via MapStruct
             modulexMapper.updateEntityFromDto(dto, ent);
-
+        
+            setModuleRelationships(ent, dto);
             //5. Sauvegarder et renvoyer
             Modulex saved = modulexRepository.save(ent);
             return modulexMapper.toDto(saved);
@@ -123,15 +125,20 @@ public class ModulexService {
     // ======================================
     private void setModuleRelationships(Modulex module, ModulexDTO dto) {
         // Filiere
-        if (module.getFiliere() == null
-                || !dto.getCodeFiliere().equals(module.getFiliere().getCodeFiliere())) {
-            module.setFiliere(filiereService.getByCodeFiliere(dto.getCodeFiliere()));
-        }
+        // Charger seulement si différente
+            if (module.getFiliere() == null ||
+                !dto.getCodeFiliere().equals(module.getFiliere().getCodeFiliere())) {
+                Filiere filiere = filiereService.getByCodeFiliere(dto.getCodeFiliere());
+                module.setFiliere(filiere);
+            }
 
-        // Coordinateur
-        if (module.getCoordinateur() == null
-                || !dto.getCoordinateurCin().equals(module.getCoordinateur().getCin())) {
-            module.setCoordinateur(employeService.getEmployeByCin(dto.getCoordinateurCin()));
-        }
+            // === Gestion du Coordinateur ===
+            //verificatin null sur dto
+            // Charger seulement si différent
+            if (module.getCoordinateur() == null ||
+                !dto.getCoordinateurCin().equals(module.getCoordinateur().getCin())) {
+                Employe coord = employeService.getEmployeByCin(dto.getCoordinateurCin());
+                module.setCoordinateur(coord);
+            }
     }
 }

@@ -1,0 +1,114 @@
+databaseChangeLog:
+  - changeSet:
+      id: 1
+      author: saad
+      failOnError: false
+      preConditions:
+        - not:
+            - tableExists:
+                tableName: modulex
+      changes:
+        - createTable:
+            tableName: modulex
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: codemodule
+                  type: VARCHAR(50)
+                  constraints:
+                    nullable: false
+                    unique: true
+              - column:
+                  name: nommodule
+                  type: VARCHAR(150)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: description
+                  type: TEXT
+              - column:
+                  name: nombreheures
+                  type: FLOAT
+              - column:
+                  name: coefficient
+                  type: FLOAT
+              - column:
+                  name: departementdattache
+                  type: VARCHAR(20)
+              - column:
+                  name: coordinateur
+                  type: VARCHAR(20)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: semestre
+                  type: INTEGER
+              - column:
+                  name: optionmodule
+                  type: VARCHAR(100)
+              - column:
+                  name: codefiliere
+                  type: VARCHAR(50)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: version
+                  type: INTEGER
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+
+        # Indexes
+        - createIndex:
+            tableName: modulex
+            indexName: idx_modulex_codefiliere
+            columns:
+              - column:
+                  name: codefiliere
+        - createIndex:
+            tableName: modulex
+            indexName: idx_modulex_departement
+            columns:
+              - column:
+                  name: departementdattache
+        - createIndex:
+            tableName: modulex
+            indexName: idx_modulex_nommodule
+            columns:
+              - column:
+                  name: nommodule
+
+        # Foreign keys
+        - addForeignKeyConstraint:
+            baseTableName: modulex
+            baseColumnNames: codefiliere
+            referencedTableName: filiere
+            referencedColumnNames: codefiliere
+            constraintName: modulex_filiere_fk
+            onDelete: CASCADE
+            onUpdate: CASCADE
+
+        - addForeignKeyConstraint:
+            baseTableName: modulex
+            baseColumnNames: coordinateur
+            referencedTableName: employe
+            referencedColumnNames: cin
+            constraintName: modulex_coordinateur_fk
+            onDelete: CASCADE
+            onUpdate: CASCADE

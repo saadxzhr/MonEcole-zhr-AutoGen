@@ -104,7 +104,7 @@ public class Modulex {
     @PrePersist
     @PreUpdate
     private void normalizeData() {
-        if (codeModule != null) codeModule = codeModule.trim().toUpperCase();
+        if (codeModule != null) codeModule = codeModule.trim();
         if (departementDattache != null) departementDattache = departementDattache.trim();
     }
 }
