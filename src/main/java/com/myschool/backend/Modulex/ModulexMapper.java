@@ -17,11 +17,11 @@ import com.myschool.backend.Model.Employe;
 public interface ModulexMapper {
 
     // === Mapping Modulex → DTO pour l'affichage ===
-    @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
-    @Mapping(source = "filiere.codeFiliere", target = "codeFiliere")
-    @Mapping(source = "filiere.nomFiliere", target = "nomFiliere")
-    @Mapping(source = "coordinateur.cin", target = "coordinateurCin")
-    @Mapping(source = "coordinateur", target = "coordinateurNomPrenom", qualifiedByName = "formatCoordinateurFullName")
+    // @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
+    // @Mapping(source = "filiere.codeFiliere", target = "codeFiliere")
+    // @Mapping(source = "filiere.nomFiliere", target = "nomFiliere")
+    // @Mapping(source = "coordinateur.cin", target = "coordinateurCin")
+    // @Mapping(source = "coordinateur", target = "coordinateurNomPrenom", qualifiedByName = "formatCoordinateurFullName")
     ModulexDTO toDto(Modulex modulex);
 
     @Named("formatCoordinateurFullName")
@@ -30,24 +30,25 @@ public interface ModulexMapper {
     }
     
     //méthode utilitaire inverse
+    @Mapping(source = "coordinateur", target = "coordinateurNomPrenom", qualifiedByName = "formatCoordinateurFullName")
     List<ModulexDTO> toDtoList(List<Modulex> modules);
 
     // === Mapping DTO → Modulex pour création ===
+    // @Mapping(target = "filiere", ignore = true)
+    // @Mapping(target = "coordinateur", ignore = true)
+    // @Mapping(target = "createdAt", ignore = true)
+    // @Mapping(target = "updatedAt", ignore = true)
+    // @Mapping(target = "version", ignore = true)
     @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
-    @Mapping(target = "filiere", ignore = true)
-    @Mapping(target = "coordinateur", ignore = true)
-    @Mapping(target = "createdAt", ignore = true)
-    @Mapping(target = "updatedAt", ignore = true)
-    @Mapping(target = "version", ignore = true)
     Modulex toEntity(ModulexDTO dto);
 
     // === Mise à jour partielle d'une entité existante ===
+    // @Mapping(target = "filiere", ignore = true)
+    // @Mapping(target = "coordinateur", ignore = true)
+    // @Mapping(target = "createdAt", ignore = true)
+    // @Mapping(target = "updatedAt", ignore = true)
+    // @Mapping(target = "version", ignore = true)
     @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
-    @Mapping(target = "filiere", ignore = true)
-    @Mapping(target = "coordinateur", ignore = true)
-    @Mapping(target = "createdAt", ignore = true)
-    @Mapping(target = "updatedAt", ignore = true)
-    @Mapping(target = "version", ignore = true)
     void updateEntityFromDto(ModulexDTO dto, @MappingTarget Modulex ent);
 
 

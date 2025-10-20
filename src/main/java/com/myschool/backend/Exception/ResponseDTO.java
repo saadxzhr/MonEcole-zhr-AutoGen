@@ -21,4 +21,5 @@ public class ResponseDTO<T> {
     public static <T> ResponseDTO<T> error(String message) {
         return new ResponseDTO<>("ERROR", message, null);
     }
+
 }

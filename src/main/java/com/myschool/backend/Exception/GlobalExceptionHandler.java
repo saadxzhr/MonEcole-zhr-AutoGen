@@ -7,9 +7,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
-
-import com.myschool.backend.Config.DuplicateResourceException;
-
 import org.springframework.web.bind.MethodArgumentNotValidException;
 
 import java.util.HashMap;

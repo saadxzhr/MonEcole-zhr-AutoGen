@@ -31,6 +31,8 @@ import java.util.Map;
 
 
 
+
+@CrossOrigin(origins = "*") 
 @RestController
 @RequestMapping("/api/v1/modulex") // ✅ Versioning + ressource
 @RequiredArgsConstructor
@@ -57,14 +59,14 @@ public class ModulexController {
     @GetMapping("/list")
     @ResponseBody
     @Operation(summary = "Lister les modules", description = "Retourne une page de modules filtrée")
-    public ResponseEntity<ResponseDTO<PageResponseDTO<ModulexDTO>>> getModules(
+    public ResponseEntity<ResponseDTO<Page<ModulexDTO>>> getModules(
             @RequestParam(required = false) String filiereCode,
             @RequestParam(required = false) String coordinateurCin,
             @RequestParam(required = false) String departement,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size
     ) {
-        PageResponseDTO<ModulexDTO> result = modulexService.getModulesPage(
+        Page<ModulexDTO> result = modulexService.getModulesPage(
                 filiereCode, coordinateurCin, departement, page, size
         );
         return ResponseEntity.ok(ResponseDTO.success("Page de modules chargée avec succès", result));

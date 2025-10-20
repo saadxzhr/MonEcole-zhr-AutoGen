@@ -1,9 +1,10 @@
 package com.myschool.backend.Modulex;
 
-import com.myschool.backend.Config.DuplicateResourceException;
 import com.myschool.backend.Exception.BusinessValidationException;
+import com.myschool.backend.Exception.DuplicateResourceException;
 import com.myschool.backend.Exception.PageResponseDTO;
 import com.myschool.backend.Exception.ResourceNotFoundException;
+import com.myschool.backend.Exception.ResponseDTO;
 import com.myschool.backend.Model.Employe;
 import com.myschool.backend.Model.Filiere;
 import com.myschool.backend.Service.EmployeService;
@@ -35,7 +36,7 @@ public class ModulexService {
     // GET PAGINATED MODULES
     // ======================================
     @Transactional(readOnly = true)
-    public PageResponseDTO<ModulexDTO> getModulesPage(
+    public Page<ModulexDTO> getModulesPage(
             String filiereCode,
             String coordinateurCin,
             String departement,
@@ -53,14 +54,7 @@ public class ModulexService {
                 filiereCode, coordinateurCin, departement, pageable
         );
 
-        return new PageResponseDTO<>(
-                result.getContent(),
-                result.getNumber(),
-                result.getSize(),
-                result.getTotalElements(),
-                result.getTotalPages(),
-                result.isLast()
-        );
+        return result;
     }
 
     // ======================================

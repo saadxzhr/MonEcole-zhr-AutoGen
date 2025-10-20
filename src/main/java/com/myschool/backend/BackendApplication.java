@@ -34,7 +34,7 @@ public class BackendApplication {
 /// 
 
 //git add .
-//git commit -m "Modulex final optimization modulex service updated removed validateModulex use dto validations + add creates/updated at + version"
+//git commit -m "Modulex final optimization before last check"
 //git push
 
 

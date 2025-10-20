@@ -1,4 +1,4 @@
-package com.myschool.backend.Config;
+package com.myschool.backend.Exception;
 
 public class DuplicateResourceException extends RuntimeException {
 

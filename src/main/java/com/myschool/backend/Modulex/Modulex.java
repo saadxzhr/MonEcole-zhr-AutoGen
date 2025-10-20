@@ -41,7 +41,7 @@ import lombok.ToString;
 @EntityListeners(AuditingEntityListener.class) 
 @Getter 
 @Setter 
-@Data 
+// @Data 
 @NoArgsConstructor 
 @AllArgsConstructor 
 @Builder
