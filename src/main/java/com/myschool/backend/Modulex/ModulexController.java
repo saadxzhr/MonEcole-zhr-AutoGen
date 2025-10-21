@@ -50,7 +50,7 @@ public class ModulexController {
     // ===============================
     @GetMapping
     public ModelAndView modulex(Model model) {
-        return new ModelAndView("fragments/direction/modulex :: content");
+        return new ModelAndView("fragments/DIRECTION/modulex :: content");
     }
 
     // ===============================
@@ -77,7 +77,7 @@ public class ModulexController {
     // ===============================
     @PostMapping
     @ResponseBody
-    @PreAuthorize("hasRole('Direction')")
+    @PreAuthorize("hasRole('DIRECTION')")
     @Operation(summary = "Créer un module", description = "Ajoute un nouveau module avec validation complète")
     public ResponseEntity<ResponseDTO<ModulexDTO>> createModule(
             @Valid @RequestBody ModulexDTO dto
@@ -93,7 +93,7 @@ public class ModulexController {
     // ===============================
     @PutMapping("/{id}")
     @ResponseBody
-    @PreAuthorize("hasRole('Direction')")
+    @PreAuthorize("hasRole('DIRECTION')")
     @Operation(summary = "Modifier un module", description = "Met à jour un module existant")
     public ResponseEntity<ResponseDTO<ModulexDTO>> updateModule(
             @PathVariable @NotNull Long id,
@@ -109,7 +109,7 @@ public class ModulexController {
     // ===============================
     @DeleteMapping("/{id}")
     @ResponseBody
-    @PreAuthorize("hasRole('Direction')")
+    @PreAuthorize("hasRole('DIRECTION')")
     @Operation(summary = "Supprimer un module", description = "Supprime un module existant")
     public ResponseEntity<ResponseDTO<Void>> deleteModule(
             @PathVariable @Valid  @NotNull Long id

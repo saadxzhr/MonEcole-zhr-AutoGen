@@ -8,12 +8,14 @@ import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
 import org.mapstruct.Named;
 import org.mapstruct.NullValuePropertyMappingStrategy;
+import org.mapstruct.ReportingPolicy;
 
 import com.myschool.backend.Exception.PageResponseDTO;
 import com.myschool.backend.Model.Employe;
 
 
-@Mapper(componentModel = "spring")
+@Mapper(componentModel = "spring", nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE,
+    unmappedTargetPolicy = ReportingPolicy.IGNORE)
 public interface ModulexMapper {
 
     // === Mapping Modulex → DTO pour l'affichage ===
@@ -39,7 +41,7 @@ public interface ModulexMapper {
     // @Mapping(target = "createdAt", ignore = true)
     // @Mapping(target = "updatedAt", ignore = true)
     // @Mapping(target = "version", ignore = true)
-    @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
+    // @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
     Modulex toEntity(ModulexDTO dto);
 
     // === Mise à jour partielle d'une entité existante ===
@@ -48,7 +50,7 @@ public interface ModulexMapper {
     // @Mapping(target = "createdAt", ignore = true)
     // @Mapping(target = "updatedAt", ignore = true)
     // @Mapping(target = "version", ignore = true)
-    @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
+    // @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
     void updateEntityFromDto(ModulexDTO dto, @MappingTarget Modulex ent);
 
 

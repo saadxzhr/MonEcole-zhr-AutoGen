@@ -11,6 +11,7 @@ import java.util.Optional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -34,18 +35,15 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.myschool.backend.DTO.FiliereDTO;
 import com.myschool.backend.Model.Employe;
 import com.myschool.backend.Model.Filiere;
-
-import com.myschool.backend.Model.MyAppUser;
 import com.myschool.backend.Modulex.ModulexDTO;
 import com.myschool.backend.Modulex.ModulexService;
 import com.myschool.backend.Projection.EmployeProjection;
 // import com.myschool.backend.Projection.ModulexProjection;
 import com.myschool.backend.Repository.EmployeRepository;
 import com.myschool.backend.Repository.FiliereRepository;
-import com.myschool.backend.Repository.MyAppUserRepository;
 import com.myschool.backend.Service.EmployeService;
 import com.myschool.backend.Service.FiliereService;
-import com.myschool.backend.Service.MyAppUserService;
+
 
 import lombok.RequiredArgsConstructor;
 
@@ -62,13 +60,13 @@ public class DirectionController {
     // private EtatDavancementService etatDavancementService;
 
     // @Autowired
-    // private EtatDavancementRepository etatDavancementRepository;
+    // // private EtatDavancementRepository etatDavancementRepository;
 
-    @Autowired
-    private MyAppUserRepository myAppUserRepository;
+    // @Autowired
+    // private MyAppUserRepository myAppUserRepository;
 
-    @Autowired
-    private MyAppUserService myAppUserService;
+    // @Autowired
+    // private MyAppUserService myAppUserService;
 
 
     @Autowired
@@ -85,7 +83,8 @@ public class DirectionController {
     // @Autowired
     // private CalculateProgress CalculateProgress;
 
-     
+
+    
     //charger l'interface direction en affichant le nom de l'utilisateur
     @GetMapping("/direction")
     public String getSecretairePage(Model model, Principal principal) {
@@ -266,34 +265,34 @@ public class DirectionController {
     //////actions sur users
   
     //charger tout les utilisateurs
-    @GetMapping("/users")
-    public String getUsers(Model model) {
-        List<MyAppUser> users = myAppUserRepository.findAll();
-        model.addAttribute("utilisateurs", users);
-        model.addAttribute("roles", employeRepository.getUniqueRole());
-        return "fragments/direction/users"; 
-    }
+    // @GetMapping("/users")
+    // public String getUsers(Model model) {
+    //     List<MyAppUser> users = myAppUserRepository.findAll();
+    //     model.addAttribute("utilisateurs", users);
+    //     model.addAttribute("roles", employeRepository.getUniqueRole());
+    //     return "fragments/direction/users"; 
+    // // }
 
-    //ajouter une employe
-    @PostMapping("/users/save")
-    @ResponseBody
-    public ResponseEntity<?> saveUser(@RequestBody MyAppUser user) {
-        if (user.getId() != null) {
-            myAppUserService.updateUser(user.getId(), user);
-        } else {
-            myAppUserService.createUser(user);
-        }
-        return ResponseEntity.ok().build();
-    }
+    // //ajouter une employe
+    // @PostMapping("/users/save")
+    // @ResponseBody
+    // public ResponseEntity<?> saveUser(@RequestBody MyAppUser user) {
+    //     if (user.getId() != null) {
+    //         myAppUserService.updateUser(user.getId(), user);
+    //     } else {
+    //         myAppUserService.createUser(user);
+    //     }
+    //     return ResponseEntity.ok().build();
+    // }
 
 
-    //supprimer un utilisateur
-    @DeleteMapping("/users/delete/{id}")
-    @ResponseBody
-    public ResponseEntity<?> deleteUser(@PathVariable("id") Long id) {
-        myAppUserRepository.deleteById(id);
-        return ResponseEntity.ok().build();
-    }
+    // //supprimer un utilisateur
+    // @DeleteMapping("/users/delete/{id}")
+    // @ResponseBody
+    // public ResponseEntity<?> deleteUser(@PathVariable("id") Long id) {
+    //     myAppUserRepository.deleteById(id);
+    //     return ResponseEntity.ok().build();
+    // }
 
 
 

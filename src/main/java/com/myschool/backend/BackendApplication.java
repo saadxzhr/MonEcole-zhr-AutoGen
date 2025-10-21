@@ -34,8 +34,10 @@ public class BackendApplication {
 /// 
 
 //git add .
-//git commit -m "Modulex final optimization before last check"
+//git commit -m "Modulex and exceptions config confirmed next jwt"
 //git push
 
+
+// /PMAK-68f69f44ad6ba20001901958-840e3aa623d3968709c4a8363b6e947778
 
 
