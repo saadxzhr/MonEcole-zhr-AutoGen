@@ -1,4 +1,4 @@
-package com.myschool.backend.Projection;
+package com.myschool.backend.projection;
 
 public interface EmployeProjection {
 

@@ -1,8 +1,8 @@
 // com/myschool/backend/utilisateur/controller/UtilisateurController.java
-package com.myschool.backend.Utilisateur.controller;
+package com.myschool.backend.utilisateur.controller;
 
-import com.myschool.backend.Utilisateur.dto.*;
-import com.myschool.backend.Utilisateur.service.UtilisateurService;
+import com.myschool.backend.utilisateur.dto.*;
+import com.myschool.backend.utilisateur.service.UtilisateurService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;

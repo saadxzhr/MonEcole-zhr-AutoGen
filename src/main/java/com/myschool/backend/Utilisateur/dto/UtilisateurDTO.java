@@ -1,6 +1,6 @@
-package com.myschool.backend.Utilisateur.dto;
+package com.myschool.backend.utilisateur.dto;
 
-import com.myschool.backend.Utilisateur.Model.Role;
+import com.myschool.backend.utilisateur.model.Role;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;

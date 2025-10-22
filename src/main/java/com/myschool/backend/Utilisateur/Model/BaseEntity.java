@@ -1,5 +1,5 @@
 // com/myschool/backend/utilisateur/model/BaseEntity.java
-package com.myschool.backend.Utilisateur.Model;
+package com.myschool.backend.utilisateur.model;
 
 import jakarta.persistence.*;
 import lombok.*;

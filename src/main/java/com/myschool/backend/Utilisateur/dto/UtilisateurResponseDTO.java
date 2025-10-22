@@ -1,4 +1,4 @@
-package com.myschool.backend.Utilisateur.dto;
+package com.myschool.backend.utilisateur.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

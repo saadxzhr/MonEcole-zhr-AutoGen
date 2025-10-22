@@ -1,5 +1,5 @@
 // com/myschool/backend/utilisateur/dto/UtilisateurCreateDTO.java
-package com.myschool.backend.Utilisateur.dto;
+package com.myschool.backend.utilisateur.dto;
 
 import jakarta.validation.constraints.NotBlank;
 import lombok.*;

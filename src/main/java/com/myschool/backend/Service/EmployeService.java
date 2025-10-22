@@ -5,8 +5,9 @@ import org.springframework.stereotype.Service;
 
 import com.myschool.backend.Model.Employe;
 import com.myschool.backend.Model.Filiere;
-import com.myschool.backend.Projection.EmployeProjection;
 import com.myschool.backend.Repository.EmployeRepository;
+import com.myschool.backend.projection.EmployeProjection;
+
 import jakarta.persistence.EntityNotFoundException;
 
 import java.util.List;

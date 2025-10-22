@@ -1,4 +1,4 @@
-package com.myschool.backend.Modulex;
+package com.myschool.backend.modulex;
 // package com.myschool.backend.Projection;
 
 

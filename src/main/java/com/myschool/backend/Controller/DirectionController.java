@@ -1,4 +1,4 @@
-package com.myschool.backend.Controller;
+package com.myschool.backend.controller;
 
 import java.security.Principal;
 import java.time.LocalDateTime;
@@ -35,9 +35,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.myschool.backend.DTO.FiliereDTO;
 import com.myschool.backend.Model.Employe;
 import com.myschool.backend.Model.Filiere;
-import com.myschool.backend.Modulex.ModulexDTO;
-import com.myschool.backend.Modulex.ModulexService;
-import com.myschool.backend.Projection.EmployeProjection;
+import com.myschool.backend.modulex.ModulexDTO;
+import com.myschool.backend.modulex.ModulexService;
+import com.myschool.backend.projection.EmployeProjection;
 // import com.myschool.backend.Projection.ModulexProjection;
 import com.myschool.backend.Repository.EmployeRepository;
 import com.myschool.backend.Repository.FiliereRepository;

@@ -8,10 +8,10 @@ import org.springframework.stereotype.Service;
 
 import com.myschool.backend.DTO.FiliereDTO;
 import com.myschool.backend.Model.Filiere;
-import com.myschool.backend.Projection.EmployeProjection;
-import com.myschool.backend.Projection.FiliereProjection;
 import com.myschool.backend.Repository.EmployeRepository;
 import com.myschool.backend.Repository.FiliereRepository;
+import com.myschool.backend.projection.EmployeProjection;
+import com.myschool.backend.projection.FiliereProjection;
 
 import jakarta.persistence.EntityNotFoundException;
 

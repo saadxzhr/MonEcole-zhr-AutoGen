@@ -4,8 +4,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
 import com.myschool.backend.Model.Employe;
-import com.myschool.backend.Projection.EmployeProjection;
-import com.myschool.backend.Projection.FiliereProjection;
+import com.myschool.backend.projection.EmployeProjection;
+import com.myschool.backend.projection.FiliereProjection;
 
 import java.util.List;
 import java.util.Optional;

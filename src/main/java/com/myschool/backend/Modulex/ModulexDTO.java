@@ -1,4 +1,4 @@
-package com.myschool.backend.Modulex;
+package com.myschool.backend.modulex;
 
 import java.time.LocalDateTime;
 

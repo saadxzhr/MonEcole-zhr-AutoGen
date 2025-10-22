@@ -2,7 +2,8 @@ package com.myschool.backend;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-
+import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
+// @EnableJpaAuditing
 @SpringBootApplication
 public class BackendApplication {
 
@@ -33,11 +34,18 @@ public class BackendApplication {
 ///Pageable pageable = PageRequest.of(page, size, Sort.by("nomModule").ascending());
 /// 
 
+
+///./mvnw compile exec:java -Dexec.mainClass="com.myschool.backend.tools.GenerateRSAKeys"
+/// mvn exec:java "-Dexec.mainClass=com.myschool.backend.tools.GenerateRSAKeys"
+
+/// 
+/// 
+/// 
 //git add .
-//git commit -m "Modulex and exceptions config confirmed next jwt"
+//git commit -m "utilisateur et jwt done 99per"
 //git push
 
-
+//postman
 // /PMAK-68f69f44ad6ba20001901958-840e3aa623d3968709c4a8363b6e947778
 
 

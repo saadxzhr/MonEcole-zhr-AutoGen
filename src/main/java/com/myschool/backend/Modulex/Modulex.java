@@ -1,4 +1,4 @@
-package com.myschool.backend.Modulex;
+package com.myschool.backend.modulex;
 
 import java.time.LocalDateTime;
 
@@ -45,7 +45,6 @@ import lombok.ToString;
 @NoArgsConstructor 
 @AllArgsConstructor 
 @Builder
-@EnableJpaAuditing
 public class Modulex {
 
     @Id

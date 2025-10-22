@@ -1,4 +1,4 @@
-package com.myschool.backend.Utilisateur.Model;
+package com.myschool.backend.utilisateur.model;
 
 public enum Role {
     DIRECTION,

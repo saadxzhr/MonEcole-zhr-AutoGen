@@ -1,8 +1,9 @@
-package com.myschool.backend.Utilisateur.mapper;
+package com.myschool.backend.utilisateur.mapper;
 
 
-import com.myschool.backend.Utilisateur.dto.*;
-import com.myschool.backend.Utilisateur.Model.Utilisateur;
+import com.myschool.backend.utilisateur.dto.*;
+import com.myschool.backend.utilisateur.model.Utilisateur;
+
 import org.mapstruct.*;
 
 @Mapper(componentModel = "spring", nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE,

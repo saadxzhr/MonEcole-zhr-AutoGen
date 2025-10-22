@@ -1,11 +1,10 @@
-package com.myschool.backend.Modulex;
+package com.myschool.backend.modulex;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import com.myschool.backend.Exception.PageResponseDTO;
 
 import java.util.List;
 import org.springframework.data.domain.Page;
@@ -17,7 +16,7 @@ import org.springframework.data.domain.Pageable;
 @Repository
     public interface ModulexRepository extends JpaRepository<Modulex, Long> {
     @Query(value = """
-                SELECT new com.myschool.backend.Modulex.ModulexDTO(
+                SELECT new com.myschool.backend.modulex.ModulexDTO(
                     m.id,
                     m.codeModule,
                     m.nomModule,

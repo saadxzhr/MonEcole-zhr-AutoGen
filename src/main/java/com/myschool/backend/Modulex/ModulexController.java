@@ -1,4 +1,4 @@
-package com.myschool.backend.Modulex;
+package com.myschool.backend.modulex;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -13,13 +13,11 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.ModelAndView;
 
-import com.myschool.backend.Exception.PageResponseDTO;
-import com.myschool.backend.Exception.ResponseDTO;
-import com.myschool.backend.Projection.EmployeProjection;
-import com.myschool.backend.Projection.FiliereProjection;
 import com.myschool.backend.Service.EmployeService;
 import com.myschool.backend.Service.FiliereService;
-
+import com.myschool.backend.exception.ResponseDTO;
+import com.myschool.backend.projection.EmployeProjection;
+import com.myschool.backend.projection.FiliereProjection;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;

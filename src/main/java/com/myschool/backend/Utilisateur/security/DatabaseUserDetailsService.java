@@ -1,7 +1,7 @@
-package com.myschool.backend.Utilisateur.security;
+package com.myschool.backend.utilisateur.security;
 
-import com.myschool.backend.Utilisateur.Model.Utilisateur;
-import com.myschool.backend.Utilisateur.service.UtilisateurQueryService;
+import com.myschool.backend.utilisateur.model.Utilisateur;
+import com.myschool.backend.utilisateur.service.UtilisateurQueryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.*;

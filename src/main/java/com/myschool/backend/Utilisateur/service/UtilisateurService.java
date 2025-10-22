@@ -1,11 +1,11 @@
 // com/myschool/backend/utilisateur/service/UtilisateurService.java
-package com.myschool.backend.Utilisateur.service;
+package com.myschool.backend.utilisateur.service;
 
-import com.myschool.backend.Exception.ResponseDTO;
-import com.myschool.backend.Utilisateur.dto.*;
-import com.myschool.backend.Utilisateur.mapper.UtilisateurMapper;
-import com.myschool.backend.Utilisateur.Model.*;
-import com.myschool.backend.Utilisateur.repository.UtilisateurRepository;
+import com.myschool.backend.exception.ResponseDTO;
+import com.myschool.backend.utilisateur.dto.*;
+import com.myschool.backend.utilisateur.mapper.UtilisateurMapper;
+import com.myschool.backend.utilisateur.model.*;
+import com.myschool.backend.utilisateur.repository.UtilisateurRepository;
 import lombok.RequiredArgsConstructor;
 
 import org.springframework.beans.factory.annotation.Autowired;

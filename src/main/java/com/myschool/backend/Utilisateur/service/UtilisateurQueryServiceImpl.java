@@ -1,7 +1,7 @@
-package com.myschool.backend.Utilisateur.service;
+package com.myschool.backend.utilisateur.service;
 
-import com.myschool.backend.Utilisateur.Model.Utilisateur;
-import com.myschool.backend.Utilisateur.repository.UtilisateurRepository;
+import com.myschool.backend.utilisateur.model.Utilisateur;
+import com.myschool.backend.utilisateur.repository.UtilisateurRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 

@@ -1,108 +1,131 @@
-package com.myschool.backend.Utilisateur.security;
+package com.myschool.backend.utilisateur.security;
 
+import com.myschool.backend.utilisateur.model.Utilisateur;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
+import jakarta.annotation.PostConstruct;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.security.core.userdetails.UserDetails;
 
-import java.security.Key;
+import java.io.InputStream;
+import java.security.*;
+import java.security.spec.PKCS8EncodedKeySpec;
+import java.security.spec.X509EncodedKeySpec;
 import java.util.Date;
-import java.util.Map;
 
+@Slf4j
 @Service
 public class JwtService {
 
-    @Value("${app.jwt.secret}")
-    private String secretKey;
+    // ==========================================================
+    // 🔧 Configuration RSA uniquement (aucun HS256 ici)
+    // ==========================================================
 
-    @Value("${app.jwt.expiration-ms:86400000}")
+    @Value("${jwt.private-key-path}")
+    private String privateKeyPath;
+
+    @Value("${jwt.public-key-path}")
+    private String publicKeyPath;
+
+    @Value("${jwt.expiration:3600000}") // 1h par défaut
     private long jwtExpirationMs;
 
-    private Key getSignInKey() {
-        return Keys.hmacShaKeyFor(secretKey.getBytes());
-    }
+    private PrivateKey privateKey;
+    private PublicKey publicKey;
 
-    // --- Simple: génère un token à partir d'un username et role (compatible avec ton controller actuel)
-    public String generateToken(String username, String role) {
-        Date now = new Date();
-        Date exp = new Date(now.getTime() + jwtExpirationMs);
-
-        return Jwts.builder()
-                .setSubject(username)
-                .addClaims(Map.of("role", role))
-                .setIssuedAt(now)
-                .setExpiration(exp)
-                .signWith(getSignInKey(), SignatureAlgorithm.HS256)
-                .compact();
-    }
-
-    // --- Avancé: génère un token à partir d'un UserDetails et flags
-    public String generateToken(UserDetails userDetails, String role, boolean forceChangePassword) {
-        Date now = new Date();
-        Date exp = new Date(now.getTime() + jwtExpirationMs);
-
-        return Jwts.builder()
-                .setSubject(userDetails.getUsername())
-                .addClaims(Map.of(
-                        "role", role,
-                        "forceChangePassword", forceChangePassword
-                ))
-                .setIssuedAt(now)
-                .setExpiration(exp)
-                .signWith(getSignInKey(), SignatureAlgorithm.HS256)
-                .compact();
-    }
-
-    // extraction simple
-    public String extractUsername(String token) {
-        return Jwts.parserBuilder()
-                .setSigningKey(getSignInKey())
-                .build()
-                .parseClaimsJws(token)
-                .getBody()
-                .getSubject();
-    }
-
-    // validation
-    public boolean validateToken(String token) {
+    // ==========================================================
+    // 🧩 INITIALISATION DES CLÉS RSA
+    // ==========================================================
+    @PostConstruct
+    public void init() {
         try {
-            Jwts.parserBuilder()
-                .setSigningKey(getSignInKey())
+            this.privateKey = loadPrivateKey(privateKeyPath);
+            this.publicKey = loadPublicKey(publicKeyPath);
+
+            if (privateKey == null || publicKey == null) {
+                throw new IllegalStateException("RSA keys not loaded correctly");
+            }
+
+            log.info("🔐 JWT Service initialized with RSA keys (RS256)");
+        } catch (Exception e) {
+            log.error("❌ Failed to initialize RSA keys: {}", e.getMessage(), e);
+            throw new IllegalStateException("RSA key initialization failed: " + e.getMessage(), e);
+        }
+    }
+
+    // ==========================================================
+    // 🔑 Chargement des clés RSA
+    // ==========================================================
+    private PrivateKey loadPrivateKey(String path) throws Exception {
+        try (InputStream is = getClass().getClassLoader().getResourceAsStream(path.replace("classpath:", ""))) {
+            if (is == null) throw new IllegalArgumentException("Private key not found at " + path);
+            byte[] keyBytes = is.readAllBytes();
+            PKCS8EncodedKeySpec spec = new PKCS8EncodedKeySpec(keyBytes);
+            return KeyFactory.getInstance("RSA").generatePrivate(spec);
+        }
+    }
+
+    private PublicKey loadPublicKey(String path) throws Exception {
+        try (InputStream is = getClass().getClassLoader().getResourceAsStream(path.replace("classpath:", ""))) {
+            if (is == null) throw new IllegalArgumentException("Public key not found at " + path);
+            byte[] keyBytes = is.readAllBytes();
+            X509EncodedKeySpec spec = new X509EncodedKeySpec(keyBytes);
+            return KeyFactory.getInstance("RSA").generatePublic(spec);
+        }
+    }
+
+    // ==========================================================
+    // 🎟️ GÉNÉRATION D’UN TOKEN
+    // ==========================================================
+    public String generateAccessToken(Utilisateur user) {
+        if (user == null || user.getUsername() == null)
+            throw new IllegalArgumentException("Utilisateur invalide pour JWT");
+
+        return Jwts.builder()
+                .setSubject(user.getUsername())
+                .claim("role", user.getRole())
+                .claim("cin", user.getCin())
+                .setIssuedAt(new Date())
+                .setExpiration(new Date(System.currentTimeMillis() + jwtExpirationMs))
+                .signWith(privateKey, SignatureAlgorithm.RS256)
+                .compact();
+    }
+
+    // ==========================================================
+    // 🧠 EXTRACTION D’INFORMATIONS DU TOKEN
+    // ==========================================================
+    public Jws<Claims> parseToken(String token) {
+        return Jwts.parserBuilder()
+                .setSigningKey(publicKey)
                 .build()
                 .parseClaimsJws(token);
-            return true;
-        } catch (JwtException e) {
+    }
+
+    public String getUsernameFromToken(String token) {
+        return parseToken(token).getBody().getSubject();
+    }
+
+    public String getRoleFromToken(String token) {
+        return parseToken(token).getBody().get("role", String.class);
+    }
+
+    public String getCinFromToken(String token) {
+        return parseToken(token).getBody().get("cin", String.class);
+    }
+
+    // ==========================================================
+    // ✅ VALIDATION DU TOKEN
+    // ==========================================================
+    public boolean isTokenValid(String token, String username) {
+        try {
+            Claims claims = parseToken(token).getBody();
+            String tokenUsername = claims.getSubject();
+            Date expiration = claims.getExpiration();
+            return tokenUsername.equals(username) && expiration.after(new Date());
+        } catch (JwtException | IllegalArgumentException e) {
+            log.warn("⚠️ Invalid JWT token: {}", e.getMessage());
             return false;
         }
     }
-
-
-
-    public String extractRole(String token) {
-        try {
-            return Jwts.parserBuilder()
-                    .setSigningKey(getSignInKey())
-                    .build()
-                    .parseClaimsJws(token)
-                    .getBody()
-                    .get("role", String.class);
-        } catch (Exception e) {
-            return null;
-        }
-    }
-
-    public <T> T extractClaim(String token, String claimKey, Class<T> type) {
-        try {
-            return Jwts.parserBuilder()
-                    .setSigningKey(getSignInKey())
-                    .build()
-                    .parseClaimsJws(token)
-                    .getBody()
-                    .get(claimKey, type);
-        } catch (Exception e) {
-            return null;
-        }
-    }
-
 }

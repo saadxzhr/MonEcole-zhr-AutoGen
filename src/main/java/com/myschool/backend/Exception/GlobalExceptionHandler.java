@@ -1,4 +1,4 @@
-package com.myschool.backend.Exception;
+package com.myschool.backend.exception;
 
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.ConstraintViolationException;
@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -26,7 +27,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ResponseDTO<Void>> handleDuplicate(DuplicateResourceException ex) {
         log.warn("Duplicate error: {}", ex.getMessage());
         return ResponseEntity.status(HttpStatus.CONFLICT)
-                .body(new ResponseDTO<>("DUPLICATE_RESOURCE", ex.getMessage(), null));
+                .body(new ResponseDTO<>("DUPLICATE_RESOURCE", ex.getMessage(), null, LocalDateTime.now()));
     }
 
     // 🚫 Ressource non trouvée
@@ -34,7 +35,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ResponseDTO<Void>> handleNotFound(RuntimeException ex) {
         log.warn("Resource not found: {}", ex.getMessage());
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body(new ResponseDTO<>("NOT_FOUND", ex.getMessage(), null));
+                .body(new ResponseDTO<>("NOT_FOUND", ex.getMessage(), null, LocalDateTime.now()));
     }
 
     // ⚠️ Erreurs de validation DTO (ex: @NotNull, @Size...)
@@ -54,7 +55,7 @@ public class GlobalExceptionHandler {
         log.warn("Validation error: {}", errors);
 
         return ResponseEntity.badRequest().body(
-                new ResponseDTO<>("VALIDATION_ERROR", message, errors)
+                new ResponseDTO<>("VALIDATION_ERROR", message, errors, LocalDateTime.now())
         );
     }
 
@@ -64,7 +65,7 @@ public class GlobalExceptionHandler {
         String message = "Type de paramètre invalide pour '" + ex.getName() + "'";
         log.warn("Type mismatch: {}", message);
         return ResponseEntity.badRequest()
-                .body(new ResponseDTO<>("TYPE_MISMATCH", message, null));
+                .body(new ResponseDTO<>("TYPE_MISMATCH", message, null, LocalDateTime.now()));
     }
 
     // 🧠 Erreurs de validation métier (Business rules)
@@ -72,7 +73,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ResponseDTO<Void>> handleBusinessValidation(BusinessValidationException ex) {
         log.warn("Business validation error: {}", ex.getMessage());
         return ResponseEntity.badRequest()
-                .body(new ResponseDTO<>("VALIDATION_ERROR", ex.getMessage(), null));
+                .body(new ResponseDTO<>("VALIDATION_ERROR", ex.getMessage(), null, LocalDateTime.now()));
     }
 
     // 💣 Cas inattendu (NullPointerException, SQL, etc.)
@@ -80,6 +81,6 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ResponseDTO<Void>> handleGeneric(Exception ex) {
         log.error("Unexpected error:", ex);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(new ResponseDTO<>("INTERNAL_ERROR", "Erreur interne du serveur.", null));
+                .body(new ResponseDTO<>("INTERNAL_ERROR", "Erreur interne du serveur.", null, LocalDateTime.now()));
     }
 }

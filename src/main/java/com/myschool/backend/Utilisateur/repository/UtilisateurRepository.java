@@ -1,10 +1,11 @@
-package com.myschool.backend.Utilisateur.repository;
+package com.myschool.backend.utilisateur.repository;
  
 
-import com.myschool.backend.Utilisateur.Model.Utilisateur;
 import org.springframework.data.domain.*;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+
+import com.myschool.backend.utilisateur.model.Utilisateur;
 
 import java.util.Optional;
 
@@ -17,7 +18,7 @@ public interface UtilisateurRepository extends JpaRepository<Utilisateur, Long> 
 
     boolean existsByUsername(String username);
 
-    boolean existsByCinAndUsernameNot(String cin, String username);
+    boolean existsByCinAndUsername(String cin, String username);
 
     Page<Utilisateur> findByRole(String role, Pageable pageable);
 

@@ -1,14 +1,13 @@
-package com.myschool.backend.Modulex;
+package com.myschool.backend.modulex;
 
-import com.myschool.backend.Exception.BusinessValidationException;
-import com.myschool.backend.Exception.DuplicateResourceException;
-import com.myschool.backend.Exception.PageResponseDTO;
-import com.myschool.backend.Exception.ResourceNotFoundException;
-import com.myschool.backend.Exception.ResponseDTO;
 import com.myschool.backend.Model.Employe;
 import com.myschool.backend.Model.Filiere;
 import com.myschool.backend.Service.EmployeService;
 import com.myschool.backend.Service.FiliereService;
+import com.myschool.backend.exception.BusinessValidationException;
+import com.myschool.backend.exception.DuplicateResourceException;
+import com.myschool.backend.exception.ResourceNotFoundException;
+import com.myschool.backend.exception.ResponseDTO;
 
 import jakarta.persistence.OptimisticLockException;
 

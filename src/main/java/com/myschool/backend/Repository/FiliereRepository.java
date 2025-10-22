@@ -9,7 +9,7 @@ import org.springframework.data.repository.query.Param;
 
 import com.myschool.backend.DTO.FiliereDTO;
 import com.myschool.backend.Model.Filiere;
-import com.myschool.backend.Projection.FiliereProjection;
+import com.myschool.backend.projection.FiliereProjection;
 
 public interface FiliereRepository extends JpaRepository<Filiere, Long> {
 

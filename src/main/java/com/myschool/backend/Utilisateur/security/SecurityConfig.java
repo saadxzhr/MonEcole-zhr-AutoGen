@@ -1,5 +1,7 @@
-package com.myschool.backend.Utilisateur.security;
+package com.myschool.backend.utilisateur.security;
 
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -18,9 +20,8 @@ import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.List;
 import java.util.Objects;
 
 @Configuration
@@ -29,7 +30,7 @@ import java.util.Objects;
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtFilter;
-    private final UserDetailsService userDetailsService; // DatabaseUserDetailsService bean
+    private final UserDetailsService userDetailsService;
 
     private static final String[] SWAGGER_WHITELIST = {
             "/v3/api-docs/**",
@@ -47,53 +48,38 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-            // disable csrf with lambda DSL (non-deprecated)
-            .csrf(AbstractHttpConfigurer::disable)
+                .csrf(AbstractHttpConfigurer::disable)
+                .cors(cors -> cors.configurationSource(request -> {
+                    var cfg = new org.springframework.web.cors.CorsConfiguration();
+                    cfg.setAllowedOrigins(List.of("http://localhost:5173")); // adapt to frontend domain in prod
+                    cfg.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+                    cfg.setAllowedHeaders(List.of("*"));
+                    cfg.setAllowCredentials(true);
+                    cfg.setExposedHeaders(List.of("Authorization"));
+                    return cfg;
+                }))
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(AUTH_WHITELIST).permitAll()
+                        .requestMatchers(SWAGGER_WHITELIST).permitAll()
+                        .anyRequest().authenticated()
+                )
+                .exceptionHandling(ex -> ex
+                        .authenticationEntryPoint(restAuthenticationEntryPoint())
+                )
+                .sessionManagement(sess -> sess.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
 
-            // cors basic (allow any origin for dev; tighten in prod)
-            .cors(cors -> cors.configurationSource(request -> {
-                var cfg = new org.springframework.web.cors.CorsConfiguration();
-                cfg.setAllowedOrigins(java.util.List.of("*")); // change to your front origin(s)
-                cfg.setAllowedMethods(java.util.List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-                cfg.setAllowedHeaders(java.util.List.of("*"));
-                cfg.setAllowCredentials(true);
-                cfg.setExposedHeaders(java.util.List.of("Authorization"));
-                return cfg;
-            }))
-
-            // authorize requests
-            .authorizeHttpRequests(auth -> auth
-                .requestMatchers("*/**").permitAll()
-                .requestMatchers(SWAGGER_WHITELIST).permitAll()
-                .requestMatchers(AUTH_WHITELIST).permitAll()
-                .anyRequest().authenticated()
-            )
-
-            // exception handling - send JSON 401 for unauthenticated requests
-            .exceptionHandling(ex -> ex
-                .authenticationEntryPoint(restAuthenticationEntryPoint())
-            )
-
-            // stateless session for JWT
-            .sessionManagement(sess -> sess.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
-
-        // add jwt filter before username/password filter
         http.addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
-
         return http.build();
     }
 
-    // DaoAuthenticationProvider using the provided UserDetailsService and PasswordEncoder.
-    // This keeps Authentication logic clear and avoids cycles.
     @Bean
-    public DaoAuthenticationProvider daoAuthenticationProvider(PasswordEncoder passwordEncoder) {
+    public DaoAuthenticationProvider daoAuthenticationProvider(PasswordEncoder encoder) {
         var provider = new DaoAuthenticationProvider();
         provider.setUserDetailsService(userDetailsService);
-        provider.setPasswordEncoder(passwordEncoder);
+        provider.setPasswordEncoder(encoder);
         return provider;
     }
 
-    // Expose AuthenticationManager (used in AuthenticationController)
     @Bean
     public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
         return config.getAuthenticationManager();
@@ -104,19 +90,14 @@ public class SecurityConfig {
         return new BCryptPasswordEncoder(12);
     }
 
-    // Return a JSON 401 body instead of default HTML page
     @Bean
     public AuthenticationEntryPoint restAuthenticationEntryPoint() {
-        return new AuthenticationEntryPoint() {
-            @Override
-            public void commence(HttpServletRequest request, HttpServletResponse response,
-                                 org.springframework.security.core.AuthenticationException authException) throws IOException {
-                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-                String message = Objects.requireNonNullElse(authException.getMessage(), "Unauthorized");
-                String body = String.format("{\"status\":\"error\",\"message\":\"%s\"}", message.replace("\"", "'"));
-                response.getWriter().write(body);
-            }
+        return (request, response, authException) -> {
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+            String message = Objects.requireNonNullElse(authException.getMessage(), "Unauthorized");
+            String body = String.format("{\"status\":\"error\",\"message\":\"%s\"}", message.replace("\"", "'"));
+            response.getWriter().write(body);
         };
     }
 }
