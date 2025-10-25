@@ -1,6 +1,5 @@
 package com.szschoolmanager.auth.dto;
 
-import com.szschoolmanager.auth.model.Role;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
@@ -20,7 +19,7 @@ public class UtilisateurDTO {
   private String password;
 
   @NotNull(message = "Le rôle est obligatoire")
-  private Role role;
+  private String role;
 
   @NotBlank(message = "Le CIN est obligatoire")
   private String cin;

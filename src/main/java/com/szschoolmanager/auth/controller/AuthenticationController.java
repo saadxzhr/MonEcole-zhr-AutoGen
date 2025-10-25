@@ -2,21 +2,24 @@ package com.szschoolmanager.auth.controller;
 
 import com.szschoolmanager.auth.dto.AuthRequestDTO;
 import com.szschoolmanager.auth.dto.AuthResponseDTO;
-import com.szschoolmanager.auth.dto.UtilisateurCreateDTO;
+
 import com.szschoolmanager.auth.model.RefreshToken;
 import com.szschoolmanager.auth.model.Utilisateur;
-import com.szschoolmanager.auth.security.JwtService;
 import com.szschoolmanager.auth.service.RefreshTokenService;
 import com.szschoolmanager.auth.service.UtilisateurService;
 import com.szschoolmanager.exception.BusinessValidationException;
 import com.szschoolmanager.exception.ResponseDTO;
+import com.szschoolmanager.auth.security.JwtService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.bind.annotation.*;
+
+import java.time.Duration;
+import java.time.Instant;
 
 @RestController
 @RequestMapping("/api/v1/auth")
@@ -26,15 +29,12 @@ public class AuthenticationController {
   private final JwtService jwtService;
   private final UtilisateurService utilisateurService;
   private final RefreshTokenService refreshTokenService;
+  private final RedisTemplate<String, String> redisTemplate;
 
-  // ==========================================================
-  // 🔹 LOGIN — Authentifie et génère Access + Refresh Tokens
-  // ==========================================================
   @PostMapping("/login")
   public ResponseEntity<ResponseDTO<AuthResponseDTO>> login(
-      @Valid @RequestBody AuthRequestDTO dto) {
+      @Valid @RequestBody AuthRequestDTO dto, HttpServletRequest request) {
     try {
-      // 🔸 Vérifier si l’utilisateur existe
       Utilisateur utilisateur =
           utilisateurService
               .findByUsername(dto.getUsername())
@@ -43,40 +43,24 @@ public class AuthenticationController {
       boolean encoded = utilisateur.getPassword().startsWith("$2a$");
       boolean matches =
           encoded
-              ? utilisateurService
-                  .passwordEncoder()
-                  .matches(dto.getPassword(), utilisateur.getPassword())
+              ? utilisateurService.passwordEncoder().matches(dto.getPassword(), utilisateur.getPassword())
               : dto.getPassword().equals(utilisateur.getPassword());
 
       if (!matches) throw new BadCredentialsException("Identifiants invalides");
 
-      // 🔐 Migration auto si mot de passe non encodé
       if (!encoded) {
         utilisateur.setPassword(utilisateurService.passwordEncoder().encode(dto.getPassword()));
         utilisateurService.save(utilisateur);
       }
 
-      // 🎟️ Génération Access + Refresh tokens
       String accessToken = jwtService.generateAccessToken(utilisateur);
 
       RefreshToken refreshToken =
           refreshTokenService.createRefreshToken(
-              utilisateur.getUsername(), dto.getUsername(), "unknown");
+              utilisateur.getUsername(),
+              request.getHeader("User-Agent"),
+              getClientIP(request));
 
-    //           RefreshToken refreshToken = refreshTokenService.createRefreshToken(
-    //       utilisateur.getUsername(),
-    //       request.getHeader("User-Agent"),  // ✅ Real user agent
-    //       getClientIP(request)  // ✅ Real IP
-    //   );
-
-    // private String getClientIP(HttpServletRequest request) {
-    //   String ip = request.getHeader("X-Forwarded-For");
-    //   if (ip == null || ip.isEmpty()) {
-    //       ip = request.getRemoteAddr();
-    //   }
-    //   return ip;
-    // }
-      // 🌐 Redirection front selon rôle
       String redirectUrl =
           switch (utilisateur.getRole().toUpperCase()) {
             case "ADMIN" -> "/dashboard/admin";
@@ -85,7 +69,6 @@ public class AuthenticationController {
             default -> "/dashboard/formateur";
           };
 
-      // 🧩 Construire réponse complète
       AuthResponseDTO response =
           AuthResponseDTO.builder()
               .token(accessToken)
@@ -97,40 +80,30 @@ public class AuthenticationController {
               .build();
 
       return ResponseEntity.ok(ResponseDTO.success("Authentification réussie", response));
-
     } catch (BadCredentialsException ex) {
       return ResponseEntity.status(401).body(ResponseDTO.error("Identifiants invalides"));
     }
   }
 
-  // ==========================================================
-  // 🔹 REFRESH TOKEN — Régénère AccessToken et fait rotation
-  // ==========================================================
   @PostMapping("/refresh")
   public ResponseEntity<ResponseDTO<AuthResponseDTO>> refreshToken(HttpServletRequest request) {
     String refreshTokenHeader = request.getHeader("Refresh-Token");
     if (refreshTokenHeader == null)
       throw new BusinessValidationException("Aucun refresh token fourni");
 
-    // 🔍 Validation du refresh token
+    // validate (throws if invalid)
     RefreshToken token = refreshTokenService.validateRefreshToken(refreshTokenHeader);
 
-    // 🔄 Générer un nouvel access token
-    String newAccessToken = jwtService.generateAccessToken(token.getUtilisateur());
+    // rotate: revoke old + create new + generate new access
+    var tokens = refreshTokenService.rotateRefreshToken(
+        refreshTokenHeader,
+        request.getHeader("User-Agent"),
+        getClientIP(request));
 
-    // 🔁 Rotation : invalider ancien + créer un nouveau refresh token
-    refreshTokenService.revokeRefreshToken(refreshTokenHeader);
-    RefreshToken newRefresh =
-        refreshTokenService.createRefreshToken(
-            token.getUtilisateur().getUsername(),
-            request.getHeader("User-Agent"),
-            request.getRemoteAddr());
-
-    // 🧩 Réponse unifiée
     AuthResponseDTO response =
         new AuthResponseDTO(
-            newAccessToken,
-            newRefresh.getToken(),
+            tokens.accessToken(),
+            tokens.refreshToken(),
             token.getUtilisateur().getUsername(),
             token.getUtilisateur().getRole(),
             false,
@@ -139,22 +112,62 @@ public class AuthenticationController {
     return ResponseEntity.ok(ResponseDTO.success("Token régénéré avec succès", response));
   }
 
-  // ==========================================================
-  // 🔹 LOGOUT — Révoque le refresh token courant
-  // ==========================================================
+  /**
+   * Logout: revoke the provided refresh token, and blacklist current access token jti (if present).
+   * - Requires "Refresh-Token" header for refresh revocation.
+   * - If Authorization Bearer token present, its jti will be stored in Redis until expiry.
+   */
   @PostMapping("/logout")
   public ResponseEntity<ResponseDTO<Void>> logout(
-      @RequestHeader("Refresh-Token") String refreshToken) {
-    refreshTokenService.revokeRefreshToken(refreshToken);
+      @RequestHeader(value = "Refresh-Token", required = false) String refreshToken,
+      @RequestHeader(value = "Authorization", required = false) String authorizationHeader) {
+
+    // Revoke refresh token if presented
+    if (refreshToken != null && !refreshToken.isBlank()) {
+      refreshTokenService.revokeRefreshToken(refreshToken);
+    }
+
+    // Blacklist access token jti if Authorization header provided as Bearer ...
+    if (authorizationHeader != null && authorizationHeader.startsWith("Bearer ")) {
+      String accessToken = authorizationHeader.substring(7).trim();
+      try {
+        var jws = jwtService.parseToken(accessToken); // will validate signature/iss/aud/alg/typ/exp
+        var claims = jws.getBody();
+        String jti = claims.getId();
+        if (jti != null && !jti.isBlank()) {
+          Instant exp = claims.getExpiration().toInstant();
+          Instant now = Instant.now();
+          Duration ttl = Duration.between(now, exp);
+          if (!ttl.isNegative() && !ttl.isZero()) {
+            String key = "blacklist:access:" + jti;
+            redisTemplate.opsForValue().set(key, "revoked");
+            // expire with duration (works on current Spring Data Redis versions)
+            try {
+              redisTemplate.expire(key, ttl);
+            } catch (Exception ignore) {
+              // fallback: try long seconds expiry if duration->seconds available
+              try {
+                redisTemplate.expire(key, ttl.getSeconds(), java.util.concurrent.TimeUnit.SECONDS);
+              } catch (Exception ex) {
+                // if expire fails, still ok — entry will be there, may persist; log if required
+              }
+            }
+          }
+        }
+      } catch (Exception e) {
+        // token parse/validation failed — we ignore blacklist (logout still revokes refresh)
+      }
+    }
+
     return ResponseEntity.ok(ResponseDTO.success("Déconnexion réussie", null));
   }
 
-  // ==========================================================
-  // 🔹 Création manuelle d’un utilisateur (Admin/Direction)
-  // ==========================================================
-  @PostMapping("/admin/create-user")
-  @PreAuthorize("hasRole('DIRECTION') or hasRole('ADMIN')")
-  public ResponseEntity<?> adminCreateUser(@Valid @RequestBody UtilisateurCreateDTO dto) {
-    return utilisateurService.create(dto);
+  // Helper
+  private String getClientIP(HttpServletRequest request) {
+    String xf = request.getHeader("X-Forwarded-For");
+    if (xf == null || xf.isBlank()) {
+      return request.getRemoteAddr();
+    }
+    return xf.split(",")[0].trim();
   }
 }

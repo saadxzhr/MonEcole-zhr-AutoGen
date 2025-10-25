@@ -1,6 +1,8 @@
 package com.szschoolmanager.auth.repository;
 
 import com.szschoolmanager.auth.model.RefreshToken;
+import com.szschoolmanager.auth.model.Utilisateur;
+
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -14,4 +16,6 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long
   List<RefreshToken> findAllByUtilisateurIdAndRevokedFalse(Long utilisateurId);
 
   void deleteByUtilisateurId(Long utilisateurId);
+
+  List<RefreshToken> findAllByUtilisateurId(Long utilisateurId);
 }

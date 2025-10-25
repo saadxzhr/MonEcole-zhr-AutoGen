@@ -28,6 +28,7 @@ public class Utilisateur extends BaseEntity {
   @Column(nullable = false, length = 20)
   private String cin;
 
+  @Builder.Default
   @Column(name = "forceChangePassword", nullable = false)
   private Boolean forceChangePassword = true;
 }

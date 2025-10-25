@@ -54,6 +54,9 @@ public class BackendApplication {
 // mvn depclean:clean
 // mvn se.kth.castor:depclean-maven-plugin:depclean
 
+// redis 6379
+
+
 
 // git add .
 // git commit -m "spotless windsurf sonar"

@@ -34,8 +34,19 @@ public class RefreshToken {
   @Column(nullable = false)
   private boolean revoked = false;
 
+
+  @Column(nullable = false, length = 100)
   private String userAgent;
+
+  @Column(nullable = false, length = 100)
   private String ipAddress;
+
+  @Column(nullable = false, unique = true, length = 255)
+  private String jti;
+
+  @Builder.Default
+  @Column(nullable = false)
+  private boolean reused = false;
 
   public boolean isExpired() {
     return LocalDateTime.now().isAfter(expiresAt);
