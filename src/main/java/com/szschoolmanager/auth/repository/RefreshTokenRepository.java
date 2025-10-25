@@ -1,7 +1,6 @@
 package com.szschoolmanager.auth.repository;
 
 import com.szschoolmanager.auth.model.RefreshToken;
-import com.szschoolmanager.auth.model.Utilisateur;
 
 import java.util.List;
 import java.util.Optional;

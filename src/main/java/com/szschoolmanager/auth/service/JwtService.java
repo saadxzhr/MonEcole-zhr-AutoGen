@@ -1,4 +1,4 @@
-package com.szschoolmanager.auth.security;
+package com.szschoolmanager.auth.service;
 
 import com.szschoolmanager.auth.model.Utilisateur;
 import io.jsonwebtoken.*;

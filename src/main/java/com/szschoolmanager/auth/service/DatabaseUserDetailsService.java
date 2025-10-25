@@ -1,7 +1,7 @@
-package com.szschoolmanager.auth.security;
+package com.szschoolmanager.auth.service;
 
 import com.szschoolmanager.auth.model.Utilisateur;
-import com.szschoolmanager.auth.service.UtilisateurQueryService;
+
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;

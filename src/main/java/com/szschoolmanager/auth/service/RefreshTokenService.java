@@ -3,7 +3,7 @@ package com.szschoolmanager.auth.service;
 import com.szschoolmanager.auth.model.RefreshToken;
 import com.szschoolmanager.auth.repository.RefreshTokenRepository;
 import com.szschoolmanager.auth.repository.UtilisateurRepository;
-import com.szschoolmanager.auth.security.JwtService;
+
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;

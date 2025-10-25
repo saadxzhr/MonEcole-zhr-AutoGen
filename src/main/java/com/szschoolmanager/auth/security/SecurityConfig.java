@@ -48,6 +48,7 @@ public class SecurityConfig {
         "/swagger-ui.html",
         "/swagger-resources/**",
         "/webjars/**",
+        "/actuator/health",
         "/favicon.ico"
     };
 

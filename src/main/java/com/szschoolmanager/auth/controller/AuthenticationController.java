@@ -5,11 +5,12 @@ import com.szschoolmanager.auth.dto.AuthResponseDTO;
 
 import com.szschoolmanager.auth.model.RefreshToken;
 import com.szschoolmanager.auth.model.Utilisateur;
+import com.szschoolmanager.auth.service.JwtService;
 import com.szschoolmanager.auth.service.RefreshTokenService;
 import com.szschoolmanager.auth.service.UtilisateurService;
 import com.szschoolmanager.exception.BusinessValidationException;
 import com.szschoolmanager.exception.ResponseDTO;
-import com.szschoolmanager.auth.security.JwtService;
+
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;

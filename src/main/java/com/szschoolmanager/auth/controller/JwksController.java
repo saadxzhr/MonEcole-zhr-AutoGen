@@ -8,14 +8,14 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.szschoolmanager.auth.security.JwtService;
+import com.szschoolmanager.auth.service.JwtService;
 
 import lombok.RequiredArgsConstructor;
 
 @RestController
 @RequestMapping("/.well-known")
 @RequiredArgsConstructor
-public class JwtController {
+public class JwksController {
 
   private final JwtService jwtService;
 
