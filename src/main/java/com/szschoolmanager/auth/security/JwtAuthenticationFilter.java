@@ -8,7 +8,9 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.redis.core.RedisTemplate;
+
+import org.springframework.core.annotation.Order;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.HttpHeaders;
 import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -28,6 +30,7 @@ import java.io.IOException;
 import java.util.List;
 
 @Slf4j
+@Order(1)
 @Component
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
@@ -36,19 +39,17 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
       "/api/v1/auth", "/v3/api-docs", "/swagger-ui", "/swagger-ui.html", "/.well-known/jwks.json"
   );
 
-  private static final int MAX_TOKEN_LENGTH = 8192; // defensive cap
+  private static final int MAX_TOKEN_LENGTH = 8192;
 
   private final JwtService jwtService;
   private final UserDetailsService userDetailsService;
-  private final RedisTemplate<String, String> redisTemplate;
+  private final StringRedisTemplate stringRedisTemplate;
   private final MeterRegistry meterRegistry;
 
   @Override
-  protected void doFilterInternal(
-      @NonNull HttpServletRequest request,
-      @NonNull HttpServletResponse response,
-      @NonNull FilterChain chain)
-      throws ServletException, IOException {
+  protected void doFilterInternal(@NonNull HttpServletRequest request,
+                                  @NonNull HttpServletResponse response,
+                                  @NonNull FilterChain chain) throws ServletException, IOException {
 
     String path = request.getRequestURI();
     if (WHITELIST.stream().anyMatch(path::startsWith)) {
@@ -63,8 +64,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     }
 
     String token = authHeader.substring(7).trim();
-
-    // quick defensive checks
     if (token.isEmpty() || token.length() > MAX_TOKEN_LENGTH) {
       meterRegistry.counter("jwt.auth.failure").increment();
       log.warn("JWT token malformed or too long from ip={}", request.getRemoteAddr());
@@ -74,11 +73,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     Jws<Claims> jws;
     try {
-      // parseToken enforce signature + issuer + audience + alg/typ checks (in JwtService)
       jws = jwtService.parseToken(token);
     } catch (Exception e) {
       meterRegistry.counter("jwt.auth.failure").increment();
-      log.debug("JWT parse/validation failed: {}", e.getMessage());
+      log.debug("Token parse failed: {}", e.getMessage());
       chain.doFilter(request, response);
       return;
     }
@@ -88,18 +86,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     String jti = claims.getId();
     String role = claims.get("role", String.class);
 
-    // blacklist check (instant revocation)
     if (jti != null) {
       try {
-        Boolean black = Boolean.TRUE.equals(redisTemplate.hasKey("blacklist:access:" + jti));
-        if (Boolean.TRUE.equals(black)) {
+        if (Boolean.TRUE.equals(stringRedisTemplate.hasKey("blacklist:access:" + jti))) {
           meterRegistry.counter("jwt.auth.blacklisted").increment();
           log.info("Rejected blacklisted token jti={} ip={}", jti, request.getRemoteAddr());
           chain.doFilter(request, response);
           return;
         }
       } catch (Exception ex) {
-        // Redis failure should not break authentication flow — log and continue
         log.warn("Redis check failed (allowing auth to proceed): {}", ex.getMessage());
       }
     }
@@ -110,12 +105,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         List<GrantedAuthority> authorities = List.of(new SimpleGrantedAuthority(
             "ROLE_" + (role == null ? "USER" : role.toUpperCase())
         ));
-
         UsernamePasswordAuthenticationToken auth =
             new UsernamePasswordAuthenticationToken(userDetails, null, authorities);
         auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
         SecurityContextHolder.getContext().setAuthentication(auth);
-
         meterRegistry.counter("jwt.auth.success").increment();
         log.info("Auth success user={} ip={} kid={}", username, request.getRemoteAddr(),
             jws.getHeader().get("kid"));

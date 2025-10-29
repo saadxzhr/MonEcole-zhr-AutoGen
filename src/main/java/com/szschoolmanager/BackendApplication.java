@@ -57,6 +57,8 @@ public class BackendApplication {
 // redis 6379
 
 
+// jWT
+// refresh tokens exposés en JSON → déplacer vers Secure HttpOnly cookie en prod ;
 
 // git add .
 // git commit -m "jwt final optimization 2"

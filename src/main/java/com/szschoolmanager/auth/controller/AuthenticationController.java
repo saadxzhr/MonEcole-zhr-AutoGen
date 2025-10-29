@@ -2,7 +2,6 @@ package com.szschoolmanager.auth.controller;
 
 import com.szschoolmanager.auth.dto.AuthRequestDTO;
 import com.szschoolmanager.auth.dto.AuthResponseDTO;
-
 import com.szschoolmanager.auth.model.RefreshToken;
 import com.szschoolmanager.auth.model.Utilisateur;
 import com.szschoolmanager.auth.service.JwtService;
@@ -12,9 +11,14 @@ import com.szschoolmanager.exception.BusinessValidationException;
 import com.szschoolmanager.exception.ResponseDTO;
 
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.redis.core.RedisTemplate;
+import lombok.extern.slf4j.Slf4j;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.bind.annotation.*;
@@ -22,6 +26,8 @@ import org.springframework.web.bind.annotation.*;
 import java.time.Duration;
 import java.time.Instant;
 
+
+@Slf4j
 @RestController
 @RequestMapping("/api/v1/auth")
 @RequiredArgsConstructor
@@ -30,22 +36,25 @@ public class AuthenticationController {
   private final JwtService jwtService;
   private final UtilisateurService utilisateurService;
   private final RefreshTokenService refreshTokenService;
-  private final RedisTemplate<String, String> redisTemplate;
+
+  @Value("${app.dev:true}") // default true for development; set false in prod
+  private boolean devMode;
+
+  @Value("${jwt.refresh-days:7}")
+  private int refreshDays;
 
   @PostMapping("/login")
   public ResponseEntity<ResponseDTO<AuthResponseDTO>> login(
-      @Valid @RequestBody AuthRequestDTO dto, HttpServletRequest request) {
+      @Valid @RequestBody AuthRequestDTO dto, HttpServletRequest request, HttpServletResponse response) {
     try {
-      Utilisateur utilisateur =
-          utilisateurService
-              .findByUsername(dto.getUsername())
-              .orElseThrow(() -> new BadCredentialsException("Utilisateur introuvable"));
+      Utilisateur utilisateur = utilisateurService
+          .findByUsername(dto.getUsername())
+          .orElseThrow(() -> new BadCredentialsException("Utilisateur introuvable"));
 
       boolean encoded = utilisateur.getPassword().startsWith("$2a$");
-      boolean matches =
-          encoded
-              ? utilisateurService.passwordEncoder().matches(dto.getPassword(), utilisateur.getPassword())
-              : dto.getPassword().equals(utilisateur.getPassword());
+      boolean matches = encoded
+          ? utilisateurService.passwordEncoder().matches(dto.getPassword(), utilisateur.getPassword())
+          : dto.getPassword().equals(utilisateur.getPassword());
 
       if (!matches) throw new BadCredentialsException("Identifiants invalides");
 
@@ -55,120 +64,182 @@ public class AuthenticationController {
       }
 
       String accessToken = jwtService.generateAccessToken(utilisateur);
+      RefreshToken refreshToken = refreshTokenService.createRefreshToken(
+          utilisateur, request.getHeader("User-Agent"), getClientIP(request));
 
-      RefreshToken refreshToken =
-          refreshTokenService.createRefreshToken(
-              utilisateur.getUsername(),
-              request.getHeader("User-Agent"),
-              getClientIP(request));
+      // In dev mode we return refresh token in JSON. In prod, set HttpOnly cookie instead.
+      String rawRefresh = refreshToken.getToken(); // in-memory raw token returned by service
+      log.info("on controller refresh token: {}", rawRefresh);
+      if (!devMode) {
+        ResponseCookie cookie = ResponseCookie.from("refreshToken", rawRefresh)
+            .httpOnly(true)
+            .secure(true)
+            .sameSite("Strict")
+            .path("/api/v1/auth")
+            .maxAge(Duration.ofDays(refreshDays))
+            .build();
+        response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+      }
 
-      String redirectUrl =
-          switch (utilisateur.getRole().toUpperCase()) {
-            case "ADMIN" -> "/dashboard/admin";
-            case "DIRECTION" -> "/dashboard/direction";
-            case "SECRETARIAT" -> "/dashboard/secretariat";
-            default -> "/dashboard/formateur";
-          };
+      String redirectUrl = switch (utilisateur.getRole().toUpperCase()) {
+        case "ADMIN" -> "/dashboard/admin";
+        case "DIRECTION" -> "/dashboard/direction";
+        case "SECRETARIAT" -> "/dashboard/secretariat";
+        default -> "/dashboard/formateur";
+      };
 
-      AuthResponseDTO response =
-          AuthResponseDTO.builder()
-              .token(accessToken)
-              .refreshToken(refreshToken.getToken())
-              .username(utilisateur.getUsername())
-              .role(utilisateur.getRole())
-              .forceChangePassword(utilisateur.getForceChangePassword())
-              .redirectUrl(redirectUrl)
-              .build();
+      AuthResponseDTO body = AuthResponseDTO.builder()
+          .token(accessToken)
+          .refreshToken(devMode ? rawRefresh : null) // only in dev
+          .username(utilisateur.getUsername())
+          .role(utilisateur.getRole())
+          .forceChangePassword(utilisateur.getForceChangePassword())
+          .redirectUrl(redirectUrl)
+          .build();
 
-      return ResponseEntity.ok(ResponseDTO.success("Authentification réussie", response));
+      return ResponseEntity.ok(ResponseDTO.success("Authentification réussie", body));
     } catch (BadCredentialsException ex) {
       return ResponseEntity.status(401).body(ResponseDTO.error("Identifiants invalides"));
     }
   }
 
-  @PostMapping("/refresh")
-  public ResponseEntity<ResponseDTO<AuthResponseDTO>> refreshToken(HttpServletRequest request) {
-    String refreshTokenHeader = request.getHeader("Refresh-Token");
-    if (refreshTokenHeader == null)
+
+  
+ @PostMapping("/refresh")
+public ResponseEntity<ResponseDTO<AuthResponseDTO>> refreshToken(
+    @RequestHeader(value = "Refresh-Token", required = false) String headerRefresh,
+    HttpServletRequest request,
+    HttpServletResponse response) {
+
+  try {
+    // 1️⃣ Retrieve presented refresh token (header or cookie)
+    String presented = getPresentedToken(headerRefresh, request);
+    if (presented == null || presented.isBlank())
       throw new BusinessValidationException("Aucun refresh token fourni");
 
-    // validate (throws if invalid)
-    RefreshToken token = refreshTokenService.validateRefreshToken(refreshTokenHeader);
-
-    // rotate: revoke old + create new + generate new access
-    var tokens = refreshTokenService.rotateRefreshToken(
-        refreshTokenHeader,
+    // 2️⃣ Rotate token (detect reuse and revoke if needed)
+    RefreshToken newRt = refreshTokenService.rotateRefreshToken(
+        presented,
         request.getHeader("User-Agent"),
-        getClientIP(request));
-
-    AuthResponseDTO response =
-        new AuthResponseDTO(
-            tokens.accessToken(),
-            tokens.refreshToken(),
-            token.getUtilisateur().getUsername(),
-            token.getUtilisateur().getRole(),
-            false,
-            null);
-
-    return ResponseEntity.ok(ResponseDTO.success("Token régénéré avec succès", response));
-  }
-
-  /**
-   * Logout: revoke the provided refresh token, and blacklist current access token jti (if present).
-   * - Requires "Refresh-Token" header for refresh revocation.
-   * - If Authorization Bearer token present, its jti will be stored in Redis until expiry.
-   */
-  @PostMapping("/logout")
-  public ResponseEntity<ResponseDTO<Void>> logout(
-      @RequestHeader(value = "Refresh-Token", required = false) String refreshToken,
-      @RequestHeader(value = "Authorization", required = false) String authorizationHeader) {
-
-    // Revoke refresh token if presented
-    if (refreshToken != null && !refreshToken.isBlank()) {
-      refreshTokenService.revokeRefreshToken(refreshToken);
+        getClientIP(request)
+    );
+    if (newRt == null) {
+        return ResponseEntity.badRequest()
+            .body(ResponseDTO.error("Refresh token reuse detected - all sessions revoked"));
     }
 
-    // Blacklist access token jti if Authorization header provided as Bearer ...
+    // 3️⃣ Generate new access token
+    String newAccessToken = jwtService.generateAccessToken(newRt.getUtilisateur());
+
+    // 4️⃣ Return refresh cookie in production mode
+    if (!devMode) {
+      ResponseCookie cookie = ResponseCookie.from("refreshToken", newRt.getToken())
+          .httpOnly(true)
+          .secure(true)
+          .sameSite("Strict")
+          .path("/api/v1/auth")
+          .maxAge(Duration.ofDays(refreshDays))
+          .build();
+      response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+    }
+
+    // 5️⃣ Build response body
+    AuthResponseDTO body = new AuthResponseDTO(
+        newAccessToken,
+        devMode ? newRt.getToken() : null,
+        newRt.getUtilisateur().getUsername(),
+        newRt.getUtilisateur().getRole(),
+        false,
+        null
+    );
+    return ResponseEntity.ok(ResponseDTO.success("Token régénéré avec succès", body));
+
+  } catch (BusinessValidationException e) {
+    // ✅ Handle token reuse or invalid token gracefully (no rollback)
+    log.warn("Erreur lors du refresh token: {}", e.getMessage());
+    return ResponseEntity.badRequest().body(ResponseDTO.error(e.getMessage()));
+  }
+}
+private String getPresentedToken(String headerRefresh, HttpServletRequest request) {
+  String presented = headerRefresh;
+  if (presented == null || presented.isBlank()) {
+    var cookies = request.getCookies();
+    if (cookies != null) {
+      for (var c : cookies) {
+        if ("refreshToken".equals(c.getName()) && c.getValue() != null && !c.getValue().isBlank()) {
+          presented = c.getValue();
+          break;
+        }
+      }
+    }
+  }
+  return presented;
+}
+
+
+
+
+  @PostMapping("/logout")
+  public ResponseEntity<ResponseDTO<Void>> logout(
+      @RequestHeader(value = "Refresh-Token", required = false) String refreshTokenHeader,
+      @RequestHeader(value = "Authorization", required = false) String authorizationHeader,
+      HttpServletRequest request,
+      HttpServletResponse servletResponse) {
+
+    // 1) Determine presented refresh token (raw) from header or cookie
+    String presented = refreshTokenHeader;
+    if (presented == null || presented.isBlank()) {
+      if (request.getCookies() != null) {
+        for (var c : request.getCookies()) {
+          if ("refreshToken".equals(c.getName()) && c.getValue() != null && !c.getValue().isBlank()) {
+            presented = c.getValue();
+            break;
+          }
+        }
+      }
+    }
+
+    // 2) Revoke refresh token (hashing + lookup done inside service)
+    if (presented != null && !presented.isBlank()) {
+      refreshTokenService.revokeRefreshToken(presented);
+    } else {
+      // instruct client to clear cookie if any (best effort)
+      ResponseCookie cookie = ResponseCookie.from("refreshToken", "")
+          .httpOnly(true)
+          .secure(true)
+          .sameSite("Strict")
+          .path("/api/v1/auth")
+          .maxAge(Duration.ZERO)
+          .build();
+      servletResponse.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+    }
+
+    // 3) Blacklist access token jti (if provided)
     if (authorizationHeader != null && authorizationHeader.startsWith("Bearer ")) {
       String accessToken = authorizationHeader.substring(7).trim();
       try {
-        var jws = jwtService.parseToken(accessToken); // will validate signature/iss/aud/alg/typ/exp
+        var jws = jwtService.parseToken(accessToken);
         var claims = jws.getBody();
         String jti = claims.getId();
         if (jti != null && !jti.isBlank()) {
-          Instant exp = claims.getExpiration().toInstant();
-          Instant now = Instant.now();
-          Duration ttl = Duration.between(now, exp);
+          var exp = claims.getExpiration().toInstant();
+          var now = Instant.now();
+          var ttl = Duration.between(now, exp);
           if (!ttl.isNegative() && !ttl.isZero()) {
-            String key = "blacklist:access:" + jti;
-            redisTemplate.opsForValue().set(key, "revoked");
-            // expire with duration (works on current Spring Data Redis versions)
-            try {
-              redisTemplate.expire(key, ttl);
-            } catch (Exception ignore) {
-              // fallback: try long seconds expiry if duration->seconds available
-              try {
-                redisTemplate.expire(key, ttl.getSeconds(), java.util.concurrent.TimeUnit.SECONDS);
-              } catch (Exception ex) {
-                // if expire fails, still ok — entry will be there, may persist; log if required
-              }
-            }
+            jwtService.blacklistAccessTokenJti(jti, ttl); // atomic set with TTL
           }
         }
-      } catch (Exception e) {
-        // token parse/validation failed — we ignore blacklist (logout still revokes refresh)
+      } catch (Exception ignored) {
+        // ignore parse errors
       }
     }
 
     return ResponseEntity.ok(ResponseDTO.success("Déconnexion réussie", null));
   }
 
-  // Helper
+
   private String getClientIP(HttpServletRequest request) {
     String xf = request.getHeader("X-Forwarded-For");
-    if (xf == null || xf.isBlank()) {
-      return request.getRemoteAddr();
-    }
-    return xf.split(",")[0].trim();
+    return (xf == null || xf.isEmpty()) ? request.getRemoteAddr() : xf.split(",")[0];
   }
 }
