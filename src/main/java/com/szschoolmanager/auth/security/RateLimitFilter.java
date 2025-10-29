@@ -9,6 +9,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -17,17 +18,12 @@ import java.time.Duration;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * ✅ RateLimitFilter — Bucket4j 8.10.1
- * - 10 requêtes / minute par IP + URI
- * - Aucun import ou API déprécié
- * - Compatible Spring Boot 3.5.6, Java 17
- */
+
 @Slf4j
 @Component
 public class RateLimitFilter extends OncePerRequestFilter {
 
-    private static final int REQUEST_LIMIT = 10;
+    private static final int REQUEST_LIMIT = 5;
     private static final Duration REFILL_PERIOD = Duration.ofMinutes(1);
 
     // cache mémoire thread-safe
@@ -43,9 +39,9 @@ public class RateLimitFilter extends OncePerRequestFilter {
     }
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request,
-                                    HttpServletResponse response,
-                                    FilterChain filterChain)
+    protected void doFilterInternal(@NonNull HttpServletRequest request,
+                                    @NonNull HttpServletResponse response,
+                                    @NonNull FilterChain filterChain)
             throws ServletException, IOException {
 
         String key = request.getRemoteAddr() + ":" + request.getRequestURI();

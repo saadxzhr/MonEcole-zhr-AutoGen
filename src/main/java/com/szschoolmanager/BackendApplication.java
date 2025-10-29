@@ -61,7 +61,7 @@ public class BackendApplication {
 // refresh tokens exposés en JSON → déplacer vers Secure HttpOnly cookie en prod ;
 
 // git add .
-// git commit -m "jwt final optimization 2"
+// git commit -m "jwt optimization - reused not commited on db fixed"
 // git push
 
 // postman

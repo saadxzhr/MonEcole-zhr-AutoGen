@@ -13,6 +13,7 @@ import org.springframework.core.annotation.Order;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.HttpHeaders;
 import org.springframework.lang.NonNull;
+import org.springframework.security.authentication.AuthenticationServiceException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -95,7 +96,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
           return;
         }
       } catch (Exception ex) {
-        log.warn("Redis check failed (allowing auth to proceed): {}", ex.getMessage());
+        log.error("Redis check failed (allowing auth to proceed): {}", ex.getMessage());
+        throw new AuthenticationServiceException("Auth service unavailable");
       }
     }
 

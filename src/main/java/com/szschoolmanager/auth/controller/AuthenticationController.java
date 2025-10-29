@@ -123,10 +123,6 @@ public ResponseEntity<ResponseDTO<AuthResponseDTO>> refreshToken(
         request.getHeader("User-Agent"),
         getClientIP(request)
     );
-    if (newRt == null) {
-        return ResponseEntity.badRequest()
-            .body(ResponseDTO.error("Refresh token reuse detected - all sessions revoked"));
-    }
 
     // 3️⃣ Generate new access token
     String newAccessToken = jwtService.generateAccessToken(newRt.getUtilisateur());

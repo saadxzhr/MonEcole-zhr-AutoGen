@@ -6,6 +6,8 @@ import com.szschoolmanager.auth.repository.RefreshTokenRepository;
 import com.szschoolmanager.exception.BusinessValidationException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -133,10 +135,10 @@ public class RefreshTokenService {
             revokeAllActiveSessionsForUserCommitted(stored.getUtilisateur().getId());
         }
 
-        return null;
 
         // throw here cause rollback problem > no changes commited on db level
-        // throw new BusinessValidationException("Refresh token reuse detected - all sessions revoked");
+        // fixed by (noRollbackFor = BusinessValidationException.class)
+        throw new BusinessValidationException("Refresh token reuse detected - all sessions revoked");
     }
 
     // ----------------- REVOKE ONE -----------------
@@ -207,4 +209,14 @@ public class RefreshTokenService {
         if (s == null) return "";
         return s.length() <= 200 ? s : s.substring(0, 200);
     }
+
+
+    @Scheduled(cron = "0 0 2 * * ?") // 2 AM daily
+    @Transactional
+    public void cleanupExpiredTokens() {
+        int deleted = refreshTokenRepository
+            .deleteByExpiresAtBefore(LocalDateTime.now());
+        log.info("🧹 Deleted {} expired refresh tokens", deleted);
+    }
+
 }
