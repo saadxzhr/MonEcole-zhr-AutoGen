@@ -56,6 +56,9 @@ import java.util.Objects;
 
     private static final String[] AUTH_WHITELIST = {"/api/v1/auth/**"};
 
+    private static final String[] ACTUATOR_WHITELIST = {"/actuator/**"};
+
+
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
       http.csrf(AbstractHttpConfigurer::disable)
@@ -63,6 +66,7 @@ import java.util.Objects;
           .authorizeHttpRequests(auth -> auth
               .requestMatchers(AUTH_WHITELIST).permitAll()
               .requestMatchers(SWAGGER_WHITELIST).permitAll()
+              .requestMatchers(ACTUATOR_WHITELIST).permitAll()
               .anyRequest().authenticated())
           .exceptionHandling(ex -> ex.authenticationEntryPoint(restAuthenticationEntryPoint()))
           .sessionManagement(sess -> sess.sessionCreationPolicy(SessionCreationPolicy.STATELESS))

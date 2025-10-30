@@ -1,5 +1,6 @@
 package com.szschoolmanager.auth.service;
 
+import com.szschoolmanager.auth.dto.TokensDTO;
 import com.szschoolmanager.auth.model.Utilisateur;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.SignatureException;
@@ -15,6 +16,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.*;
 import java.security.interfaces.RSAPublicKey;
 import java.security.spec.*;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 
@@ -109,6 +111,7 @@ public class JwtService {
         .setId(jti)
         .claim("role", user.getRole())
         .claim("cin", user.getCin())
+        .claim("authorities", List.of("ROLE_" + user.getRole().toUpperCase())) 
         .setIssuedAt(Date.from(now))
         .setExpiration(Date.from(now.plusSeconds(accessExpirationSeconds)))
         .signWith(privateKey, SignatureAlgorithm.RS256)
@@ -169,4 +172,30 @@ public class JwtService {
       log.warn("Failed to write blacklist jti={} into redis: {}", jti, e.getMessage());
     }
   }
+
+
+  /**
+ * Génère un couple (access + refresh) et les retourne dans un DTO.
+ * Le refresh token est stocké en Redis avec TTL pour invalidation future.
+ */
+  public TokensDTO generateTokens(Utilisateur user) {
+      String accessToken = generateAccessToken(user);
+
+      // Génération d’un refresh token simple (JWT non signé ici, peut être un UUID)
+      String refreshToken = UUID.randomUUID().toString();
+      String redisKey = "refresh:" + user.getUsername() + ":" + refreshToken;
+
+      try {
+          // Durée de vie du refresh = 30 jours
+          Duration refreshTtl = Duration.ofDays(30);
+          stringRedisTemplate.opsForValue().set(redisKey, "valid", refreshTtl);
+          log.info("🧩 Refresh token stocké dans Redis pour {} (TTL {} jours)", user.getUsername(), 30);
+      } catch (Exception e) {
+          log.error("⚠️ Échec d’écriture du refresh token dans Redis : {}", e.getMessage());
+      }
+
+      // Retourne les deux tokens dans un DTO standard
+      return new TokensDTO(accessToken, refreshToken, accessExpirationSeconds, 30 * 24 * 3600);
+  }
+
 }

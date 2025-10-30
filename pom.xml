@@ -32,6 +32,12 @@
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
 
+        <!-- Micrometer Prometheus -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-prometheus</artifactId>
+        </dependency>
+
         <!-- Spring Boot Starters -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -140,12 +146,7 @@
             <version>3.25.2</version>
         </dependency>
 
-        <!-- Micrometer Prometheus -->
-        <dependency>
-            <groupId>io.micrometer</groupId>
-            <artifactId>micrometer-registry-prometheus</artifactId>
-        </dependency>
-
+        
         <!-- <dependency>
             <groupId>org.liquibase</groupId>
             <artifactId>liquibase-core</artifactId>

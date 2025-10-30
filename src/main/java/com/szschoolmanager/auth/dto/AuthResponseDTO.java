@@ -16,15 +16,4 @@ public class AuthResponseDTO {
   private String role; // Rôle unique
   private boolean forceChangePassword; // Doit changer son mot de passe
   private String redirectUrl; // Redirection frontend
-
-  // // ✅ Constructeur pour /refresh
-  // public AuthResponseDTO(String token, String refreshToken, String username, String role,
-  //                        boolean forceChangePassword, String redirectUrl) {
-  //     this.token = token;
-  //     this.refreshToken = refreshToken;
-  //     this.username = username;
-  //     this.role = role;
-  //     this.forceChangePassword = forceChangePassword;
-  //     this.redirectUrl = redirectUrl;
-  // }
 }

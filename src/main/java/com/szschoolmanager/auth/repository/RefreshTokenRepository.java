@@ -1,6 +1,9 @@
 package com.szschoolmanager.auth.repository;
 
 import com.szschoolmanager.auth.model.RefreshToken;
+
+import jakarta.transaction.Transactional;
+
 import org.springframework.data.jpa.repository.*;
 import org.springframework.stereotype.Repository;
 import java.util.Optional;
@@ -17,10 +20,14 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long
 
     List<RefreshToken> findAllByUtilisateurIdAndRevokedFalse(Long userId);
 
-    // ✅ JPQL bulk update to revoke all valid tokens for a user
+    // JPQL bulk update to revoke all valid tokens for a user
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("UPDATE RefreshToken r SET r.revoked = true WHERE r.utilisateur.id = :userId AND r.revoked = false")
     int revokeAllByUserId(Long userId);
 
+    // Deletes all tokens whose expiry time has passed
+    @Modifying
+    @Transactional
+    @Query("DELETE FROM RefreshToken t WHERE t.expiresAt < :now")
     int deleteByExpiresAtBefore(LocalDateTime now);
 }

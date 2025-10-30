@@ -8,4 +8,6 @@ import lombok.Data;
 public class TokensDTO {
     private String accessToken;
     private String refreshToken;
+    private long accessExpiresIn;
+    private long refreshExpiresIn;
 }
