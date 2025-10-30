@@ -20,6 +20,9 @@ import org.springframework.http.MediaType;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.cors.*;
+
+import com.szschoolmanager.auth.config.RateLimitFilter;
+
 import jakarta.servlet.http.HttpServletResponse;
 
 import java.util.Arrays;
