@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.security.*;
+import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
 import java.security.spec.*;
 import java.time.Duration;
@@ -58,6 +59,7 @@ public class JwtService {
   // --- Runtime state ---
   private PrivateKey privateKey;
   @Getter private RSAPublicKey publicKey;
+  private JwtParser jwtParser;
 
  
 
@@ -71,11 +73,21 @@ public class JwtService {
   @PostConstruct
   public void init() {
     try {
-      this.privateKey = loadPrivateKey(privateKeyPath);
-      this.publicKey = (RSAPublicKey) loadPublicKey(publicKeyPath);
-      if (privateKey == null || publicKey == null)
-        throw new IllegalStateException("RSA keys not loaded correctly");
-      log.info("🔐 JWT initialized kid={} issuer={} audience={}", configuredKid, issuer, audience);
+      PrivateKey priv = loadPrivateKey(privateKeyPath);
+      if (!(priv instanceof RSAPrivateKey))
+          throw new IllegalStateException("Clé privée non RSA : " + privateKeyPath);
+      this.privateKey = (RSAPrivateKey) priv;
+
+      PublicKey loaded = loadPublicKey(publicKeyPath);
+      if (!(loaded instanceof RSAPublicKey)) {
+          throw new IllegalStateException("La clé publique fournie n'est pas une clé RSA compatible (chemin=" 
+              + publicKeyPath + "). Vérifiez le format PEM/DER et que la clé est une clé RSA.");
+      }
+      this.publicKey = (RSAPublicKey) loaded;
+      this.jwtParser = Jwts.parserBuilder()
+                          .setSigningKey(publicKey)
+                          .requireIssuer(issuer)
+                          .build();
     } catch (Exception e) {
       log.error("Failed to init JwtService: {}", e.getMessage(), e);
       throw new IllegalStateException(e);
@@ -139,7 +151,7 @@ public class JwtService {
       
       String userAgent = (request != null && request.getHeader("User-Agent") != null)
               ? request.getHeader("User-Agent") : "unknown-client";
-      String accessJti = getJti(accessToken);
+      String accessJti = extractJti(accessToken);
       RefreshToken refreshEntity = refreshTokenService.createRefreshToken(user, userAgent, clientIp, accessJti);
       String rawRefresh = refreshEntity.getToken();
       
@@ -178,23 +190,24 @@ public class JwtService {
 
   // --- JWT parsing ---
   public Jws<Claims> parseToken(String token) {
-    JwtParser parser = Jwts.parserBuilder().setSigningKey(publicKey).build();
-    Jws<Claims> jws = parser.parseClaimsJws(token);
-    Claims c = jws.getBody();
-    if (!issuer.equals(c.getIssuer())) throw new JwtException("Invalid issuer");
-    if (c.getAudience() == null || !c.getAudience().contains(audience)) throw new JwtException("Invalid audience");
-    return jws;
+      Jws<Claims> jws = jwtParser.parseClaimsJws(token);
+  Claims c = jws.getBody();
+  if (c.getAudience() == null || !c.getAudience().contains(audience))
+      throw new JwtException("Invalid audience");
+  return jws;
   }
 
-  public String getUsernameFromToken(String token) { return parseToken(token).getBody().getSubject(); }
-  public String getRoleFromToken(String token) { return parseToken(token).getBody().get("role", String.class); }
-  // public String getCinFromToken(String token) { return parseToken(token).getBody().get("cin", String.class); }
-  public String getJti(String token) { return parseToken(token).getBody().getId(); }
+  // public String getUsernameFromToken(String token) { return parseToken(token).getBody().getSubject(); }
+  // public String getRoleFromToken(String token) { return parseToken(token).getBody().get("role", String.class); }
+  // public String getJti(String token) { return parseToken(token).getBody().getId(); }
 
+    private String extractJti(String token) {
+      return parseToken(token).getBody().getId();
+  }
   public boolean isTokenValid(String token, String username) {
     try {
       Claims claims = parseToken(token).getBody();
-      return claims.getSubject().equals(username)
+      return username.equals(claims.getSubject())
           && claims.getExpiration().after(new Date());
     } catch (JwtException | IllegalArgumentException e) {
       log.warn("Invalid JWT: {}", e.getMessage());

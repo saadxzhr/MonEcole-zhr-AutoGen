@@ -134,17 +134,25 @@ public ResponseEntity<ResponseDTO<AuthResponseDTO>> refreshToken(
       throw new BusinessValidationException("Aucun refresh token fourni");
 
     
+    // 1️⃣ Validate RT (to get user safely)
+    Utilisateur user = refreshTokenService.validateRefreshToken(presented).getUtilisateur();
 
-    // 3️⃣ Generate new access token
-    String newAccessToken = jwtService.generateAccessToken(
-        refreshTokenService.validateRefreshToken(presented).getUtilisateur()
+    // 2️⃣ Rotate (detect reuse first)
+    RefreshToken newRt = tokenOrchestratorService.rotateWithAccessHandling(
+        presented, request.getHeader("User-Agent"), getClientIP(request), null
     );
 
-    String newAccessJti = jwtService.getJti(newAccessToken);
+    // 3️⃣ Generate new access token only if rotation succeeded
+    String newAccessToken = jwtService.generateAccessToken(user);
+    String newAccessJti = jwtService.parseToken(newAccessToken).getBody().getId();
 
-    // 2️⃣ Rotate token (detect reuse and revoke if needed)
-     RefreshToken newRt = tokenOrchestratorService.rotateWithAccessHandling(
-                presented, request.getHeader("User-Agent"), getClientIP(request), newAccessJti);
+
+    // 4️⃣ Update the new refresh token with this access JTI (sync link)
+    newRt.setAccessJti(newAccessJti);
+    refreshTokenService.saveAccessJtiLink(newRt.getId(), newAccessJti);
+
+
+
 
     // 4️⃣ Return refresh cookie in production mode
     if (!devMode) {
@@ -175,6 +183,8 @@ public ResponseEntity<ResponseDTO<AuthResponseDTO>> refreshToken(
     return ResponseEntity.badRequest().body(ResponseDTO.error(e.getMessage()));
   }
 }
+
+
 private String getPresentedToken(String headerRefresh, HttpServletRequest request) {
   String presented = headerRefresh;
   if (presented == null || presented.isBlank()) {

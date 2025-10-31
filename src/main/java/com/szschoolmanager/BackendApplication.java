@@ -69,7 +69,7 @@ public class BackendApplication {
 
 
 // git add .
-// git commit -m “jwt auth 99.1%”
+// git commit -m “jwt auth 99.3%”
 // git push
 
 // postman

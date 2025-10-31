@@ -1,6 +1,8 @@
 package com.szschoolmanager.auth.security;
 
 import com.szschoolmanager.auth.service.JwtService;
+import com.szschoolmanager.auth.util.ErrorUtil;
+
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jws;
 import jakarta.servlet.FilterChain;
@@ -46,12 +48,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     
     private final JwtService jwtService;
-    private final StringRedisTemplate stringRedisTemplate;
     private final MeterRegistry meterRegistry;
 
     
     private static final List<String> WHITELIST = List.of(
-            "/api/v1/auth",
+            "/api/v1/auth/",
             "/v3/api-docs",
             "/swagger-ui",
             "/swagger-ui.html",
@@ -59,7 +60,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             "/webjars/"
     );
 
-    private static final String BLACKLIST_PREFIX = "blacklist:access:";
     private static final int MAX_TOKEN_LENGTH = 8192;
 
     @Value("${app.redis.fail-closed:true}")
@@ -93,7 +93,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             meterRegistry.counter("jwt.auth.failure").increment();
             meterRegistry.counter("jwt.auth.empty").increment();
             log.warn("JWT token manquant — ip={}", request.getRemoteAddr());
-            respondError(response, HttpStatus.BAD_REQUEST, "Missing token");
+            ErrorUtil.writeJsonError(response, HttpStatus.BAD_REQUEST, "Missing token");
             return;
         }
 
@@ -101,7 +101,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             meterRegistry.counter("jwt.auth.failure").increment();
             meterRegistry.counter("jwt.auth.oversized").increment();
             log.warn("JWT trop long ({} octets) — ip={}", token.length(), request.getRemoteAddr());
-            respondError(response, HttpStatus.BAD_REQUEST, "Token too large");
+            ErrorUtil.writeJsonError(response, HttpStatus.BAD_REQUEST, "Token too large");
             return;
         }
 
@@ -112,7 +112,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         } catch (Exception e) {
             meterRegistry.counter("jwt.auth.failure").increment();
             log.warn("JWT invalide/expiré : {}", e.getMessage());
-            respondError(response, HttpStatus.UNAUTHORIZED, "Invalid or expired token");
+            ErrorUtil.writeJsonError(response, HttpStatus.UNAUTHORIZED, "Invalid or expired token");
             return;
         }
 
@@ -120,41 +120,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         String username = claims.getSubject();
         // vérifier la blacklist
         String jti = claims.getId();
+
         if (jti != null && jwtService.isAccessTokenBlacklisted(jti)) {
             log.warn("Access token JTI {} is blacklisted", jti);
-            respondError(response, HttpStatus.UNAUTHORIZED, "Access token revoked");
+            ErrorUtil.writeJsonError(response, HttpStatus.UNAUTHORIZED, "Access token revoked");
             return;
         }
 
-        //  Blacklist (revoked tokens) — atomic check via Redis key existence
-        if (jti != null) {
-            try {
-                if (Boolean.TRUE.equals(stringRedisTemplate.hasKey(BLACKLIST_PREFIX + jti))) {
-                    meterRegistry.counter("jwt.auth.blacklisted").increment();
-                    log.info("Token blacklisté jti={} ip={}", jti, request.getRemoteAddr());
-                    respondError(response, HttpStatus.UNAUTHORIZED, "Token revoked");
-                    return;
-                }
-            } catch (RedisConnectionFailureException ex) {
-                // Fail-closed configurable : en prod on préfère bloquer pour éviter bypass
-                log.error("Redis indisponible (failClosed={}) pour jti={} ip={}", failClosed, jti, request.getRemoteAddr(), ex);
-                meterRegistry.counter("jwt.auth.redis.unavailable").increment();
-                if (failClosed) {
-                    respondError(response, HttpStatus.SERVICE_UNAVAILABLE, "Authentication temporarily unavailable");
-                    return;
-                } else {
-                    log.warn("Redis indisponible mais failClosed=false → mode DEV, on continue");
-                }
-            } catch (Exception ex) {
-                log.error("Erreur vérif blacklist jti={} ip={}", jti, request.getRemoteAddr(), ex);
-                meterRegistry.counter("jwt.auth.redis.error").increment();
-                if (failClosed) {
-                    respondError(response, HttpStatus.SERVICE_UNAVAILABLE, "Auth service temporarily unavailable");
-                    return;
-                }
-            }
-        }
-
+        
         // 6) Reconstruction du SecurityContext **depuis le JWT uniquement**
         if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
             try {
@@ -177,7 +150,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             } catch (Exception e) {
                 meterRegistry.counter("jwt.auth.failure").increment();
                 log.error("Erreur construction SecurityContext pour user={} : {}", username, e.getMessage(), e);
-                respondError(response, HttpStatus.UNAUTHORIZED, "Authentication context error");
+                ErrorUtil.writeJsonError(response, HttpStatus.UNAUTHORIZED, "Authentication context error");
                 return;
             }
         }
@@ -205,11 +178,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         return out;
     }
 
-    private void respondError(HttpServletResponse response, HttpStatus status, String message) throws IOException {
-        response.setStatus(status.value());
-        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-        response.setCharacterEncoding("UTF-8");
-        response.getWriter().write(String.format("{\"status\":\"error\",\"message\":\"%s\",\"code\":%d}", message, status.value()));
-        response.getWriter().flush();
-    }
+    // private void respondError(HttpServletResponse response, HttpStatus status, String message) throws IOException {
+    //     response.setStatus(status.value());
+    //     response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+    //     response.setCharacterEncoding("UTF-8");
+    //     response.getWriter().write(String.format("{\"status\":\"error\",\"message\":\"%s\",\"code\":%d}", message, status.value()));
+    //     response.getWriter().flush();
+    // }
 }

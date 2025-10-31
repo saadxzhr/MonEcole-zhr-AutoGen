@@ -18,12 +18,16 @@ import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.cors.*;
+import com.szschoolmanager.auth.util.ErrorUtil;
+import org.springframework.http.HttpStatus;
+
 
 import com.szschoolmanager.auth.config.RateLimitFilter;
 
@@ -95,6 +99,10 @@ import java.util.Optional;
                 // Tout le reste = JWT obligatoire
                 .anyRequest().authenticated()
             )
+            .exceptionHandling(ex -> ex
+                  .authenticationEntryPoint(restAuthenticationEntryPoint())
+                  .accessDeniedHandler(restAccessDeniedHandler())
+              )
             .authenticationProvider(daoAuthenticationProvider(passwordEncoder()))// ✅ correspond à ton bean réel
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class) // ✅ nom réel de ton filtre
             .build();
@@ -141,11 +149,15 @@ import java.util.Optional;
     @Bean
     public AuthenticationEntryPoint restAuthenticationEntryPoint() {
       return (request, response, authException) -> {
-        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         String message = Objects.requireNonNullElse(authException.getMessage(), "Unauthorized");
-        String body = String.format("{\"status\":\"error\",\"message\":\"%s\"}", message.replace("\"", "'"));
-        response.getWriter().write(body);
+        ErrorUtil.writeJsonError(response, HttpStatus.UNAUTHORIZED, message);
       };
+    }
+
+    @Bean
+    public AccessDeniedHandler restAccessDeniedHandler() {
+        return (request, response, accessDeniedException) ->
+            ErrorUtil.writeJsonError(response, HttpStatus.FORBIDDEN,
+                "Accès refusé : vous n'êtes pas autorisé à effectuer cette action");
     }
   }

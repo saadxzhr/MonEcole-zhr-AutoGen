@@ -7,12 +7,14 @@ import com.szschoolmanager.exception.BusinessValidationException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Duration;
@@ -22,6 +24,9 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
 
 /**
  * Complete RefreshTokenService (production-ready).
@@ -113,7 +118,7 @@ public class RefreshTokenService {
             throw new BusinessValidationException("Aucun refresh token fourni");
         }
         String hashed = hashToken(rawToken);
-        RefreshToken rt = refreshTokenRepository.findByTokenWithUser(hashed)
+        RefreshToken rt = refreshTokenRepository.findDetailedByToken(hashed)
                 .orElseThrow(() -> new BusinessValidationException("Token invalide"));
         if (rt.isExpired()) throw new BusinessValidationException("Token expiré");
         return rt;
@@ -133,7 +138,7 @@ public class RefreshTokenService {
         }
 
         String hashed = hashToken(presentedRaw);
-        RefreshToken stored = refreshTokenRepository.findByTokenWithUser(hashed)
+        RefreshToken stored = refreshTokenRepository.findDetailedByToken(hashed)
                 .orElseThrow(() -> new BusinessValidationException("Token invalide"));
 
         // normal rotation
@@ -147,10 +152,17 @@ public class RefreshTokenService {
         if (!stored.isReused()) {
             stored.setReused(true);
             refreshTokenRepository.saveAndFlush(stored);
-            revokeAllActiveSessionsForUserCommitted(stored.getUtilisateur().getId());
         }
+        revokeAllActiveSessionsForUserCommitted(stored.getUtilisateur().getId());
+
         throw new BusinessValidationException("Refresh token reuse detected - all sessions revoked");
     }
+
+    @Transactional
+    public void saveAccessJtiLink(Long refreshId, String accessJti) {
+        refreshTokenRepository.updateAccessJti(refreshId, accessJti);
+    }
+
 
     // ----------------- REVOKE ONE -----------------
     @Transactional
@@ -160,7 +172,7 @@ public class RefreshTokenService {
             return;
         }
         String hashed = hashToken(rawToken);
-        Optional<RefreshToken> optional = refreshTokenRepository.findByTokenWithUser(hashed);
+        Optional<RefreshToken> optional = refreshTokenRepository.findDetailedByToken(hashed);
         optional.ifPresent(rt -> {
             if (!rt.isRevoked()) {
                 rt.setRevoked(true);
@@ -202,17 +214,25 @@ public class RefreshTokenService {
         return UUID.randomUUID().toString().replace("-", "") + UUID.randomUUID().toString().replace("-", "");
     }
 
-    private static String hashToken(String token) {
+
+    private static final String HMAC_ALGO = "HmacSHA256";
+    private static final Charset UTF8 = StandardCharsets.UTF_8;
+
+    // this secret should come from your config (never hard-coded)
+    @Value("${app.security.token-hash-secret}")
+    private String tokenHashSecret;
+
+
+    private String hashToken(String rawToken) {
         try {
-            MessageDigest md = MessageDigest.getInstance("SHA-256");
-            byte[] h = md.digest(token.getBytes(StandardCharsets.UTF_8));
-            StringBuilder hex = new StringBuilder(h.length * 2);
-            for (byte b : h) {
-                hex.append(String.format("%02x", b));
-            }
+            Mac hmac = Mac.getInstance(HMAC_ALGO);
+            hmac.init(new SecretKeySpec(tokenHashSecret.getBytes(UTF8), HMAC_ALGO));
+            byte[] digest = hmac.doFinal(rawToken.getBytes(UTF8));
+            StringBuilder hex = new StringBuilder(digest.length * 2);
+            for (byte b : digest) hex.append(String.format("%02x", b));
             return hex.toString();
         } catch (Exception e) {
-            throw new IllegalStateException("Erreur lors du hachage du refresh token", e);
+            throw new IllegalStateException("Erreur lors du hachage sécurisé du refresh token", e);
         }
     }
 
@@ -241,7 +261,7 @@ public class RefreshTokenService {
             return null;
         }
         String hashed = hashToken(rawToken);
-        return refreshTokenRepository.findByTokenWithUser(hashed).orElse(null);
+        return refreshTokenRepository.findRawByToken(hashed).orElse(null);
     }
 
 
