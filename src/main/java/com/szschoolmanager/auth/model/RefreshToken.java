@@ -44,6 +44,9 @@ public class RefreshToken {
   @Column(nullable = false, unique = true, length = 255)
   private String jti;
 
+  @Column(nullable = false, unique = true, length = 255)
+  private String accessJti;
+
   @Builder.Default
   @Column(nullable = false)
   private boolean reused = false;

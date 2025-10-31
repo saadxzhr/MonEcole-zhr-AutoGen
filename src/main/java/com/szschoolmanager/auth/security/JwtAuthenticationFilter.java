@@ -44,6 +44,12 @@ import java.util.List;
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
+    
+    private final JwtService jwtService;
+    private final StringRedisTemplate stringRedisTemplate;
+    private final MeterRegistry meterRegistry;
+
+    
     private static final List<String> WHITELIST = List.of(
             "/api/v1/auth",
             "/v3/api-docs",
@@ -59,9 +65,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     @Value("${app.redis.fail-closed:true}")
     private boolean failClosed;
 
-    private final JwtService jwtService;
-    private final StringRedisTemplate stringRedisTemplate;
-    private final MeterRegistry meterRegistry;
 
     @Override
     protected void doFilterInternal(@NonNull HttpServletRequest request,
@@ -115,9 +118,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         Claims claims = jws.getBody();
         String username = claims.getSubject();
+        // vérifier la blacklist
         String jti = claims.getId();
+        if (jti != null && jwtService.isAccessTokenBlacklisted(jti)) {
+            log.warn("Access token JTI {} is blacklisted", jti);
+            respondError(response, HttpStatus.UNAUTHORIZED, "Access token revoked");
+            return;
+        }
 
-        // 5) Blacklist (revoked tokens) — atomic check via Redis key existence
+        //  Blacklist (revoked tokens) — atomic check via Redis key existence
         if (jti != null) {
             try {
                 if (Boolean.TRUE.equals(stringRedisTemplate.hasKey(BLACKLIST_PREFIX + jti))) {

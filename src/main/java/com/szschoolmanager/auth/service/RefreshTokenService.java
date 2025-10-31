@@ -7,6 +7,7 @@ import com.szschoolmanager.exception.BusinessValidationException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+import org.springframework.context.annotation.Lazy;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -14,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
@@ -34,13 +36,13 @@ import java.util.UUID;
 public class RefreshTokenService {
 
     private final RefreshTokenRepository refreshTokenRepository;
-
+    
     private static final int REFRESH_TOKEN_DAYS = 7;
     private static final int MAX_ACTIVE_SESSIONS = 3;
 
     // ----------------- CREATE -----------------
     @Transactional
-    public RefreshToken createRefreshToken(Utilisateur user, String userAgent, String ipAddress) {
+    public RefreshToken createRefreshToken(Utilisateur user, String userAgent, String ipAddress, String accessJti) {
         Objects.requireNonNull(user, "Utilisateur ne peut pas être nul");
 
         try {
@@ -73,6 +75,7 @@ public class RefreshTokenService {
                     .reused(false)
                     .userAgent(shorten(userAgent))
                     .ipAddress(shorten(ipAddress))
+                    .accessJti(accessJti)
                     .build();
 
             RefreshToken saved = refreshTokenRepository.save(entity); // one persist call only
@@ -89,6 +92,7 @@ public class RefreshTokenService {
                     .userAgent(saved.getUserAgent())
                     .ipAddress(saved.getIpAddress())
                     .jti(saved.getJti())
+                    .accessJti(accessJti)
                     .build();
 
         } catch (Exception e) {
@@ -111,10 +115,10 @@ public class RefreshTokenService {
         String hashed = hashToken(rawToken);
         RefreshToken rt = refreshTokenRepository.findByTokenWithUser(hashed)
                 .orElseThrow(() -> new BusinessValidationException("Token invalide"));
-        if (rt.isRevoked()) throw new BusinessValidationException("Token déjà révoqué");
         if (rt.isExpired()) throw new BusinessValidationException("Token expiré");
         return rt;
     }
+
 
     // ----------------- ROTATE -----------------
     /**
@@ -123,7 +127,7 @@ public class RefreshTokenService {
      * - If presented token is already revoked -> mark reused, commit revocations for user (REQUIRES_NEW), then throw.
      */
     @Transactional(noRollbackFor = BusinessValidationException.class)
-    public RefreshToken rotateRefreshToken(String presentedRaw, String userAgent, String ipAddress) {
+    public RefreshToken rotateRefreshToken(String presentedRaw, String userAgent, String ipAddress, String accessJti) {
         if (presentedRaw == null || presentedRaw.isBlank()) {
             throw new BusinessValidationException("Aucun refresh token fourni");
         }
@@ -136,7 +140,7 @@ public class RefreshTokenService {
         if (!stored.isRevoked()) {
             stored.setRevoked(true);
             refreshTokenRepository.saveAndFlush(stored);
-            return createRefreshToken(stored.getUtilisateur(), userAgent, ipAddress);
+            return createRefreshToken(stored.getUtilisateur(), userAgent, ipAddress, accessJti);
         }
 
         // reuse detected
@@ -145,10 +149,6 @@ public class RefreshTokenService {
             refreshTokenRepository.saveAndFlush(stored);
             revokeAllActiveSessionsForUserCommitted(stored.getUtilisateur().getId());
         }
-
-
-        // throw here cause rollback problem > no changes commited on db level
-        // fixed by (noRollbackFor = BusinessValidationException.class)
         throw new BusinessValidationException("Refresh token reuse detected - all sessions revoked");
     }
 
@@ -229,5 +229,20 @@ public class RefreshTokenService {
             .deleteByExpiresAtBefore(LocalDateTime.now());
         log.info("🧹 Deleted {} expired refresh tokens", deleted);
     }
+
+     public long getRefreshExpirationSeconds() {
+        return Duration.ofDays(REFRESH_TOKEN_DAYS).getSeconds();
+    }
+
+
+    @Transactional(readOnly = true)
+    public RefreshToken findByRawToken(String rawToken) {
+        if (rawToken == null || rawToken.isBlank()) {
+            return null;
+        }
+        String hashed = hashToken(rawToken);
+        return refreshTokenRepository.findByTokenWithUser(hashed).orElse(null);
+    }
+
 
 }

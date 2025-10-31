@@ -8,6 +8,7 @@ import com.szschoolmanager.auth.model.Utilisateur;
 import com.szschoolmanager.auth.service.DatabaseUserDetailsService;
 import com.szschoolmanager.auth.service.JwtService;
 import com.szschoolmanager.auth.service.RefreshTokenService;
+import com.szschoolmanager.auth.service.TokenOrchestratorService;
 import com.szschoolmanager.auth.service.UtilisateurService;
 import com.szschoolmanager.exception.BusinessValidationException;
 import com.szschoolmanager.exception.ResponseDTO;
@@ -36,6 +37,7 @@ import java.time.Instant;
 @RequiredArgsConstructor
 public class AuthenticationController {
 
+  private final TokenOrchestratorService tokenOrchestratorService;
   private final JwtService jwtService;
   private final UtilisateurService utilisateurService;
   private final RefreshTokenService refreshTokenService;
@@ -119,7 +121,7 @@ public class AuthenticationController {
 
 
   
- @PostMapping("/refresh")
+@PostMapping("/refresh")
 public ResponseEntity<ResponseDTO<AuthResponseDTO>> refreshToken(
     @RequestHeader(value = "Refresh-Token", required = false) String headerRefresh,
     HttpServletRequest request,
@@ -131,15 +133,18 @@ public ResponseEntity<ResponseDTO<AuthResponseDTO>> refreshToken(
     if (presented == null || presented.isBlank())
       throw new BusinessValidationException("Aucun refresh token fourni");
 
-    // 2️⃣ Rotate token (detect reuse and revoke if needed)
-    RefreshToken newRt = refreshTokenService.rotateRefreshToken(
-        presented,
-        request.getHeader("User-Agent"),
-        getClientIP(request)
-    );
+    
 
     // 3️⃣ Generate new access token
-    String newAccessToken = jwtService.generateAccessToken(newRt.getUtilisateur());
+    String newAccessToken = jwtService.generateAccessToken(
+        refreshTokenService.validateRefreshToken(presented).getUtilisateur()
+    );
+
+    String newAccessJti = jwtService.getJti(newAccessToken);
+
+    // 2️⃣ Rotate token (detect reuse and revoke if needed)
+     RefreshToken newRt = tokenOrchestratorService.rotateWithAccessHandling(
+                presented, request.getHeader("User-Agent"), getClientIP(request), newAccessJti);
 
     // 4️⃣ Return refresh cookie in production mode
     if (!devMode) {

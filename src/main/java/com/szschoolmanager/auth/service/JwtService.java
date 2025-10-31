@@ -29,6 +29,12 @@ import java.util.*;
 @Service
 public class JwtService {
 
+
+   // --- Dependencies ---
+  private final StringRedisTemplate stringRedisTemplate;
+  private final RefreshTokenService refreshTokenService;
+
+
   // --- Configuration JWT ---
   @Value("${jwt.private-key-path}")
   private String privateKeyPath;
@@ -53,9 +59,7 @@ public class JwtService {
   private PrivateKey privateKey;
   @Getter private RSAPublicKey publicKey;
 
-  // --- Dependencies ---
-  private final StringRedisTemplate stringRedisTemplate;
-  private final RefreshTokenService refreshTokenService;
+ 
 
   public JwtService(StringRedisTemplate stringRedisTemplate,
                     RefreshTokenService refreshTokenService) {
@@ -132,11 +136,13 @@ public class JwtService {
   public TokensDTO generateTokens(Utilisateur user, HttpServletRequest request) {
       String accessToken = generateAccessToken(user);
       String clientIp = extractClientIp(request);
+      
       String userAgent = (request != null && request.getHeader("User-Agent") != null)
               ? request.getHeader("User-Agent") : "unknown-client";
-
-      RefreshToken refreshEntity = refreshTokenService.createRefreshToken(user, userAgent, clientIp);
+      String accessJti = getJti(accessToken);
+      RefreshToken refreshEntity = refreshTokenService.createRefreshToken(user, userAgent, clientIp, accessJti);
       String rawRefresh = refreshEntity.getToken();
+      
 
       log.info("🔐 Tokens générés pour [{}] depuis IP [{}], agent [{}]",
               user.getUsername(), clientIp, userAgent);
@@ -204,4 +210,19 @@ public class JwtService {
       log.warn("Failed to write blacklist jti={} into redis: {}", jti, e.getMessage());
     }
   }
+
+  public boolean isAccessTokenBlacklisted(String jti) {
+    try {
+        String key = "blacklist:access:" + jti;
+        return Boolean.TRUE.equals(stringRedisTemplate.hasKey(key));
+    } catch (Exception e) {
+        log.warn("Failed to check blacklist for jti {}: {}", jti, e.getMessage());
+        return false;
+    }
+}
+
+public long getAccessExpirationSeconds() {
+      return accessExpirationSeconds;
+  }
+
 }
