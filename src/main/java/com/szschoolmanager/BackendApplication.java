@@ -3,6 +3,8 @@ package com.szschoolmanager;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.cache.annotation.EnableCaching;
+import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
+import org.springframework.data.redis.repository.configuration.EnableRedisRepositories;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
 // @EnableJpaAuditing
@@ -10,6 +12,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @SpringBootApplication
 @EnableScheduling
 @EnableCaching
+@EnableRedisRepositories(basePackages = "com.szschoolmanager.auth.redis", considerNestedRepositories = true)
 public class BackendApplication {
 
   public static void main(String[] args) {
@@ -66,7 +69,7 @@ public class BackendApplication {
 
 
 // git add .
-// git commit -m “Fixed (atomic Redis Lua, scalable, production-ready)”
+// git commit -m “jwt auth 99%”
 // git push
 
 // postman

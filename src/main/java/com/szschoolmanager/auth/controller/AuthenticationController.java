@@ -2,8 +2,10 @@ package com.szschoolmanager.auth.controller;
 
 import com.szschoolmanager.auth.dto.AuthRequestDTO;
 import com.szschoolmanager.auth.dto.AuthResponseDTO;
+import com.szschoolmanager.auth.dto.TokensDTO;
 import com.szschoolmanager.auth.model.RefreshToken;
 import com.szschoolmanager.auth.model.Utilisateur;
+import com.szschoolmanager.auth.service.DatabaseUserDetailsService;
 import com.szschoolmanager.auth.service.JwtService;
 import com.szschoolmanager.auth.service.RefreshTokenService;
 import com.szschoolmanager.auth.service.UtilisateurService;
@@ -18,6 +20,7 @@ import lombok.extern.slf4j.Slf4j;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -36,6 +39,7 @@ public class AuthenticationController {
   private final JwtService jwtService;
   private final UtilisateurService utilisateurService;
   private final RefreshTokenService refreshTokenService;
+  private final DatabaseUserDetailsService userDetailsService;
 
   @Value("${app.dev:true}") // default true for development; set false in prod
   private boolean devMode;
@@ -61,26 +65,30 @@ public class AuthenticationController {
       if (!encoded) {
         utilisateur.setPassword(utilisateurService.passwordEncoder().encode(dto.getPassword()));
         utilisateurService.save(utilisateur);
+        userDetailsService.invalidateUserCache(utilisateur.getUsername());
       }
 
-      String accessToken = jwtService.generateAccessToken(utilisateur);
-      RefreshToken refreshToken = refreshTokenService.createRefreshToken(
-          utilisateur, request.getHeader("User-Agent"), getClientIP(request));
+      // 3️⃣ Génération sécurisée des tokens via JwtService
+      TokensDTO tokens = jwtService.generateTokens(utilisateur, request);
+      String accessToken = tokens.getAccessToken();
+      String rawRefresh = tokens.getRefreshToken();
 
       // In dev mode we return refresh token in JSON. In prod, set HttpOnly cookie instead.
-      String rawRefresh = refreshToken.getToken(); // in-memory raw token returned by service
-      log.info("on controller refresh token: {}", rawRefresh);
       if (!devMode) {
-        ResponseCookie cookie = ResponseCookie.from("refreshToken", rawRefresh)
+        ResponseCookie cookie = ResponseCookie.from("refreshToken", rawRefresh) 
             .httpOnly(true)
             .secure(true)
             .sameSite("Strict")
             .path("/api/v1/auth")
-            .maxAge(Duration.ofDays(refreshDays))
+            .maxAge(Duration.ofSeconds(tokens.getRefreshExpiresIn()))
             .build();
         response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
       }
 
+
+
+
+      // 5️⃣ Détermination du tableau de bord selon le rôle utilisateur
       String redirectUrl = switch (utilisateur.getRole().toUpperCase()) {
         case "ADMIN" -> "/dashboard/admin";
         case "DIRECTION" -> "/dashboard/direction";
@@ -88,6 +96,7 @@ public class AuthenticationController {
         default -> "/dashboard/formateur";
       };
 
+      // 6️Construction de la réponse complète pour le front
       AuthResponseDTO body = AuthResponseDTO.builder()
           .token(accessToken)
           .refreshToken(devMode ? rawRefresh : null) // only in dev
@@ -98,8 +107,13 @@ public class AuthenticationController {
           .build();
 
       return ResponseEntity.ok(ResponseDTO.success("Authentification réussie", body));
-    } catch (BadCredentialsException ex) {
-      return ResponseEntity.status(401).body(ResponseDTO.error("Identifiants invalides"));
+      } catch (BadCredentialsException ex) {
+      return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+          .body(ResponseDTO.error("Identifiants invalides"));
+    } catch (Exception ex) {
+      log.error("Erreur inattendue pendant le login : {}", ex.getMessage(), ex);
+      return ResponseEntity.internalServerError()
+          .body(ResponseDTO.error("Erreur interne pendant l’authentification"));
     }
   }
 

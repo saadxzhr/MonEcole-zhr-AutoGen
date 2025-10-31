@@ -7,6 +7,7 @@ import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotWritableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
@@ -83,4 +84,13 @@ public class GlobalExceptionHandler {
             new ResponseDTO<>(
                 "INTERNAL_ERROR", "Erreur interne du serveur.", null, LocalDateTime.now()));
   }
+
+  // 🧩 Fallback ultime : capture les erreurs non interceptées (conversion, content-type...)
+  @ExceptionHandler(HttpMessageNotWritableException.class)
+  public ResponseEntity<ResponseDTO<Void>> handleConverterIssue(HttpMessageNotWritableException ex) {
+    log.error("Erreur de conversion HTTP (fallback): {}", ex.getMessage());
+    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+        .body(new ResponseDTO<>("INTERNAL_ERROR", "Erreur de conversion de réponse JSON.", null, LocalDateTime.now()));
+  }
+
 }

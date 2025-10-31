@@ -1,0 +1,3888 @@
+
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\auth\config\RateLimitConstants.java
+
+package com.szschoolmanager.auth.config;
+
+import java.time.Duration;
+
+public final class RateLimitConstants {
+    
+    private RateLimitConstants() {
+        throw new UnsupportedOperationException("Utility class");
+    }
+
+    // Rate limiting configuration
+    public static final int LOGIN_LIMIT = 5;
+    public static final Duration LOGIN_WINDOW = Duration.ofMinutes(1);
+    
+    public static final int API_LIMIT = 100;
+    public static final Duration API_WINDOW = Duration.ofMinutes(1);
+    
+    public static final int REFRESH_LIMIT = 10;
+    public static final Duration REFRESH_WINDOW = Duration.ofMinutes(5);
+    
+    // Redis key prefixes
+    public static final String RATE_LIMIT_PREFIX = "rl:";
+    public static final String BLACKLIST_PREFIX = "blacklist:access:";
+    
+    // Max token length
+    public static final int MAX_TOKEN_LENGTH = 8192;
+    
+    // IP extraction
+    public static final String X_FORWARDED_FOR = "X-Forwarded-For";
+    public static final String X_REAL_IP = "X-Real-IP";
+}
+
+### END FILE
+
+
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\auth\config\RateLimitFilter.java
+
+package com.szschoolmanager.auth.config;
+
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.RedisConnectionFailureException;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.RedisScript;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.lang.NonNull;
+import org.springframework.stereotype.Component;
+import org.springframework.web.filter.OncePerRequestFilter;
+
+import java.io.IOException;
+import java.util.Collections;
+import java.util.Set;
+import java.time.Duration;
+
+
+import static com.szschoolmanager.auth.config.RateLimitConstants.*;
+
+@Slf4j
+@Component
+@RequiredArgsConstructor
+public class RateLimitFilter extends OncePerRequestFilter {
+
+    private final StringRedisTemplate redisTemplate;
+    private final RedisScript<Long> rateLimitScript;
+
+    // Paths exempt from rate limiting
+    private static final Set<String> WHITELIST_PATHS = Set.of(
+        "/actuator/health",
+        "/v3/api-docs",
+        "/swagger-ui",
+        "/favicon.ico"
+    );
+
+    @Override
+    protected void doFilterInternal(@NonNull HttpServletRequest request,
+                                    @NonNull HttpServletResponse response,
+                                    @NonNull FilterChain filterChain)
+            throws ServletException, IOException {
+
+        String path = request.getRequestURI();
+
+        // Skip whitelisted paths
+        if (isWhitelisted(path)) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
+        // Determine rate limit based on endpoint
+        RateLimitConfig config = getRateLimitConfig(path);
+        
+        String clientIp = extractClientIP(request);
+        String redisKey = RATE_LIMIT_PREFIX + clientIp + ":" + normalizeUri(path);
+
+        Long currentCount;
+        try {
+            // Atomic increment + TTL via Lua script
+            currentCount = redisTemplate.execute(
+                rateLimitScript,
+                Collections.singletonList(redisKey),
+                String.valueOf(config.limit()),
+                String.valueOf(config.window().getSeconds())
+            );
+
+            if (currentCount == null) {
+                // Script execution failed but no exception - should never happen
+                log.error("❌ Rate limit script returned null for key={}", redisKey);
+                rejectRequest(response, HttpStatus.SERVICE_UNAVAILABLE, 
+                    "Rate limiting service unavailable");
+                return;
+            }
+
+        } catch (RedisConnectionFailureException ex) {
+            // Fail-closed: Redis unavailable = deny request
+            log.error("❌ Redis connection failed - denying request from {} to {} (fail-closed)", 
+                clientIp, path, ex);
+            rejectRequest(response, HttpStatus.SERVICE_UNAVAILABLE, 
+                "Service temporarily unavailable");
+            return;
+
+        } catch (Exception ex) {
+            // Unexpected error - fail-closed for security
+            log.error("❌ Unexpected rate limit error for {} - denying request (fail-closed)", 
+                clientIp, ex);
+            rejectRequest(response, HttpStatus.SERVICE_UNAVAILABLE, 
+                "Service temporarily unavailable");
+            return;
+        }
+
+        // Check if limit exceeded
+        if (currentCount <= config.limit()) {
+            // Add rate limit headers for client awareness
+            response.setHeader("X-RateLimit-Limit", String.valueOf(config.limit()));
+            response.setHeader("X-RateLimit-Remaining", 
+                String.valueOf(Math.max(0, config.limit() - currentCount)));
+            response.setHeader("X-RateLimit-Reset", 
+                String.valueOf(System.currentTimeMillis() / 1000 + config.window().getSeconds()));
+            
+            filterChain.doFilter(request, response);
+        } else {
+            log.warn("⚠️ Rate limit exceeded: ip={} path={} count={}/{}", 
+                clientIp, path, currentCount, config.limit());
+            
+            response.setHeader("X-RateLimit-Limit", String.valueOf(config.limit()));
+            response.setHeader("X-RateLimit-Remaining", "0");
+            response.setHeader("Retry-After", String.valueOf(config.window().getSeconds()));
+            
+            rejectRequest(response, HttpStatus.TOO_MANY_REQUESTS, 
+                "Too many requests. Please retry after " + config.window().getSeconds() + " seconds.");
+        }
+    }
+
+    /**
+     * Extract real client IP from request headers (proxy-aware).
+     * Prevents IP spoofing by prioritizing trusted headers.
+     */
+    private String extractClientIP(HttpServletRequest request) {
+        // Try X-Real-IP first (single IP, most reliable from reverse proxy)
+        String ip = request.getHeader(X_REAL_IP);
+        if (isValidIp(ip)) {
+            return ip;
+        }
+
+        // Try X-Forwarded-For (comma-separated list, take first/leftmost = client)
+        String xForwardedFor = request.getHeader(X_FORWARDED_FOR);
+        if (xForwardedFor != null && !xForwardedFor.isBlank()) {
+            String clientIp = xForwardedFor.split(",")[0].trim();
+            if (isValidIp(clientIp)) {
+                return clientIp;
+            }
+        }
+
+        // Fallback to remote address
+        return request.getRemoteAddr();
+    }
+
+    private boolean isValidIp(String ip) {
+        return ip != null && !ip.isBlank() && !"unknown".equalsIgnoreCase(ip);
+    }
+
+    private boolean isWhitelisted(String path) {
+        return WHITELIST_PATHS.stream().anyMatch(path::startsWith);
+    }
+
+    /**
+     * Normalize URI to prevent cache key explosion.
+     * Example: /api/users/123 -> /api/users/{id}
+     */
+    private String normalizeUri(String uri) {
+        // Remove query parameters
+        int queryIndex = uri.indexOf('?');
+        if (queryIndex > 0) {
+            uri = uri.substring(0, queryIndex);
+        }
+
+        // Replace numeric IDs with placeholder to avoid key explosion
+        // /api/users/123 -> /api/users/{id}
+        uri = uri.replaceAll("/\\d+", "/{id}");
+        
+        return uri;
+    }
+
+    /**
+     * Determine rate limit based on endpoint sensitivity.
+     */
+    private RateLimitConfig getRateLimitConfig(String path) {
+        if (path.startsWith("/api/v1/auth/login")) {
+            return new RateLimitConfig(LOGIN_LIMIT, LOGIN_WINDOW);
+        }
+        if (path.startsWith("/api/v1/auth/refresh")) {
+            return new RateLimitConfig(REFRESH_LIMIT, REFRESH_WINDOW);
+        }
+        // Default for all other API endpoints
+        return new RateLimitConfig(API_LIMIT, API_WINDOW);
+    }
+
+    private void rejectRequest(HttpServletResponse response, HttpStatus status, String message) 
+            throws IOException {
+        response.setStatus(status.value());
+        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        response.setCharacterEncoding("UTF-8");
+        
+        String jsonResponse = String.format(
+            "{\"status\":\"error\",\"message\":\"%s\",\"code\":%d}",
+            message.replace("\"", "\\\""),
+            status.value()
+        );
+        
+        response.getWriter().write(jsonResponse);
+        response.getWriter().flush();
+    }
+
+    /**
+     * Rate limit configuration holder.
+     */
+    private record RateLimitConfig(int limit, Duration window) {}
+}
+
+### END FILE
+
+
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\auth\config\RateLimitFilterTest.java
+
+// package com.szschoolmanager.auth.config;
+
+// import org.junit.jupiter.api.Test;
+// import org.junit.jupiter.api.extension.ExtendWith;
+// import org.mockito.InjectMocks;
+// import org.mockito.Mock;
+// import org.mockito.junit.jupiter.MockitoExtension;
+// import org.springframework.data.redis.core.StringRedisTemplate;
+// import org.springframework.data.redis.core.script.RedisScript;
+// import org.springframework.mock.web.MockFilterChain;
+// import org.springframework.mock.web.MockHttpServletRequest;
+// import org.springframework.mock.web.MockHttpServletResponse;
+
+// import java.util.Collections;
+
+// import static org.junit.jupiter.api.Assertions.*;
+// import static org.mockito.ArgumentMatchers.*;
+// import static org.mockito.Mockito.*;
+
+// @ExtendWith(MockitoExtension.class)
+// class RateLimitFilterTest {
+
+//     @Mock
+//     private StringRedisTemplate redisTemplate;
+
+//     @Mock
+//     private RedisScript<Long> rateLimitScript;
+
+//     @InjectMocks
+//     private RateLimitFilter rateLimitFilter;
+
+//     @Test
+//     void shouldAllowRequestWhenUnderLimit() throws Exception {
+//         MockHttpServletRequest request = new MockHttpServletRequest();
+//         request.setRequestURI("/api/v1/auth/login");
+//         request.setRemoteAddr("192.168.1.1");
+
+//         MockHttpServletResponse response = new MockHttpServletResponse();
+//         MockFilterChain filterChain = new MockFilterChain();
+
+//         when(redisTemplate.execute(
+//             any(RedisScript.class),
+//             anyList(),
+//             anyString(),
+//             anyString()
+//         )).thenReturn(3L); // Under limit
+
+//         rateLimitFilter.doFilterInternal(request, response, filterChain);
+
+//         assertEquals(200, response.getStatus());
+//         assertNotNull(filterChain.getRequest());
+//     }
+
+//     @Test
+//     void shouldRejectRequestWhenOverLimit() throws Exception {
+//         MockHttpServletRequest request = new MockHttpServletRequest();
+//         request.setRequestURI("/api/v1/auth/login");
+//         request.setRemoteAddr("192.168.1.1");
+
+//         MockHttpServletResponse response = new MockHttpServletResponse();
+//         MockFilterChain filterChain = new MockFilterChain();
+
+//         when(redisTemplate.execute(
+//             any(RedisScript.class),
+//             anyList(),
+//             anyString(),
+//             anyString()
+//         )).thenReturn(6L); // Over limit (5)
+
+//         rateLimitFilter.doFilterInternal(request, response, filterChain);
+
+//         assertEquals(429, response.getStatus());
+//         assertTrue(response.getContentAsString().contains("Too many requests"));
+//     }
+
+//     @Test
+//     void shouldFailClosedWhenRedisUnavailable() throws Exception {
+//         MockHttpServletRequest request = new MockHttpServletRequest();
+//         request.setRequestURI("/api/v1/auth/login");
+//         request.setRemoteAddr("192.168.1.1");
+
+//         MockHttpServletResponse response = new MockHttpServletResponse();
+//         MockFilterChain filterChain = new MockFilterChain();
+
+//         when(redisTemplate.execute(
+//             any(RedisScript.class),
+//             anyList(),
+//             anyString(),
+//             anyString()
+//         )).thenThrow(new org.springframework.data.redis.RedisConnectionFailureException("Connection refused"));
+
+//         rateLimitFilter.doFilterInternal(request, response, filterChain);
+
+//         assertEquals(503, response.getStatus());
+//         assertTrue(response.getContentAsString().contains("Service temporarily unavailable"));
+//     }
+
+//     @Test
+//     void shouldExtractClientIpFromXForwardedFor() throws Exception {
+//         MockHttpServletRequest request = new MockHttpServletRequest();
+//         request.setRequestURI("/api/v1/auth/login");
+//         request.addHeader("X-Forwarded-For", "203.0.113.1, 198.51.100.1");
+//         request.setRemoteAddr("192.168.1.1");
+
+//         MockHttpServletResponse response = new MockHttpServletResponse();
+//         MockFilterChain filterChain = new MockFilterChain();
+
+//         when(redisTemplate.execute(
+//             any(RedisScript.class),
+//             eq(Collections.singletonList("rl:203.0.113.1:/api/v1/auth/login")),
+//             anyString(),
+//             anyString()
+//         )).thenReturn(1L);
+
+//         rateLimitFilter.doFilterInternal(request, response, filterChain);
+
+//         verify(redisTemplate).execute(
+//             any(RedisScript.class),
+//             eq(Collections.singletonList("rl:203.0.113.1:/api/v1/auth/login")),
+//             anyString(),
+//             anyString()
+//         );
+//     }
+// }
+
+### END FILE
+
+
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\auth\config\RedisConfig.java
+
+package com.szschoolmanager.auth.config;
+
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.web.embedded.tomcat.TomcatServletWebServerFactory;
+import org.springframework.cache.CacheManager;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.data.redis.cache.RedisCacheConfiguration;
+import org.springframework.data.redis.cache.RedisCacheManager;
+import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
+import org.springframework.data.redis.connection.lettuce.LettuceClientConfiguration;
+import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.RedisScript;
+import org.springframework.data.redis.serializer.RedisSerializationContext;
+import org.springframework.data.redis.serializer.StringRedisSerializer;
+import org.apache.catalina.valves.RemoteIpValve;
+import java.time.Duration;
+
+@Slf4j
+@Configuration
+public class RedisConfig {
+
+    @Value("${spring.redis.host:localhost}")
+    private String redisHost;
+
+    @Value("${spring.redis.port:6379}")
+    private int redisPort;
+
+    @Value("${spring.redis.password:}")
+    private String redisPassword;
+
+    @Value("${spring.redis.timeout:2000}")
+    private long timeout;
+
+    @Bean
+    public LettuceConnectionFactory redisConnectionFactory() {
+        RedisStandaloneConfiguration redisConfig = new RedisStandaloneConfiguration(redisHost, redisPort);
+        
+        if (redisPassword != null && !redisPassword.isBlank()) {
+            redisConfig.setPassword(redisPassword);
+        }
+
+        // ✅ Let Spring Boot auto-configure the pool (uses defaults)
+        LettuceClientConfiguration clientConfig = LettuceClientConfiguration.builder()
+            .commandTimeout(Duration.ofMillis(timeout))
+            .shutdownTimeout(Duration.ofSeconds(5))
+            .build();
+
+        LettuceConnectionFactory factory = new LettuceConnectionFactory(redisConfig, clientConfig);
+        factory.afterPropertiesSet();
+        log.info("🔗 Redis connection factory configured: {}:{}", redisHost, redisPort);
+        return factory;
+    }
+
+
+
+
+    @Bean
+    public StringRedisTemplate stringRedisTemplate(LettuceConnectionFactory connectionFactory) {
+        StringRedisTemplate template = new StringRedisTemplate();
+        template.setConnectionFactory(connectionFactory);
+        template.setKeySerializer(new StringRedisSerializer());
+        template.setValueSerializer(new StringRedisSerializer());
+        template.setHashKeySerializer(new StringRedisSerializer());
+        template.setHashValueSerializer(new StringRedisSerializer());
+        template.afterPropertiesSet();
+        log.info("✅ StringRedisTemplate configured");
+        return template;
+    }
+
+    /**
+     * Atomic rate limit script using Lua.
+     * Guarantees INCR + EXPIRE happen atomically (no race condition).
+     * 
+     * Returns current count after increment.
+     */
+    @Bean
+    public RedisScript<Long> rateLimitScript() {
+        String luaScript = """
+            local key = KEYS[1]
+            local limit = tonumber(ARGV[1])
+            local window = tonumber(ARGV[2])
+            
+            local current = redis.call('INCR', key)
+            
+            -- Set TTL only on first increment (prevents race condition)
+            if current == 1 then
+                redis.call('EXPIRE', key, window)
+            end
+            
+            return current
+            """;
+        
+        RedisScript<Long> script = RedisScript.of(luaScript, Long.class);
+        log.info("📜 Rate limit Lua script loaded");
+        return script;
+    }
+
+    /**
+     * Alternative: Sliding window script for more accurate rate limiting.
+     * Uses sorted sets to track individual requests.
+     */
+    @Bean
+    public RedisScript<Long> slidingWindowScript() {
+        String luaScript = """
+            local key = KEYS[1]
+            local now = tonumber(ARGV[1])
+            local window = tonumber(ARGV[2])
+            local limit = tonumber(ARGV[3])
+            
+            local clearBefore = now - window
+            
+            -- Remove old entries outside the window
+            redis.call('ZREMRANGEBYSCORE', key, 0, clearBefore)
+            
+            -- Count current requests in window
+            local count = redis.call('ZCARD', key)
+            
+            if count < limit then
+                -- Add new request with current timestamp as score
+                redis.call('ZADD', key, now, now)
+                redis.call('EXPIRE', key, window)
+                return count + 1
+            end
+            
+            return -1
+            """;
+        
+        RedisScript<Long> script = RedisScript.of(luaScript, Long.class);
+        log.info("📊 Sliding window script loaded");
+        return script;
+    }
+
+
+   @Bean
+    public CacheManager redisCacheManager(LettuceConnectionFactory factory) {
+        RedisCacheConfiguration config = RedisCacheConfiguration.defaultCacheConfig()
+                .entryTtl(Duration.ofMinutes(5)) // ⏱️ TTL = 5 minutes
+                .disableCachingNullValues()
+                .serializeKeysWith(RedisSerializationContext.SerializationPair.fromSerializer(new StringRedisSerializer()))
+                .serializeValuesWith(RedisSerializationContext.SerializationPair.fromSerializer(new StringRedisSerializer()));
+
+        return RedisCacheManager.builder(factory)
+                .cacheDefaults(config)
+                .build();
+    }
+   
+}
+
+### END FILE
+
+
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\auth\config\RedisHealthIndicator.java
+
+package com.szschoolmanager.auth.config;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.actuate.health.Health;
+import org.springframework.boot.actuate.health.HealthIndicator;
+import org.springframework.data.redis.RedisConnectionFailureException;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.stereotype.Component;
+
+@Slf4j
+@Component
+@RequiredArgsConstructor
+public class RedisHealthIndicator implements HealthIndicator {
+
+    private final StringRedisTemplate redisTemplate;
+
+    @Override
+    public Health health() {
+        try {
+            // Ping Redis
+            var factory = redisTemplate.getConnectionFactory();
+            if (factory == null) {
+                log.error("❌ RedisConnectionFactory is null — RedisTemplate not initialized");
+                return Health.down()
+                    .withDetail("redis", "not_initialized")
+                    .build();
+            }
+
+            String pong = factory.getConnection().ping();
+
+            if ("PONG".equalsIgnoreCase(pong)) {
+                // Test lecture/écriture
+                String testKey = "health:check:" + System.currentTimeMillis();
+                redisTemplate.opsForValue().set(testKey, "ok");
+                String value = redisTemplate.opsForValue().get(testKey);
+                redisTemplate.delete(testKey);
+
+                if ("ok".equals(value)) {
+                    return Health.up()
+                        .withDetail("redis", "connected")
+                        .withDetail("ping", "PONG")
+                        .withDetail("operations", "working")
+                        .build();
+                } else {
+                    log.warn("⚠️ Redis ping OK mais opérations échouées");
+                    return Health.down() // ✅ Use predefined methods
+                        .withDetail("redis", "degraded")
+                        .withDetail("reason", "operations_failed")
+                        .build();
+                }
+            } else {
+                log.warn("⚠️ Redis ping inattendu: {}", pong);
+                return Health.down()
+                    .withDetail("redis", "unresponsive")
+                    .withDetail("ping_response", pong)
+                    .build();
+            }
+
+        } catch (RedisConnectionFailureException e) {
+            log.error("❌ Échec de connexion Redis: {}", e.getMessage());
+            return Health.down()
+                .withDetail("redis", "connection_failed")
+                .withDetail("error", e.getMessage())
+                .build();
+
+        } catch (Exception e) {
+            log.error("❌ Échec du health check Redis: {}", e.getMessage(), e);
+            return Health.down(e)
+                .withDetail("redis", "error")
+                .build();
+        }
+    }
+}
+
+
+### END FILE
+
+
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\auth\config\TomcatProxyConfig.java
+
+package com.szschoolmanager.auth.config;
+
+import org.apache.catalina.valves.RemoteIpValve;
+import org.springframework.boot.web.embedded.tomcat.TomcatServletWebServerFactory;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+/**
+ * ✅ Configuration production-ready
+ * Active la traduction des IPs réelles derrière proxy (Nginx, Cloudflare, etc.)
+ * Aucun impact négatif en dev local — safe à laisser activé.
+ */
+@Configuration
+public class TomcatProxyConfig {
+
+    @Bean
+    public TomcatServletWebServerFactory tomcatCustomizer() {
+        TomcatServletWebServerFactory factory = new TomcatServletWebServerFactory();
+        RemoteIpValve valve = new RemoteIpValve();
+        valve.setRemoteIpHeader("X-Forwarded-For");
+        valve.setProtocolHeader("X-Forwarded-Proto");
+        factory.addContextValves(valve);
+        return factory;
+    }
+}
+
+
+### END FILE
+
+
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\auth\controller\AuthenticationController.java
+
+package com.szschoolmanager.auth.controller;
+
+import com.szschoolmanager.auth.dto.AuthRequestDTO;
+import com.szschoolmanager.auth.dto.AuthResponseDTO;
+import com.szschoolmanager.auth.dto.TokensDTO;
+import com.szschoolmanager.auth.model.RefreshToken;
+import com.szschoolmanager.auth.model.Utilisateur;
+import com.szschoolmanager.auth.service.DatabaseUserDetailsService;
+import com.szschoolmanager.auth.service.JwtService;
+import com.szschoolmanager.auth.service.RefreshTokenService;
+import com.szschoolmanager.auth.service.UtilisateurService;
+import com.szschoolmanager.exception.BusinessValidationException;
+import com.szschoolmanager.exception.ResponseDTO;
+
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseCookie;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.web.bind.annotation.*;
+
+import java.time.Duration;
+import java.time.Instant;
+
+
+@Slf4j
+@RestController
+@RequestMapping("/api/v1/auth")
+@RequiredArgsConstructor
+public class AuthenticationController {
+
+  private final JwtService jwtService;
+  private final UtilisateurService utilisateurService;
+  private final RefreshTokenService refreshTokenService;
+  private final DatabaseUserDetailsService userDetailsService;
+
+  @Value("${app.dev:true}") // default true for development; set false in prod
+  private boolean devMode;
+
+  @Value("${jwt.refresh-days:7}")
+  private int refreshDays;
+
+  @PostMapping("/login")
+  public ResponseEntity<ResponseDTO<AuthResponseDTO>> login(
+      @Valid @RequestBody AuthRequestDTO dto, HttpServletRequest request, HttpServletResponse response) {
+    try {
+      Utilisateur utilisateur = utilisateurService
+          .findByUsername(dto.getUsername())
+          .orElseThrow(() -> new BadCredentialsException("Utilisateur introuvable"));
+
+      boolean encoded = utilisateur.getPassword().startsWith("$2a$");
+      boolean matches = encoded
+          ? utilisateurService.passwordEncoder().matches(dto.getPassword(), utilisateur.getPassword())
+          : dto.getPassword().equals(utilisateur.getPassword());
+
+      if (!matches) throw new BadCredentialsException("Identifiants invalides");
+
+      if (!encoded) {
+        utilisateur.setPassword(utilisateurService.passwordEncoder().encode(dto.getPassword()));
+        utilisateurService.save(utilisateur);
+        userDetailsService.invalidateUserCache(utilisateur.getUsername());
+      }
+
+      // 3️⃣ Génération sécurisée des tokens via JwtService
+      TokensDTO tokens = jwtService.generateTokens(utilisateur, request);
+      String accessToken = tokens.getAccessToken();
+      String rawRefresh = tokens.getRefreshToken();
+
+      // In dev mode we return refresh token in JSON. In prod, set HttpOnly cookie instead.
+      if (!devMode) {
+        ResponseCookie cookie = ResponseCookie.from("refreshToken", rawRefresh) 
+            .httpOnly(true)
+            .secure(true)
+            .sameSite("Strict")
+            .path("/api/v1/auth")
+            .maxAge(Duration.ofSeconds(tokens.getRefreshExpiresIn()))
+            .build();
+        response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+      }
+
+
+
+
+      // 5️⃣ Détermination du tableau de bord selon le rôle utilisateur
+      String redirectUrl = switch (utilisateur.getRole().toUpperCase()) {
+        case "ADMIN" -> "/dashboard/admin";
+        case "DIRECTION" -> "/dashboard/direction";
+        case "SECRETARIAT" -> "/dashboard/secretariat";
+        default -> "/dashboard/formateur";
+      };
+
+      // 6️Construction de la réponse complète pour le front
+      AuthResponseDTO body = AuthResponseDTO.builder()
+          .token(accessToken)
+          .refreshToken(devMode ? rawRefresh : null) // only in dev
+          .username(utilisateur.getUsername())
+          .role(utilisateur.getRole())
+          .forceChangePassword(utilisateur.getForceChangePassword())
+          .redirectUrl(redirectUrl)
+          .build();
+
+      return ResponseEntity.ok(ResponseDTO.success("Authentification réussie", body));
+      } catch (BadCredentialsException ex) {
+      return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+          .body(ResponseDTO.error("Identifiants invalides"));
+    } catch (Exception ex) {
+      log.error("Erreur inattendue pendant le login : {}", ex.getMessage(), ex);
+      return ResponseEntity.internalServerError()
+          .body(ResponseDTO.error("Erreur interne pendant l’authentification"));
+    }
+  }
+
+
+  
+ @PostMapping("/refresh")
+public ResponseEntity<ResponseDTO<AuthResponseDTO>> refreshToken(
+    @RequestHeader(value = "Refresh-Token", required = false) String headerRefresh,
+    HttpServletRequest request,
+    HttpServletResponse response) {
+
+  try {
+    // 1️⃣ Retrieve presented refresh token (header or cookie)
+    String presented = getPresentedToken(headerRefresh, request);
+    if (presented == null || presented.isBlank())
+      throw new BusinessValidationException("Aucun refresh token fourni");
+
+    // 2️⃣ Rotate token (detect reuse and revoke if needed)
+    RefreshToken newRt = refreshTokenService.rotateRefreshToken(
+        presented,
+        request.getHeader("User-Agent"),
+        getClientIP(request)
+    );
+
+    // 3️⃣ Generate new access token
+    String newAccessToken = jwtService.generateAccessToken(newRt.getUtilisateur());
+
+    // 4️⃣ Return refresh cookie in production mode
+    if (!devMode) {
+      ResponseCookie cookie = ResponseCookie.from("refreshToken", newRt.getToken())
+          .httpOnly(true)
+          .secure(true)
+          .sameSite("Strict")
+          .path("/api/v1/auth")
+          .maxAge(Duration.ofDays(refreshDays))
+          .build();
+      response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+    }
+
+    // 5️⃣ Build response body
+    AuthResponseDTO body = new AuthResponseDTO(
+        newAccessToken,
+        devMode ? newRt.getToken() : null,
+        newRt.getUtilisateur().getUsername(),
+        newRt.getUtilisateur().getRole(),
+        false,
+        null
+    );
+    return ResponseEntity.ok(ResponseDTO.success("Token régénéré avec succès", body));
+
+  } catch (BusinessValidationException e) {
+    // ✅ Handle token reuse or invalid token gracefully (no rollback)
+    log.warn("Erreur lors du refresh token: {}", e.getMessage());
+    return ResponseEntity.badRequest().body(ResponseDTO.error(e.getMessage()));
+  }
+}
+private String getPresentedToken(String headerRefresh, HttpServletRequest request) {
+  String presented = headerRefresh;
+  if (presented == null || presented.isBlank()) {
+    var cookies = request.getCookies();
+    if (cookies != null) {
+      for (var c : cookies) {
+        if ("refreshToken".equals(c.getName()) && c.getValue() != null && !c.getValue().isBlank()) {
+          presented = c.getValue();
+          break;
+        }
+      }
+    }
+  }
+  return presented;
+}
+
+
+
+
+  @PostMapping("/logout")
+  public ResponseEntity<ResponseDTO<Void>> logout(
+      @RequestHeader(value = "Refresh-Token", required = false) String refreshTokenHeader,
+      @RequestHeader(value = "Authorization", required = false) String authorizationHeader,
+      HttpServletRequest request,
+      HttpServletResponse servletResponse) {
+
+    // 1) Determine presented refresh token (raw) from header or cookie
+    String presented = refreshTokenHeader;
+    if (presented == null || presented.isBlank()) {
+      if (request.getCookies() != null) {
+        for (var c : request.getCookies()) {
+          if ("refreshToken".equals(c.getName()) && c.getValue() != null && !c.getValue().isBlank()) {
+            presented = c.getValue();
+            break;
+          }
+        }
+      }
+    }
+
+    // 2) Revoke refresh token (hashing + lookup done inside service)
+    if (presented != null && !presented.isBlank()) {
+      refreshTokenService.revokeRefreshToken(presented);
+    } else {
+      // instruct client to clear cookie if any (best effort)
+      ResponseCookie cookie = ResponseCookie.from("refreshToken", "")
+          .httpOnly(true)
+          .secure(true)
+          .sameSite("Strict")
+          .path("/api/v1/auth")
+          .maxAge(Duration.ZERO)
+          .build();
+      servletResponse.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+    }
+
+    // 3) Blacklist access token jti (if provided)
+    if (authorizationHeader != null && authorizationHeader.startsWith("Bearer ")) {
+      String accessToken = authorizationHeader.substring(7).trim();
+      try {
+        var jws = jwtService.parseToken(accessToken);
+        var claims = jws.getBody();
+        String jti = claims.getId();
+        if (jti != null && !jti.isBlank()) {
+          var exp = claims.getExpiration().toInstant();
+          var now = Instant.now();
+          var ttl = Duration.between(now, exp);
+          if (!ttl.isNegative() && !ttl.isZero()) {
+            jwtService.blacklistAccessTokenJti(jti, ttl); // atomic set with TTL
+          }
+        }
+      } catch (Exception ignored) {
+        // ignore parse errors
+      }
+    }
+
+    return ResponseEntity.ok(ResponseDTO.success("Déconnexion réussie", null));
+  }
+
+
+  private String getClientIP(HttpServletRequest request) {
+    String xf = request.getHeader("X-Forwarded-For");
+    return (xf == null || xf.isEmpty()) ? request.getRemoteAddr() : xf.split(",")[0];
+  }
+}
+
+
+### END FILE
+
+
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\auth\controller\JwksController.java
+
+package com.szschoolmanager.auth.controller;
+
+import java.math.BigInteger;
+import java.util.Base64;
+import java.util.Map;
+
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.szschoolmanager.auth.service.JwtService;
+
+import lombok.RequiredArgsConstructor;
+
+@RestController
+@RequestMapping("/.well-known")
+@RequiredArgsConstructor
+public class JwksController {
+
+  private final JwtService jwtService;
+
+  @GetMapping("/jwks.json")
+  public Map<String, Object> jwks() {
+    var rsa = jwtService.getPublicKey();
+    // n and e in Base64URL
+    String n = base64Url(rsa.getModulus());
+    String e = base64Url(rsa.getPublicExponent());
+    Map<String, Object> jwk = Map.of(
+        "kty", "RSA",
+        "kid", jwtService.getConfiguredKid(), // add getter or expose configuredKid
+        "use", "sig",
+        "alg", "RS256",
+        "n", n,
+        "e", e
+    );
+    return Map.of("keys", java.util.List.of(jwk));
+  }
+
+  private String base64Url(BigInteger bigInt) {
+    byte[] bytes = bigInt.toByteArray();
+    // strip leading zero if present
+    if (bytes.length > 1 && bytes[0] == 0) {
+      byte[] tmp = new byte[bytes.length - 1];
+      System.arraycopy(bytes, 1, tmp, 0, tmp.length);
+      bytes = tmp;
+    }
+    return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+  }
+}
+
+### END FILE
+
+
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\auth\controller\UtilisateurController.java
+
+// com/myschool/backend/utilisateur/controller/UtilisateurController.java
+package com.szschoolmanager.auth.controller;
+
+import com.szschoolmanager.auth.dto.*;
+import com.szschoolmanager.auth.service.UtilisateurService;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/api/v1/utilisateurs")
+@RequiredArgsConstructor
+public class UtilisateurController {
+
+  private final UtilisateurService service;
+
+  @PreAuthorize("hasRole('DIRECTION')")
+  @GetMapping("/direction")
+  public ResponseEntity<?> getDirectionDashboard() {
+    return ResponseEntity.ok("Bienvenue Direction !");
+  }
+
+  @GetMapping
+  @PreAuthorize("hasRole('DIRECTION') or hasRole('ADMIN') or hasRole('SECRETARIAT')")
+  public ResponseEntity<?> list(
+      @RequestParam(defaultValue = "0") int page,
+      @RequestParam(defaultValue = "10") int size,
+      @RequestParam(required = false) String role) {
+    return service.list(page, size, role);
+  }
+
+  @PostMapping
+  @PreAuthorize("hasRole('DIRECTION') or hasRole('ADMIN')")
+  public ResponseEntity<?> create(@Valid @RequestBody UtilisateurCreateDTO dto) {
+    return service.create(dto);
+  }
+
+  @PutMapping("/{id}")
+  @PreAuthorize("hasRole('DIRECTION') or hasRole('ADMIN')")
+  public ResponseEntity<?> update(
+      @PathVariable Long id, @Valid @RequestBody UtilisateurUpdateDTO dto) {
+    return service.update(id, dto);
+  }
+
+  @PutMapping("/{id}/change-password")
+  @PreAuthorize("isAuthenticated()")
+  public ResponseEntity<?> changePassword(
+      @PathVariable Long id, @Valid @RequestBody ChangePasswordDTO dto) {
+    // si l'utilisateur change son propre mdp => verifyOld true, sinon si admin => verifyOld false
+    // Ici on suppose que contrôles en place côté frontend/back (ou vérifier SecurityContext)
+    return service.changePassword(id, dto, true);
+  }
+
+  @DeleteMapping("/{id}")
+  @PreAuthorize("hasRole('DIRECTION') or hasRole('ADMIN')")
+  public ResponseEntity<?> delete(@PathVariable Long id) {
+    return service.delete(id);
+  }
+}
+
+
+### END FILE
+
+
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\auth\dto\AuthRequestDTO.java
+
+package com.szschoolmanager.auth.dto;
+
+import jakarta.validation.constraints.NotBlank;
+import lombok.*;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class AuthRequestDTO {
+  @NotBlank private String username;
+  @NotBlank private String password;
+}
+
+
+### END FILE
+
+
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\auth\dto\AuthResponseDTO.java
+
+package com.szschoolmanager.auth.dto;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class AuthResponseDTO {
+  private String token; // Access Token
+  private String refreshToken; // Refresh Token
+  private String username; // Nom d’utilisateur
+  private String role; // Rôle unique
+  private boolean forceChangePassword; // Doit changer son mot de passe
+  private String redirectUrl; // Redirection frontend
+}
+
+
+### END FILE
+
+
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\auth\dto\ChangePasswordDTO.java
+
+package com.szschoolmanager.auth.dto;
+
+import jakarta.validation.constraints.NotBlank;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class ChangePasswordDTO {
+  @NotBlank private String oldPassword;
+  @NotBlank private String newPassword;
+}
+
+
+### END FILE
+
+
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\auth\dto\TokensDTO.java
+
+package com.szschoolmanager.auth.dto;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+
+@Data
+@AllArgsConstructor
+public class TokensDTO {
+    private String accessToken;
+    private String refreshToken;
+    private long accessExpiresIn;
+    private long refreshExpiresIn;
+}
+
+
+### END FILE
+
+
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\auth\dto\UtilisateurCreateDTO.java
+
+// com/myschool/backend/utilisateur/dto/UtilisateurCreateDTO.java
+package com.szschoolmanager.auth.dto;
+
+import jakarta.validation.constraints.NotBlank;
+import lombok.*;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class UtilisateurCreateDTO {
+  @NotBlank private String username;
+  @NotBlank private String password;
+  @NotBlank private String role; // ex: "DIRECTION" ou "FORMATEUR_PERMANENT"
+  @NotBlank private String cin;
+}
+
+
+### END FILE
+
+
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\auth\dto\UtilisateurDTO.java
+
+// package com.szschoolmanager.auth.dto;
+
+// import jakarta.validation.constraints.NotBlank;
+// import jakarta.validation.constraints.NotNull;
+// import lombok.*;
+
+// @Data
+// @Builder
+// @NoArgsConstructor
+// @AllArgsConstructor
+// public class UtilisateurDTO {
+
+//   private Long id;
+
+//   @NotBlank(message = "Le nom d’utilisateur est obligatoire")
+//   private String username;
+
+//   @NotBlank(message = "Le mot de passe est obligatoire")
+//   private String password;
+
+//   @NotNull(message = "Le rôle est obligatoire")
+//   private String role;
+
+//   @NotBlank(message = "Le CIN est obligatoire")
+//   private String cin;
+// }
+
+
+### END FILE
+
+
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\auth\dto\UtilisateurResponseDTO.java
+
+package com.szschoolmanager.auth.dto;
+
+import java.time.LocalDateTime;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class UtilisateurResponseDTO {
+  private Long id;
+  private String username;
+  private String role;
+  private String cin;
+  private Boolean forceChangePassword;
+  private LocalDateTime createdAt;
+  private LocalDateTime updatedAt;
+}
+
+
+### END FILE
+
+
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\auth\dto\UtilisateurUpdateDTO.java
+
+package com.szschoolmanager.auth.dto;
+
+import jakarta.validation.constraints.NotBlank;
+import lombok.*;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class UtilisateurUpdateDTO {
+  @NotBlank private String username;
+  @NotBlank private String role;
+  @NotBlank private String cin;
+  // password optionnel : admin/direction peut fournir un nouveau mot de passe via update
+  private String password;
+  private Boolean forceChangePassword; // optionnel
+}
+
+
+### END FILE
+
+
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\auth\exception\AccountLockedException.java
+
+package com.szschoolmanager.auth.exception;
+
+import org.springframework.security.core.AuthenticationException;
+
+/**
+ * Exception levée lorsqu'un compte est temporairement verrouillé.
+ */
+public class AccountLockedException extends AuthenticationException {
+    public AccountLockedException(String msg) {
+        super(msg);
+    }
+}
+
+
+### END FILE
+
+
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\auth\mapper\UtilisateurMapper.java
+
+package com.szschoolmanager.auth.mapper;
+
+import com.szschoolmanager.auth.dto.*;
+import com.szschoolmanager.auth.model.Utilisateur;
+import org.mapstruct.*;
+
+@Mapper(
+    componentModel = "spring",
+    nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE,
+    unmappedTargetPolicy = ReportingPolicy.IGNORE)
+public interface UtilisateurMapper {
+
+  // Création : DTO -> Entity
+  @Mapping(target = "id", ignore = true)
+  @Mapping(target = "forceChangePassword", ignore = true)
+  Utilisateur toEntity(UtilisateurCreateDTO dto);
+
+  // Entity -> DTO de réponse
+  UtilisateurResponseDTO toResponseDTO(Utilisateur entity);
+
+  // Mise à jour : DTO -> Entity existant
+  @Mapping(target = "id", ignore = true)
+  @Mapping(target = "createdAt", ignore = true)
+  @Mapping(target = "updatedAt", ignore = true)
+  void updateFromDto(UtilisateurUpdateDTO dto, @MappingTarget Utilisateur entity);
+}
+
+
+### END FILE
+
+
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\auth\model\AuditLog.java
+
+// package com.szschoolmanager.auth.model;
+
+// import jakarta.persistence.*;
+// import lombok.*;
+// import java.time.LocalDateTime;
+
+// @Entity
+// @Table(
+//     name = "auditLogs"
+//     // indexes = {
+//     //     @Index(name = "idx_username", columnList = "username"),
+//     //     @Index(name = "idx_action", columnList = "action"),
+//     //     @Index(name = "idx_created_at", columnList = "created_at")
+//     // }
+// )
+// @Data
+// @NoArgsConstructor
+// @AllArgsConstructor
+// @Builder
+// public class AuditLog {
+
+//     @Id
+//     @GeneratedValue(strategy = GenerationType.IDENTITY)
+//     private Long id;
+
+//     @Column(name = "username", nullable = false)
+//     private String username;
+
+//     @Column(name = "action", nullable = false)
+//     private String action; // LOGIN_SUCCESS, LOGIN_FAILED, PASSWORD_CHANGED, etc.
+
+//     @Column(name = "ipAddress")
+//     private String ipAddress;
+
+//     @Column(name = "userAgent")
+//     private String userAgent;
+
+//     @Column(name = "details", columnDefinition = "TEXT")
+//     private String details;
+
+//     @Column(name = "severity")
+//     @Enumerated(EnumType.STRING)
+//     private Severity severity = Severity.INFO;
+
+//     @Column(name = "createdAt", nullable = false)
+//     private LocalDateTime createdAt;
+
+//     @PrePersist
+//     protected void onCreate() {
+//         if (createdAt == null) {
+//             createdAt = LocalDateTime.now();
+//         }
+//     }
+
+//     public enum Severity {
+//         INFO, WARNING, ERROR, CRITICAL
+//     }
+// }
+
+### END FILE
+
+
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\auth\model\BaseEntity.java
+
+// com/myschool/backend/utilisateur/model/BaseEntity.java
+package com.szschoolmanager.auth.model;
+
+import jakarta.persistence.*;
+import java.time.LocalDateTime;
+import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
+
+@MappedSuperclass
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+public abstract class BaseEntity {
+
+  @CreationTimestamp
+  @Column(name = "createdAt", updatable = false)
+  private LocalDateTime createdAt;
+
+  @UpdateTimestamp
+  @Column(name = "updatedAt")
+  private LocalDateTime updatedAt;
+}
+
+
+### END FILE
+
+
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\auth\model\ClientIp.java
+
+package com.szschoolmanager.auth.model;
+
+public class ClientIp {
+
+}
+
+
+### END FILE
+
+
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\auth\model\RefreshToken.java
+
+package com.szschoolmanager.auth.model;
+
+import jakarta.persistence.*;
+import java.time.LocalDateTime;
+import lombok.*;
+
+@Entity
+@Table(name = "refreshtoken")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class RefreshToken {
+
+  @Id
+  @GeneratedValue(strategy = GenerationType.IDENTITY)
+  private Long id;
+
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "utilisateurId", referencedColumnName = "id", nullable = false)
+  private Utilisateur utilisateur;
+
+  @Column(nullable = false, unique = true)
+  private String token;
+
+  @Column(nullable = false)
+  private LocalDateTime createdAt;
+
+  @Column(nullable = false)
+  private LocalDateTime expiresAt;
+
+  @Builder.Default
+  @Column(nullable = false)
+  private boolean revoked = false;
+
+
+  @Column(nullable = false, length = 100)
+  private String userAgent;
+
+  @Column(nullable = false, length = 100)
+  private String ipAddress;
+
+  @Column(nullable = false, unique = true, length = 255)
+  private String jti;
+
+  @Builder.Default
+  @Column(nullable = false)
+  private boolean reused = false;
+
+  public boolean isExpired() {
+    return LocalDateTime.now().isAfter(expiresAt);
+  }
+}
+
+
+### END FILE
+
+
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\auth\model\Utilisateur.java
+
+package com.szschoolmanager.auth.model;
+
+import jakarta.persistence.*;
+import lombok.*;
+
+@Entity
+@Table(name = "utilisateur")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class Utilisateur extends BaseEntity {
+
+  @Id
+  @GeneratedValue(strategy = GenerationType.IDENTITY)
+  private Long id;
+
+  @Column(unique = true, nullable = false, length = 100)
+  private String username;
+
+  @Column(nullable = false)
+  private String password;
+
+  @Column(nullable = false, length = 50)
+  private String role; // simple String, pas un enum
+
+  @Column(nullable = false, length = 20)
+  private String cin;
+
+  @Builder.Default
+  @Column(name = "forceChangePassword", nullable = false)
+  private Boolean forceChangePassword = true;
+}
+
+
+### END FILE
+
+
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\auth\repository\AuditLogRepository.java
+
+// package com.szschoolmanager.auth.repository;
+
+// import org.springframework.stereotype.Repository;
+
+// import com.szschoolmanager.auth.model.AuditLog;
+
+// @Repository
+// public class AuditLogRepository {
+
+//     public void save(AuditLog entry) {
+//         // TODO Auto-generated method stub
+//         throw new UnsupportedOperationException("Unimplemented method 'save'");
+//     }
+
+// }
+
+
+### END FILE
+
+
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\auth\repository\RefreshTokenRepository.java
+
+package com.szschoolmanager.auth.repository;
+
+import com.szschoolmanager.auth.model.RefreshToken;
+import com.szschoolmanager.auth.model.Utilisateur;
+
+import jakarta.persistence.LockModeType;
+import jakarta.transaction.Transactional;
+
+import org.springframework.data.jpa.repository.*;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+import java.util.Optional;
+import java.time.LocalDateTime;
+import java.util.List;
+
+@Repository
+public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long> {
+
+    Optional<RefreshToken> findByToken(String token);
+
+    @Query("SELECT r FROM RefreshToken r JOIN FETCH r.utilisateur WHERE r.token = :token")
+    Optional<RefreshToken> findByTokenWithUser(String token);
+
+    List<RefreshToken> findAllByUtilisateurIdAndRevokedFalse(Long userId);
+
+    // JPQL bulk update to revoke all valid tokens for a user
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE RefreshToken r SET r.revoked = true WHERE r.utilisateur.id = :userId AND r.revoked = false")
+    int revokeAllByUserId(Long userId);
+
+    // Deletes all tokens whose expiry time has passed
+    @Modifying
+    @Transactional
+    @Query("DELETE FROM RefreshToken t WHERE t.expiresAt < :now")
+    int deleteByExpiresAtBefore(LocalDateTime now);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT r FROM RefreshToken r WHERE r.utilisateur = :utilisateur AND r.revoked = false ORDER BY r.createdAt ASC")
+    List<RefreshToken> findActiveTokensForUpdate(@Param("utilisateur") Utilisateur utilisateur);
+
+}
+
+
+### END FILE
+
+
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\auth\repository\UtilisateurRepository.java
+
+package com.szschoolmanager.auth.repository;
+
+import com.szschoolmanager.auth.model.Utilisateur;
+import java.util.Optional;
+import org.springframework.data.domain.*;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+
+public interface UtilisateurRepository extends JpaRepository<Utilisateur, Long> {
+
+  @Query(
+      "SELECT new Utilisateur(u.id, u.username, u.password, u.role, u.cin, u.forceChangePassword) "
+          + "FROM Utilisateur u WHERE u.username = :username")
+  Optional<Utilisateur> findByUsername(String username);
+
+  boolean existsByUsername(String username);
+
+  boolean existsByCinAndUsername(String cin, String username);
+
+  Page<Utilisateur> findByRole(String role, Pageable pageable);
+
+  Page<Utilisateur> findByCin(String cin, Pageable pageable);
+}
+
+
+### END FILE
+
+
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\auth\security\JwtAuthenticationFilter.java
+
+package com.szschoolmanager.auth.security;
+
+import com.szschoolmanager.auth.service.JwtService;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jws;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import io.micrometer.core.instrument.MeterRegistry;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.annotation.Order;
+import org.springframework.data.redis.RedisConnectionFailureException;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.lang.NonNull;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
+import org.springframework.stereotype.Component;
+import org.springframework.web.filter.OncePerRequestFilter;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * Filtre JWT : secure, minimal, sans fallback DB automatique.
+ * - Vérifie signature/expiration via JwtService
+ * - Vérifie blacklist Redis (fail-closed configurable)
+ * - Reconstruit Authentication depuis les claims "authorities"
+ *
+ * IMPORTANT : Les rôles restent dynamiques côté génération du token.
+ */
+@Slf4j
+@Order(1)
+@Component
+@RequiredArgsConstructor
+public class JwtAuthenticationFilter extends OncePerRequestFilter {
+
+    private static final List<String> WHITELIST = List.of(
+            "/api/v1/auth",
+            "/v3/api-docs",
+            "/swagger-ui",
+            "/swagger-ui.html",
+            "/.well-known/jwks.json",
+            "/webjars/"
+    );
+
+    private static final String BLACKLIST_PREFIX = "blacklist:access:";
+    private static final int MAX_TOKEN_LENGTH = 8192;
+
+    @Value("${app.redis.fail-closed:true}")
+    private boolean failClosed;
+
+    private final JwtService jwtService;
+    private final StringRedisTemplate stringRedisTemplate;
+    private final MeterRegistry meterRegistry;
+
+    @Override
+    protected void doFilterInternal(@NonNull HttpServletRequest request,
+                                    @NonNull HttpServletResponse response,
+                                    @NonNull FilterChain chain)
+            throws ServletException, IOException {
+
+        String path = request.getRequestURI();
+
+        // 1) Whitelist rapide
+        if (WHITELIST.stream().anyMatch(path::startsWith)) {
+            chain.doFilter(request, response);
+            return;
+        }
+
+        // 2) Header Authorization
+        String authHeader = request.getHeader(HttpHeaders.AUTHORIZATION);
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            chain.doFilter(request, response);
+            return;
+        }
+
+        // 3) Extraction & validations basiques
+        String token = authHeader.substring(7).trim();
+        if (token.isEmpty()) {
+            meterRegistry.counter("jwt.auth.failure").increment();
+            meterRegistry.counter("jwt.auth.empty").increment();
+            log.warn("JWT token manquant — ip={}", request.getRemoteAddr());
+            respondError(response, HttpStatus.BAD_REQUEST, "Missing token");
+            return;
+        }
+
+        if (token.length() > MAX_TOKEN_LENGTH) {
+            meterRegistry.counter("jwt.auth.failure").increment();
+            meterRegistry.counter("jwt.auth.oversized").increment();
+            log.warn("JWT trop long ({} octets) — ip={}", token.length(), request.getRemoteAddr());
+            respondError(response, HttpStatus.BAD_REQUEST, "Token too large");
+            return;
+        }
+
+        // 4) Vérification cryptographique (signature / expiration)
+        Jws<Claims> jws;
+        try {
+            jws = jwtService.parseToken(token);
+        } catch (Exception e) {
+            meterRegistry.counter("jwt.auth.failure").increment();
+            log.warn("JWT invalide/expiré : {}", e.getMessage());
+            respondError(response, HttpStatus.UNAUTHORIZED, "Invalid or expired token");
+            return;
+        }
+
+        Claims claims = jws.getBody();
+        String username = claims.getSubject();
+        String jti = claims.getId();
+
+        // 5) Blacklist (revoked tokens) — atomic check via Redis key existence
+        if (jti != null) {
+            try {
+                if (Boolean.TRUE.equals(stringRedisTemplate.hasKey(BLACKLIST_PREFIX + jti))) {
+                    meterRegistry.counter("jwt.auth.blacklisted").increment();
+                    log.info("Token blacklisté jti={} ip={}", jti, request.getRemoteAddr());
+                    respondError(response, HttpStatus.UNAUTHORIZED, "Token revoked");
+                    return;
+                }
+            } catch (RedisConnectionFailureException ex) {
+                // Fail-closed configurable : en prod on préfère bloquer pour éviter bypass
+                log.error("Redis indisponible (failClosed={}) pour jti={} ip={}", failClosed, jti, request.getRemoteAddr(), ex);
+                meterRegistry.counter("jwt.auth.redis.unavailable").increment();
+                if (failClosed) {
+                    respondError(response, HttpStatus.SERVICE_UNAVAILABLE, "Authentication temporarily unavailable");
+                    return;
+                } else {
+                    log.warn("Redis indisponible mais failClosed=false → mode DEV, on continue");
+                }
+            } catch (Exception ex) {
+                log.error("Erreur vérif blacklist jti={} ip={}", jti, request.getRemoteAddr(), ex);
+                meterRegistry.counter("jwt.auth.redis.error").increment();
+                if (failClosed) {
+                    respondError(response, HttpStatus.SERVICE_UNAVAILABLE, "Auth service temporarily unavailable");
+                    return;
+                }
+            }
+        }
+
+        // 6) Reconstruction du SecurityContext **depuis le JWT uniquement**
+        if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+            try {
+                List<GrantedAuthority> authorities = extractAuthorities(claims);
+
+                if (authorities.isEmpty()) {
+                    // Avertissement — cela signifie que le token a été généré sans authorities
+                    meterRegistry.counter("jwt.auth.db.fallback").increment();
+                    log.warn("Aucun rôle dans le JWT pour user={} — vérifier génération du token", username);
+                }
+
+                UsernamePasswordAuthenticationToken auth =
+                        new UsernamePasswordAuthenticationToken(username, null, authorities);
+
+                auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                SecurityContextHolder.getContext().setAuthentication(auth);
+
+                meterRegistry.counter("jwt.auth.success").increment();
+                log.debug("Auth réussie user={} ip={}", username, request.getRemoteAddr());
+            } catch (Exception e) {
+                meterRegistry.counter("jwt.auth.failure").increment();
+                log.error("Erreur construction SecurityContext pour user={} : {}", username, e.getMessage(), e);
+                respondError(response, HttpStatus.UNAUTHORIZED, "Authentication context error");
+                return;
+            }
+        }
+
+        // Continue la chaîne de filtres
+        chain.doFilter(request, response);
+    }
+
+    // --- utilitaires ---
+
+    /**
+     * Extrait des autorités depuis la claim "authorities" qui doit être un tableau JSON de strings.
+     * Retourne une liste vide si absent.
+     */
+    private List<GrantedAuthority> extractAuthorities(Claims claims) {
+        Object raw = claims.get("authorities");
+        List<GrantedAuthority> out = new ArrayList<>();
+        if (raw instanceof List<?> list) {
+            for (Object o : list) {
+                if (o instanceof String s && !s.isBlank()) {
+                    out.add(new SimpleGrantedAuthority(s));
+                }
+            }
+        }
+        return out;
+    }
+
+    private void respondError(HttpServletResponse response, HttpStatus status, String message) throws IOException {
+        response.setStatus(status.value());
+        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        response.setCharacterEncoding("UTF-8");
+        response.getWriter().write(String.format("{\"status\":\"error\",\"message\":\"%s\",\"code\":%d}", message, status.value()));
+        response.getWriter().flush();
+    }
+}
+
+
+### END FILE
+
+
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\auth\security\JwtExceptionHandler.java
+
+package com.szschoolmanager.auth.security;
+
+import io.jsonwebtoken.JwtException;
+import lombok.extern.slf4j.Slf4j;
+
+import java.util.Map;
+
+import org.springframework.http.*;
+import org.springframework.web.bind.annotation.*;
+
+import com.szschoolmanager.auth.exception.AccountLockedException;
+
+@RestControllerAdvice
+@Slf4j
+public class JwtExceptionHandler {
+
+  @ExceptionHandler({JwtException.class, IllegalArgumentException.class})
+  public ResponseEntity<Object> handleJwt(Exception ex) {
+    log.warn("JWT error: {}", ex.getMessage());
+    var body = java.util.Map.of("error", "invalid_token", "message", ex.getMessage());
+    return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(body);
+  }
+
+  @ExceptionHandler(AccountLockedException.class)
+  public ResponseEntity<Map<String, Object>> handleAccountLocked(AccountLockedException ex) {
+      return ResponseEntity.status(HttpStatus.LOCKED).body(Map.of(
+          "status", "error",
+          "message", ex.getMessage(),
+          "code", HttpStatus.LOCKED.value()
+      ));
+  }
+
+}
+
+
+### END FILE
+
+
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\auth\security\LoginAttemptService.java
+
+package com.szschoolmanager.auth.security;
+
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+
+import java.time.Instant;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
+/**
+ * Simple local brute-force protection (per username).
+ * Later can be switched to Redis (TTL-based).
+ */
+@Slf4j
+@Service
+public class LoginAttemptService {
+
+    private static final int MAX_ATTEMPTS = 5;
+    private static final long LOCK_DURATION_MS = 30 * 60 * 1000; // 30 minutes
+
+    // username -> (failedAttempts, lockExpiration)
+    private final Map<String, LoginAttempt> attempts = new ConcurrentHashMap<>();
+
+    public void recordFailedAttempt(String username) {
+        var current = attempts.getOrDefault(username, new LoginAttempt(0, 0));
+        int newCount = current.failedAttempts() + 1;
+        long lockUntil = current.lockUntil();
+
+        if (newCount >= MAX_ATTEMPTS) {
+            lockUntil = Instant.now().toEpochMilli() + LOCK_DURATION_MS;
+            log.warn("🔒 Account {} locked for 30 minutes due to too many failed attempts", username);
+        }
+
+        attempts.put(username, new LoginAttempt(newCount, lockUntil));
+    }
+
+    public void resetAttempts(String username) {
+        attempts.remove(username);
+    }
+
+    public boolean isLocked(String username) {
+        var entry = attempts.get(username);
+        if (entry == null) return false;
+
+        if (entry.lockUntil() > Instant.now().toEpochMilli()) {
+            return true;
+        } else if (entry.lockUntil() != 0) {
+            // expired lock -> reset
+            attempts.remove(username);
+        }
+        return false;
+    }
+
+    private record LoginAttempt(int failedAttempts, long lockUntil) {}
+}
+
+
+### END FILE
+
+
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\auth\security\SecurityConfig.java
+
+package com.szschoolmanager.auth.security;
+
+import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.AuthenticationEntryPoint;
+import org.springframework.http.MediaType;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.web.cors.*;
+
+import com.szschoolmanager.auth.config.RateLimitFilter;
+
+import jakarta.servlet.http.HttpServletResponse;
+
+import java.util.Arrays;
+import java.util.List;
+import java.util.Objects;
+
+  @RequiredArgsConstructor
+  @Configuration
+  @EnableWebSecurity
+  @EnableMethodSecurity(prePostEnabled = true)
+  public class SecurityConfig {
+
+    private final RateLimitFilter rateLimitFilter;
+    private final UserDetailsService userDetailsService;
+    private final JwtAuthenticationFilter jwtAuthenticationFilter;
+
+    // 👉 Externalisation des origines CORS via application.properties
+    // Exemple :
+    // app.cors.allowed-origins=http://localhost:5173,https://schoolmanager.ma
+    @Value("${app.cors.allowed-origins:http://localhost:5173}")
+    private String[] allowedOrigins;
+
+    private static final String[] SWAGGER_WHITELIST = {
+        "/v3/api-docs/**",
+        "/swagger-ui/**",
+        "/swagger-ui.html",
+        "/swagger-resources/**",
+        "/webjars/**",
+        "/favicon.ico"
+    };
+
+    private static final String[] AUTH_WHITELIST = {"/api/v1/auth/**"};
+
+    private static final String[] ACTUATOR_WHITELIST = {"/actuator/**"};
+
+
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+      http.csrf(AbstractHttpConfigurer::disable)
+          .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+          .authorizeHttpRequests(auth -> auth
+              .requestMatchers(AUTH_WHITELIST).permitAll()
+              .requestMatchers(SWAGGER_WHITELIST).permitAll()
+              .requestMatchers(ACTUATOR_WHITELIST).permitAll()
+              .anyRequest().authenticated())
+          .exceptionHandling(ex -> ex.authenticationEntryPoint(restAuthenticationEntryPoint()))
+          .sessionManagement(sess -> sess.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+          .authenticationProvider(daoAuthenticationProvider(passwordEncoder()));;
+
+      // Add rate limiter before auth filter
+      // RateLimitFilter → JwtAuthenticationFilter → UsernamePasswordAuthenticationFilter
+      http.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+      http.addFilterBefore(rateLimitFilter, JwtAuthenticationFilter.class);
+
+
+      return http.build();
+    }
+
+    @Bean
+    public UrlBasedCorsConfigurationSource corsConfigurationSource() {
+      CorsConfiguration cfg = new CorsConfiguration();
+      cfg.setAllowedOriginPatterns(Arrays.asList(allowedOrigins));
+      cfg.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+      cfg.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept", "X-Requested-With"));
+      cfg.setExposedHeaders(List.of("Authorization"));
+      cfg.setAllowCredentials(true);
+      
+      UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+      source.registerCorsConfiguration("/**", cfg);
+      return source;
+    }
+
+
+    // ✅ Provider utilisant ton DatabaseUserDetailsService
+    @Bean
+    @SuppressWarnings("deprecation")
+    public DaoAuthenticationProvider daoAuthenticationProvider(PasswordEncoder encoder) {
+      DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
+      provider.setUserDetailsService(userDetailsService);
+      provider.setPasswordEncoder(encoder);
+      return provider;
+    }
+
+    @Bean
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
+      return config.getAuthenticationManager();
+    }
+
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+      return new BCryptPasswordEncoder(12);
+    }
+
+    @Bean
+    public AuthenticationEntryPoint restAuthenticationEntryPoint() {
+      return (request, response, authException) -> {
+        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        String message = Objects.requireNonNullElse(authException.getMessage(), "Unauthorized");
+        String body = String.format("{\"status\":\"error\",\"message\":\"%s\"}", message.replace("\"", "'"));
+        response.getWriter().write(body);
+      };
+    }
+  }
+
+
+### END FILE
+
+
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\auth\service\AuditLogService.java
+
+// package com.szschoolmanager.auth.service;
+
+// import com.szschoolmanager.auth.model.AuditLog;
+// import com.szschoolmanager.auth.repository.AuditLogRepository;
+// import lombok.RequiredArgsConstructor;
+// import lombok.extern.slf4j.Slf4j;
+// import org.springframework.scheduling.annotation.Async;
+// import org.springframework.stereotype.Service;
+
+// @Service
+// @RequiredArgsConstructor
+// @Slf4j
+// public class AuditLogService {
+
+//     private final AuditLogRepository auditLogRepository;
+
+//     @Async
+//     public void log(String action, String username, String ip, String userAgent) {
+//         log(action, username, ip, userAgent, null, AuditLog.Severity.INFO);
+//     }
+
+//     @Async
+//     public void log(String action, String username, String ip, String userAgent, 
+//                     String details, AuditLog.Severity severity) {
+//         try {
+//             AuditLog entry = AuditLog.builder()
+//                 .username(username)
+//                 .action(action)
+//                 .ipAddress(ip)
+//                 .userAgent(userAgent)
+//                 .details(details)
+//                 .severity(severity)
+//                 .build();
+            
+//             auditLogRepository.save(entry);
+//             log.info("📝 Audit: {} - {} from {}", action, username, ip);
+//         } catch (Exception e) {
+//             log.error("❌ Failed to save audit log: {}", e.getMessage());
+//         }
+//     }
+// }
+
+### END FILE
+
+
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\auth\service\AuthenticationService.java
+
+package com.szschoolmanager.auth.service;
+
+import com.szschoolmanager.auth.dto.AuthRequestDTO;
+import com.szschoolmanager.auth.dto.TokensDTO;
+import com.szschoolmanager.auth.exception.AccountLockedException;
+import com.szschoolmanager.auth.model.Utilisateur;
+import com.szschoolmanager.auth.repository.UtilisateurRepository;
+
+import io.micrometer.core.instrument.MeterRegistry;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.stereotype.Service;
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class AuthenticationService {
+
+    private final AuthenticationManager authenticationManager;
+    private final JwtService jwtService;
+    private final UtilisateurRepository utilisateurRepository;
+    private final RedisLoginAttemptService loginAttemptService;
+    private final MeterRegistry meterRegistry;
+
+    public TokensDTO authenticate(AuthRequestDTO request) {
+        String username = request.getUsername();
+
+        // 🔒 Vérifie si le compte est verrouillé
+        if (loginAttemptService.isLocked(username)) {
+            meterRegistry.counter("auth.locked.user").increment();
+            log.warn("🚫 Tentative refusée : compte verrouillé -> {}", username);
+            throw new AccountLockedException("Compte verrouillé pour 30 minutes après échecs multiples.");
+        }
+
+        try {
+            // ✅ Authentification Spring Security
+            authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(username, request.getPassword())
+            );
+
+            // ✅ Réinitialise les tentatives si succès
+            loginAttemptService.resetAttempts(username);
+            meterRegistry.counter("auth.success").increment();
+            log.info("✅ Connexion réussie pour {}", username);
+
+            Utilisateur user = utilisateurRepository.findByUsername(username)
+                    .orElseThrow(() -> new UsernameNotFoundException("Utilisateur introuvable"));
+
+            // ✅ Génère les tokens JWT
+            return jwtService.generateTokens(user);
+
+        } catch (BadCredentialsException ex) {
+            // ❌ Échec : incrémente le compteur Redis
+            long count = loginAttemptService.recordFailedAttemptAndGet(username);
+            meterRegistry.counter("auth.failed").increment();
+
+            if (count >= 5) {
+                log.warn("🔒 Compte {} verrouillé après {} échecs", username, count);
+                throw new AccountLockedException("Trop de tentatives échouées. Compte verrouillé 30 min.");
+            }
+
+            log.warn("❌ Échec de connexion user={} (tentative {}/{})", username, count, 5);
+            throw new BadCredentialsException("Nom d'utilisateur ou mot de passe invalide.");
+        }
+    }
+}
+
+
+### END FILE
+
+
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\auth\service\DatabaseUserDetailsService.java
+
+package com.szschoolmanager.auth.service;
+
+import com.szschoolmanager.auth.model.Utilisateur;
+
+import java.util.List;
+import lombok.RequiredArgsConstructor;
+
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.userdetails.*;
+import org.springframework.stereotype.Service;
+
+@Service
+@RequiredArgsConstructor
+public class DatabaseUserDetailsService implements UserDetailsService {
+
+  private final UtilisateurQueryService utilisateurQueryService;
+
+  @Override
+  @Cacheable(value = "userDetails", key = "#username", cacheManager = "redisCacheManager")
+  public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
+    Utilisateur u =
+        utilisateurQueryService
+            .findByUsername(username)
+            .orElseThrow(() -> new UsernameNotFoundException("Utilisateur introuvable"));
+
+    return User.builder()
+        .username(u.getUsername())
+        .password(u.getPassword())
+        .authorities(List.of(new SimpleGrantedAuthority("ROLE_" + u.getRole().toUpperCase())))
+        .build();
+  }
+
+  @CacheEvict(value = "userDetails", key = "#username")
+  public void invalidateUserCache(String username) {
+  }
+}
+
+
+### END FILE
+
+
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\auth\service\JwtService.java
+
+package com.szschoolmanager.auth.service;
+
+import com.szschoolmanager.auth.dto.TokensDTO;
+import com.szschoolmanager.auth.model.RefreshToken;
+import com.szschoolmanager.auth.model.Utilisateur;
+import io.jsonwebtoken.*;
+import jakarta.annotation.PostConstruct;
+import jakarta.servlet.http.HttpServletRequest;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.stereotype.Service;
+
+import java.io.*;
+import java.nio.charset.StandardCharsets;
+import java.security.*;
+import java.security.interfaces.RSAPublicKey;
+import java.security.spec.*;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.util.*;
+
+
+
+@Slf4j
+@Service
+public class JwtService {
+
+  // --- Configuration JWT ---
+  @Value("${jwt.private-key-path}")
+  private String privateKeyPath;
+
+  @Value("${jwt.public-key-path}")
+  private String publicKeyPath;
+
+  @Value("${jwt.issuer}")
+  private String issuer;
+
+  @Value("${jwt.audience}")
+  private String audience;
+
+  @Value("${jwt.access-expiration-seconds:900}")
+  private long accessExpirationSeconds;
+
+  @Getter
+  @Value("${jwt.kid}")
+  private String configuredKid;
+
+  // --- Runtime state ---
+  private PrivateKey privateKey;
+  @Getter private RSAPublicKey publicKey;
+
+  // --- Dependencies ---
+  private final StringRedisTemplate stringRedisTemplate;
+  private final RefreshTokenService refreshTokenService;
+
+  public JwtService(StringRedisTemplate stringRedisTemplate,
+                    RefreshTokenService refreshTokenService) {
+      this.stringRedisTemplate = stringRedisTemplate;
+      this.refreshTokenService = refreshTokenService;
+  }
+
+  // --- Initialization ---
+  @PostConstruct
+  public void init() {
+    try {
+      this.privateKey = loadPrivateKey(privateKeyPath);
+      this.publicKey = (RSAPublicKey) loadPublicKey(publicKeyPath);
+      if (privateKey == null || publicKey == null)
+        throw new IllegalStateException("RSA keys not loaded correctly");
+      log.info("🔐 JWT initialized kid={} issuer={} audience={}", configuredKid, issuer, audience);
+    } catch (Exception e) {
+      log.error("Failed to init JwtService: {}", e.getMessage(), e);
+      throw new IllegalStateException(e);
+    }
+  }
+
+  // --- Key loaders ---
+  private PrivateKey loadPrivateKey(String path) throws Exception {
+    try (InputStream is = getClass().getClassLoader().getResourceAsStream(path.replace("classpath:", ""))) {
+      if (is == null) throw new FileNotFoundException("Private key not found at " + path);
+      byte[] normalized = normalizeKey(is.readAllBytes(), true);
+      return KeyFactory.getInstance("RSA").generatePrivate(new PKCS8EncodedKeySpec(normalized));
+    }
+  }
+
+  private PublicKey loadPublicKey(String path) throws Exception {
+    try (InputStream is = getClass().getClassLoader().getResourceAsStream(path.replace("classpath:", ""))) {
+      if (is == null) throw new FileNotFoundException("Public key not found at " + path);
+      byte[] normalized = normalizeKey(is.readAllBytes(), false);
+      return KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(normalized));
+    }
+  }
+
+  private byte[] normalizeKey(byte[] input, boolean isPrivate) {
+    String asText = new String(input, StandardCharsets.UTF_8).trim();
+    if (asText.startsWith("-----BEGIN")) {
+      String header = isPrivate ? "-----BEGIN PRIVATE KEY-----" : "-----BEGIN PUBLIC KEY-----";
+      String footer = isPrivate ? "-----END PRIVATE KEY-----" : "-----END PUBLIC KEY-----";
+      String base64 = asText.replace(header, "").replace(footer, "").replaceAll("\\s", "");
+      return Base64.getDecoder().decode(base64);
+    }
+    return input;
+  }
+
+  // --- JWT Generation ---
+  public String generateAccessToken(Utilisateur user) {
+    Instant now = Instant.now();
+    String jti = UUID.randomUUID().toString();
+
+    return Jwts.builder()
+        .setHeaderParam("kid", configuredKid)
+        .setIssuer(issuer)
+        .setAudience(audience)
+        .setSubject(user.getUsername())
+        .setId(jti)
+        .claim("role", user.getRole())
+        .claim("authorities", List.of("ROLE_" + user.getRole().toUpperCase()))
+        .setIssuedAt(Date.from(now))
+        .setNotBefore(Date.from(now))
+        .setExpiration(Date.from(now.plusSeconds(accessExpirationSeconds)))
+        .signWith(privateKey, SignatureAlgorithm.RS256)
+        .compact();
+  }
+
+  /**
+   * Génère un couple (access + refresh) complet et prêt à production.
+   */
+  public TokensDTO generateTokens(Utilisateur user, HttpServletRequest request) {
+      String accessToken = generateAccessToken(user);
+      String clientIp = extractClientIp(request);
+      String userAgent = (request != null && request.getHeader("User-Agent") != null)
+              ? request.getHeader("User-Agent") : "unknown-client";
+
+      RefreshToken refreshEntity = refreshTokenService.createRefreshToken(user, userAgent, clientIp);
+      String rawRefresh = refreshEntity.getToken();
+
+      log.info("🔐 Tokens générés pour [{}] depuis IP [{}], agent [{}]",
+              user.getUsername(), clientIp, userAgent);
+
+      long refreshExpiresIn = refreshEntity.getExpiresAt() != null
+          ? Duration.between(
+                Instant.now(),
+                refreshEntity.getExpiresAt().atZone(ZoneId.systemDefault()).toInstant()
+            ).getSeconds()
+          : Duration.ofDays(30).getSeconds();
+
+
+      return new TokensDTO(accessToken, rawRefresh, accessExpirationSeconds, refreshExpiresIn);
+  }
+
+  public TokensDTO generateTokens(Utilisateur user) {
+      return generateTokens(user, null);
+  }
+
+  // --- Helpers ---
+  private String extractClientIp(HttpServletRequest request) {
+      try {
+          if (request == null) return "unknown";
+          String xfHeader = request.getHeader("X-Forwarded-For");
+          if (xfHeader != null && !xfHeader.isBlank())
+              return xfHeader.split(",")[0].trim();
+          return request.getRemoteAddr() != null ? request.getRemoteAddr() : "unknown";
+      } catch (Exception e) {
+          log.warn("Failed to extract IP: {}", e.getMessage());
+          return "unknown";
+      }
+  }
+
+  // --- JWT parsing ---
+  public Jws<Claims> parseToken(String token) {
+    JwtParser parser = Jwts.parserBuilder().setSigningKey(publicKey).build();
+    Jws<Claims> jws = parser.parseClaimsJws(token);
+    Claims c = jws.getBody();
+    if (!issuer.equals(c.getIssuer())) throw new JwtException("Invalid issuer");
+    if (c.getAudience() == null || !c.getAudience().contains(audience)) throw new JwtException("Invalid audience");
+    return jws;
+  }
+
+  public String getUsernameFromToken(String token) { return parseToken(token).getBody().getSubject(); }
+  public String getRoleFromToken(String token) { return parseToken(token).getBody().get("role", String.class); }
+  public String getCinFromToken(String token) { return parseToken(token).getBody().get("cin", String.class); }
+  public String getJti(String token) { return parseToken(token).getBody().getId(); }
+
+  public boolean isTokenValid(String token, String username) {
+    try {
+      Claims claims = parseToken(token).getBody();
+      return claims.getSubject().equals(username)
+          && claims.getExpiration().after(new Date());
+    } catch (JwtException | IllegalArgumentException e) {
+      log.warn("Invalid JWT: {}", e.getMessage());
+      return false;
+    }
+  }
+
+  public void blacklistAccessTokenJti(String jti, Duration ttl) {
+    try {
+      if (ttl == null || ttl.isZero() || ttl.isNegative()) return;
+      stringRedisTemplate.opsForValue().set("blacklist:access:" + jti, "revoked", ttl);
+    } catch (Exception e) {
+      log.warn("Failed to write blacklist jti={} into redis: {}", jti, e.getMessage());
+    }
+  }
+}
+
+
+### END FILE
+
+
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\auth\service\RedisLoginAttemptService.java
+
+package com.szschoolmanager.auth.service;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataAccessException;
+import org.springframework.data.redis.RedisConnectionFailureException;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.RedisScript;
+import org.springframework.stereotype.Service;
+
+import io.micrometer.core.instrument.MeterRegistry;
+
+import java.time.Duration;
+import java.util.Collections;
+
+/**
+ * Service de gestion des tentatives de connexion basé sur Redis.
+ * Utilise un script Lua atomique (INCR + EXPIRE) fourni par RedisConfig.rateLimitScript.
+ */
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class RedisLoginAttemptService {
+
+    private static final String KEY_PREFIX = "login:fail:";
+    private static final int MAX_FAILED_ATTEMPTS = 5;
+    private static final Duration ACCOUNT_LOCK_DURATION = Duration.ofMinutes(30);
+// 30 minutes
+
+    private final StringRedisTemplate redisTemplate;
+    private final RedisScript<Long> rateLimitScript; // bean fourni dans RedisConfig
+    private final MeterRegistry meterRegistry;
+
+    /**
+     * Incrémente le compteur d'échecs pour username et retourne la valeur courante après incrément.
+     * Si la valeur dépasse MAX_ATTEMPTS, considère le compte verrouillé.
+     */
+    public long recordFailedAttemptAndGet(String username) {
+        String key = KEY_PREFIX + username;
+        try {
+            Long current = redisTemplate.execute(
+                rateLimitScript,
+                Collections.singletonList(key),
+                String.valueOf(MAX_FAILED_ATTEMPTS), // limit argument non utilisé dans our script but kept for compatibility
+                String.valueOf(ACCOUNT_LOCK_DURATION.getSeconds())
+            );
+            if (current == null) {
+                 // Should never happen unless Redis script fails to return a value
+                log.error("rateLimitScript returned null for key={}", key);
+                return 0L;
+            }
+            meterRegistry.counter("auth.login.attempts").increment();
+            log.debug("Login failed attempt for {} -> count={}", username, current);
+            return current;
+        } catch (RedisConnectionFailureException ex) {
+            // Redis inaccessible : fail-open for login attempts (do not block legit users)
+            meterRegistry.counter("auth.login.redis.unavailable").increment();
+            log.error("Redis unavailable while recording login attempt for {} — allowing attempts (fail-open)", username, ex);
+            return 0L;
+        } catch (DataAccessException ex) {
+            meterRegistry.counter("auth.login.redis.error").increment();
+            log.error("Redis data access error while recording login attempt for {} — allowing attempts", username, ex);
+            return 0L;
+        } catch (Exception ex) {
+            log.error("Unexpected error while recording login attempt for {} — allowing attempts", username, ex);
+            return 0L;
+        }
+    }
+
+    /**
+     * Vérifie si le compte est verrouillé (basé sur la valeur stockée).
+     */
+    public boolean isLocked(String username) {
+        String key = KEY_PREFIX + username;
+        try {
+            String value = redisTemplate.opsForValue().get(key);
+            if (value == null) return false;
+            try {
+                long count = Long.parseLong(value);
+                boolean locked = count >= MAX_FAILED_ATTEMPTS;
+                if (locked) {
+                    meterRegistry.counter("auth.login.locked").increment();
+                }
+                return locked;
+            } catch (NumberFormatException nfe) {
+                // clé mal formée -> considérer non verrouillé (et log)
+                log.warn("Malformed login attempt value for key={} value={}", key, value);
+                return false;
+            }
+        } catch (RedisConnectionFailureException ex) {
+            meterRegistry.counter("auth.login.redis.unavailable").increment();
+            log.error("Redis unavailable while checking lock for {} — treat as not locked (fail-open)", username, ex);
+            return false;
+        } catch (Exception ex) {
+            log.error("Unexpected error while checking lock for {} — treat as not locked", username, ex);
+            return false;
+        }
+    }
+
+    /**
+     * Reset (supprime) les tentatives après succès de connexion.
+     */
+    public void resetAttempts(String username) {
+        String key = KEY_PREFIX + username;
+        try {
+            redisTemplate.delete(key);
+            meterRegistry.counter("auth.login.reset").increment();
+            log.debug("Reset login attempts for {}", username);
+        } catch (RedisConnectionFailureException ex) {
+            meterRegistry.counter("auth.login.redis.unavailable").increment();
+            log.error("Redis unavailable while resetting attempts for {} — nothing done (fail-open)", username, ex);
+        } catch (Exception ex) {
+            log.error("Unexpected error while resetting attempts for {}", username, ex);
+        }
+    }
+}
+
+
+### END FILE
+
+
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\auth\service\RedisService.java
+
+package com.szschoolmanager.auth.service;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.RedisConnectionFailureException;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.stereotype.Service;
+
+@RequiredArgsConstructor
+@Slf4j
+@Service
+public class RedisService {
+
+    private final StringRedisTemplate redisTemplate;
+
+    /**
+     * Vérifie si un token (par son jti) est dans la blacklist.
+     * - Si Redis répond, renvoie true/false.
+     * - Si Redis indisponible ou erreur, lance RedisUnavailableException.
+     */
+    public boolean isTokenBlacklisted(String tokenId) {
+        try {
+            String key = "blacklist:access:" + tokenId;
+            Boolean present = redisTemplate.hasKey(key);
+            return Boolean.TRUE.equals(present);
+        } catch (RedisConnectionFailureException ex) {
+            log.error("❌ Redis connection failure while checking blacklist for tokenId={}", tokenId, ex);
+            throw new RedisUnavailableException("Redis unavailable", ex);
+        } catch (Exception ex) {
+            log.error("❌ Unexpected Redis error while checking blacklist for tokenId={}", tokenId, ex);
+            // On considère toutes les erreurs comme critique -> fail-closed
+            throw new RedisUnavailableException("Redis error", ex);
+        }
+    }
+
+    /**
+     * Méthode utilitaire : marque un token dans la blacklist (usage ailleurs)
+     */
+    public void blacklistToken(String tokenId) {
+        try {
+            String key = "blacklist:access:" + tokenId;
+            // Exemple: marquer avec TTL (1 jour) — ajuste si nécessaire
+            redisTemplate.opsForValue().set(key, "1");
+            redisTemplate.expire(key, java.time.Duration.ofDays(1));
+        } catch (Exception ex) {
+            log.error("❌ Failed to write blacklist key for tokenId={}", tokenId, ex);
+            throw new RedisUnavailableException("Redis unavailable", ex);
+        }
+    }
+}
+
+
+### END FILE
+
+
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\auth\service\RedisUnavailableException.java
+
+package com.szschoolmanager.auth.service;
+
+public class RedisUnavailableException extends RuntimeException {
+    public RedisUnavailableException(String message, Throwable cause) {
+        super(message, cause);
+    }
+    public RedisUnavailableException(String message) {
+        super(message);
+    }
+}
+
+
+### END FILE
+
+
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\auth\service\RefreshTokenService.java
+
+package com.szschoolmanager.auth.service;
+
+import com.szschoolmanager.auth.model.RefreshToken;
+import com.szschoolmanager.auth.model.Utilisateur;
+import com.szschoolmanager.auth.repository.RefreshTokenRepository;
+import com.szschoolmanager.exception.BusinessValidationException;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.time.LocalDateTime;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.UUID;
+
+/**
+ * Complete RefreshTokenService (production-ready).
+ * - Stores hashed tokens in DB and returns raw token to client (detached object).
+ * - Limits active sessions.
+ * - Rotate with reuse detection (committed revocation via REQUIRES_NEW).
+ * - Simple hex SHA-256 for token hashing (readable).
+ */
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class RefreshTokenService {
+
+    private final RefreshTokenRepository refreshTokenRepository;
+
+    private static final int REFRESH_TOKEN_DAYS = 7;
+    private static final int MAX_ACTIVE_SESSIONS = 3;
+
+    // ----------------- CREATE -----------------
+    @Transactional
+    public RefreshToken createRefreshToken(Utilisateur user, String userAgent, String ipAddress) {
+        Objects.requireNonNull(user, "Utilisateur ne peut pas être nul");
+
+        try {
+            // 🔒 1. Lock active tokens to ensure atomic behavior
+            List<RefreshToken> activeTokens = refreshTokenRepository.findActiveTokensForUpdate(user);
+
+            // 🧹 2. Enforce max active sessions
+            if (activeTokens.size() >= MAX_ACTIVE_SESSIONS) {
+                int revokeCount = activeTokens.size() - MAX_ACTIVE_SESSIONS + 1;
+                activeTokens.stream()
+                        .sorted(Comparator.comparing(RefreshToken::getCreatedAt))
+                        .limit(revokeCount)
+                        .forEach(t -> t.setRevoked(true));
+                refreshTokenRepository.saveAllAndFlush(activeTokens);
+                log.info("Revoked {} old refresh tokens for user {}", revokeCount, user.getUsername());
+            }
+
+            // 🔑 3. Generate secure token (raw + hashed)
+            String raw = generateRawToken();
+            String hashed = hashToken(raw);
+
+            // 🧱 4. Build entity (hash only)
+            RefreshToken entity = RefreshToken.builder()
+                    .utilisateur(user)
+                    .token(hashed)
+                    .jti(UUID.randomUUID().toString())
+                    .createdAt(LocalDateTime.now())
+                    .expiresAt(LocalDateTime.now().plusDays(REFRESH_TOKEN_DAYS))
+                    .revoked(false)
+                    .reused(false)
+                    .userAgent(shorten(userAgent))
+                    .ipAddress(shorten(ipAddress))
+                    .build();
+
+            RefreshToken saved = refreshTokenRepository.save(entity); // one persist call only
+
+            // 🎁 5. Return detached copy with raw token for frontend
+            return RefreshToken.builder()
+                    .id(saved.getId())
+                    .utilisateur(user)
+                    .token(raw) // raw never persisted
+                    .createdAt(saved.getCreatedAt())
+                    .expiresAt(saved.getExpiresAt())
+                    .revoked(saved.isRevoked())
+                    .reused(saved.isReused())
+                    .userAgent(saved.getUserAgent())
+                    .ipAddress(saved.getIpAddress())
+                    .jti(saved.getJti())
+                    .build();
+
+        } catch (Exception e) {
+            log.error("❌ Error creating refresh token for user {}: {}", 
+                    user != null ? user.getUsername() : "unknown", e.getMessage(), e);
+            throw new BusinessValidationException("Erreur lors de la création du refresh token");
+        }
+    }
+
+    
+
+
+
+    // ----------------- VALIDATE -----------------
+    @Transactional(readOnly = true)
+    public RefreshToken validateRefreshToken(String rawToken) {
+        if (rawToken == null || rawToken.isBlank()) {
+            throw new BusinessValidationException("Aucun refresh token fourni");
+        }
+        String hashed = hashToken(rawToken);
+        RefreshToken rt = refreshTokenRepository.findByTokenWithUser(hashed)
+                .orElseThrow(() -> new BusinessValidationException("Token invalide"));
+        if (rt.isRevoked()) throw new BusinessValidationException("Token déjà révoqué");
+        if (rt.isExpired()) throw new BusinessValidationException("Token expiré");
+        return rt;
+    }
+
+    // ----------------- ROTATE -----------------
+    /**
+     * Rotate refresh token:
+     * - If presented token is active -> revoke it and issue new one.
+     * - If presented token is already revoked -> mark reused, commit revocations for user (REQUIRES_NEW), then throw.
+     */
+    @Transactional(noRollbackFor = BusinessValidationException.class)
+    public RefreshToken rotateRefreshToken(String presentedRaw, String userAgent, String ipAddress) {
+        if (presentedRaw == null || presentedRaw.isBlank()) {
+            throw new BusinessValidationException("Aucun refresh token fourni");
+        }
+
+        String hashed = hashToken(presentedRaw);
+        RefreshToken stored = refreshTokenRepository.findByTokenWithUser(hashed)
+                .orElseThrow(() -> new BusinessValidationException("Token invalide"));
+
+        // normal rotation
+        if (!stored.isRevoked()) {
+            stored.setRevoked(true);
+            refreshTokenRepository.saveAndFlush(stored);
+            return createRefreshToken(stored.getUtilisateur(), userAgent, ipAddress);
+        }
+
+        // reuse detected
+        if (!stored.isReused()) {
+            stored.setReused(true);
+            refreshTokenRepository.saveAndFlush(stored);
+            revokeAllActiveSessionsForUserCommitted(stored.getUtilisateur().getId());
+        }
+
+
+        // throw here cause rollback problem > no changes commited on db level
+        // fixed by (noRollbackFor = BusinessValidationException.class)
+        throw new BusinessValidationException("Refresh token reuse detected - all sessions revoked");
+    }
+
+    // ----------------- REVOKE ONE -----------------
+    @Transactional
+    public void revokeRefreshToken(String rawToken) {
+        if (rawToken == null || rawToken.isBlank()) {
+            log.warn("Attempt to revoke blank token");
+            return;
+        }
+        String hashed = hashToken(rawToken);
+        Optional<RefreshToken> optional = refreshTokenRepository.findByTokenWithUser(hashed);
+        optional.ifPresent(rt -> {
+            if (!rt.isRevoked()) {
+                rt.setRevoked(true);
+                refreshTokenRepository.saveAndFlush(rt);
+                log.info("Revoked refresh token id={}", rt.getId());
+            } else {
+                log.info("Refresh token was already revoked id={}", rt.getId());
+            }
+        });
+    }
+
+    // ----------------- REVOKE ALL FOR USER (committed helper) -----------------
+    /**
+     * Commits the bulk revocation in its own transaction so the revoke persists even if caller rolls back.
+     * Uses the repository bulk query (revokeAllByUserId).
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public int revokeAllActiveSessionsForUserCommitted(Long userId) {
+        int count = refreshTokenRepository.revokeAllByUserId(userId);
+        log.info("Committed revocation of {} refresh tokens for user id={}", count, userId);
+        return count;
+    }
+
+    // ----------------- REVOKE ALL FOR USER (non-committed) -----------------
+    @Transactional
+    public void revokeAllForUser(Utilisateur user) {
+        if (user == null) return;
+        List<RefreshToken> tokens = refreshTokenRepository.findAllByUtilisateurIdAndRevokedFalse(user.getId());
+        for (RefreshToken rt : tokens) {
+            rt.setRevoked(true);
+            refreshTokenRepository.save(rt);
+        }
+        refreshTokenRepository.flush();
+        log.info("Revoked {} refresh tokens for user {}", tokens.size(), user.getUsername());
+    }
+
+    // ----------------- HELPERS -----------------
+    private static String generateRawToken() {
+        return UUID.randomUUID().toString().replace("-", "") + UUID.randomUUID().toString().replace("-", "");
+    }
+
+    private static String hashToken(String token) {
+        try {
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            byte[] h = md.digest(token.getBytes(StandardCharsets.UTF_8));
+            StringBuilder hex = new StringBuilder(h.length * 2);
+            for (byte b : h) {
+                hex.append(String.format("%02x", b));
+            }
+            return hex.toString();
+        } catch (Exception e) {
+            throw new IllegalStateException("Erreur lors du hachage du refresh token", e);
+        }
+    }
+
+    private static String shorten(String s) {
+        if (s == null) return "";
+        return s.length() <= 200 ? s : s.substring(0, 200);
+    }
+
+
+    @Scheduled(cron = "0 0 2 * * ?") // 2 AM daily
+    @Transactional
+    public void cleanupExpiredTokens() {
+        int deleted = refreshTokenRepository
+            .deleteByExpiresAtBefore(LocalDateTime.now());
+        log.info("🧹 Deleted {} expired refresh tokens", deleted);
+    }
+
+}
+
+
+### END FILE
+
+
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\auth\service\UtilisateurQueryService.java
+
+package com.szschoolmanager.auth.service;
+
+import com.szschoolmanager.auth.model.Utilisateur;
+import java.util.Optional;
+
+public interface UtilisateurQueryService {
+  Optional<Utilisateur> findByUsername(String username);
+}
+
+
+### END FILE
+
+
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\auth\service\UtilisateurQueryServiceImpl.java
+
+package com.szschoolmanager.auth.service;
+
+import com.szschoolmanager.auth.model.Utilisateur;
+import com.szschoolmanager.auth.repository.UtilisateurRepository;
+import java.util.Optional;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+
+@Service
+@RequiredArgsConstructor
+public class UtilisateurQueryServiceImpl implements UtilisateurQueryService {
+
+  private final UtilisateurRepository repository;
+
+  @Override
+  public Optional<Utilisateur> findByUsername(String username) {
+    return repository.findByUsername(username);
+  }
+}
+
+
+### END FILE
+
+
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\auth\service\UtilisateurService.java
+
+package com.szschoolmanager.auth.service;
+
+import com.szschoolmanager.auth.dto.*;
+import com.szschoolmanager.auth.mapper.UtilisateurMapper;
+import com.szschoolmanager.auth.model.Utilisateur;
+import com.szschoolmanager.auth.repository.UtilisateurRepository;
+import com.szschoolmanager.exception.ResponseDTO;
+
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.*;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Optional;
+
+@Service
+@RequiredArgsConstructor
+public class UtilisateurService {
+
+  private final UtilisateurRepository repo;
+  private final UtilisateurMapper mapper;
+  private final PasswordEncoder passwordEncoder;
+  private final DatabaseUserDetailsService userDetailsService;
+
+  public PasswordEncoder passwordEncoder() {
+    return passwordEncoder;
+  }
+
+  @Transactional
+  public void save(Utilisateur utilisateur) {
+    repo.save(utilisateur);
+    userDetailsService.invalidateUserCache(utilisateur.getUsername());
+  }
+
+  public UserDetails buildUserDetails(Utilisateur u) {
+    return org.springframework.security.core.userdetails.User.builder()
+        .username(u.getUsername())
+        .password(u.getPassword())
+        .authorities("ROLE_" + (u.getRole() == null ? "USER" : u.getRole().toUpperCase()))
+        .build();
+  }
+
+  public ResponseEntity<ResponseDTO<Page<UtilisateurResponseDTO>>> list(int page, int size, String roleFilter) {
+    Pageable pageable = PageRequest.of(page, size, Sort.by("id").descending());
+    Page<Utilisateur> p;
+
+    if (roleFilter != null && !roleFilter.isBlank()) {
+      String roleStr = roleFilter.trim().toUpperCase();
+      p = repo.findByRole(roleStr, pageable);
+    } else {
+      p = repo.findAll(pageable);
+    }
+
+    Page<UtilisateurResponseDTO> res = p.map(mapper::toResponseDTO);
+    return ResponseEntity.ok(ResponseDTO.success("Liste des utilisateurs", res));
+  }
+
+  @Transactional
+  public ResponseEntity<ResponseDTO<UtilisateurResponseDTO>> create(UtilisateurCreateDTO dto) {
+    if (repo.existsByUsername(dto.getUsername())) {
+      return ResponseEntity.badRequest().body(ResponseDTO.error("Nom d'utilisateur déjà existant"));
+    }
+
+    Utilisateur utilisateur = mapper.toEntity(dto);
+    utilisateur.setPassword(passwordEncoder.encode(dto.getPassword()));
+  
+    // Rôle dynamique (aucun enum)
+    if (dto.getRole() == null || dto.getRole().isBlank()) {
+      utilisateur.setRole("USER");
+    } else {
+      utilisateur.setRole(dto.getRole().trim().toUpperCase());
+    }
+
+    utilisateur.setForceChangePassword(true);
+    repo.save(utilisateur);
+    userDetailsService.invalidateUserCache(utilisateur.getUsername());
+    return ResponseEntity.ok(ResponseDTO.success("Utilisateur créé", mapper.toResponseDTO(utilisateur)));
+  }
+
+  @Transactional
+  public ResponseEntity<ResponseDTO<UtilisateurResponseDTO>> update(Long id, UtilisateurUpdateDTO dto) {
+    Optional<Utilisateur> opt = repo.findById(id);
+    if (opt.isEmpty()) {
+      return ResponseEntity.badRequest().body(ResponseDTO.error("Utilisateur introuvable"));
+    }
+
+    Utilisateur u = opt.get();
+
+    if (!u.getUsername().equals(dto.getUsername()) && repo.existsByUsername(dto.getUsername())) {
+      return ResponseEntity.badRequest().body(ResponseDTO.error("Nom d'utilisateur déjà existant"));
+    }
+
+    mapper.updateFromDto(dto, u);
+
+    if (dto.getPassword() != null && !dto.getPassword().isBlank()) {
+      u.setPassword(passwordEncoder.encode(dto.getPassword()));
+      if (dto.getForceChangePassword() != null) {
+        u.setForceChangePassword(dto.getForceChangePassword());
+      } else {
+        u.setForceChangePassword(false);
+      }
+    } else if (dto.getForceChangePassword() != null) {
+      u.setForceChangePassword(dto.getForceChangePassword());
+    }
+
+    if (dto.getRole() != null && !dto.getRole().isBlank()) {
+      u.setRole(dto.getRole().trim().toUpperCase());
+    }
+
+    repo.save(u);
+    userDetailsService.invalidateUserCache(u.getUsername());
+    return ResponseEntity.ok(ResponseDTO.success("Utilisateur mis à jour avec succès", mapper.toResponseDTO(u)));
+  }
+
+  @Transactional
+  public ResponseEntity<ResponseDTO<String>> changePassword(Long id, ChangePasswordDTO dto, boolean verifyOld) {
+    Optional<Utilisateur> opt = repo.findById(id);
+    if (opt.isEmpty()) {
+      return ResponseEntity.badRequest().body(ResponseDTO.error("Utilisateur introuvable"));
+    }
+
+    Utilisateur u = opt.get();
+
+    if (verifyOld && !passwordEncoder.matches(dto.getOldPassword(), u.getPassword())) {
+      return ResponseEntity.badRequest().body(ResponseDTO.error("Ancien mot de passe incorrect"));
+    }
+
+    u.setPassword(passwordEncoder.encode(dto.getNewPassword()));
+    u.setForceChangePassword(false);
+    repo.save(u);
+    userDetailsService.invalidateUserCache(u.getUsername());
+    return ResponseEntity.ok(ResponseDTO.success("Mot de passe modifié", null));
+  }
+
+  @Transactional
+  public ResponseEntity<ResponseDTO<String>> delete(Long id) {
+    if (!repo.existsById(id)) {
+      return ResponseEntity.badRequest().body(ResponseDTO.error("Utilisateur introuvable"));
+    }
+    repo.deleteById(id);
+    return ResponseEntity.ok(ResponseDTO.success("Utilisateur supprimé", null));
+  }
+
+  public Optional<Utilisateur> findByUsername(String username) {
+    return repo.findByUsername(username);
+  }
+
+  public String encodePassword(String rawPassword) {
+    return passwordEncoder.encode(rawPassword);
+  }
+}
+
+
+
+
+package com.szschoolmanager.tools;
+
+import java.io.FileOutputStream;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
+import java.security.PrivateKey;
+import java.security.PublicKey;
+
+public class GenerateRSAKeys {
+  public static void main(String[] args) throws Exception {
+    KeyPairGenerator generator = KeyPairGenerator.getInstance("RSA");
+    generator.initialize(2048);
+    KeyPair pair = generator.generateKeyPair();
+    PrivateKey privateKey = pair.getPrivate();
+    PublicKey publicKey = pair.getPublic();
+
+    try (FileOutputStream out = new FileOutputStream("src/main/resources/keys/private_key.pem")) {
+      out.write(privateKey.getEncoded());
+    }
+    try (FileOutputStream out = new FileOutputStream("src/main/resources/keys/public_key.pem")) {
+      out.write(publicKey.getEncoded());
+    }
+
+    System.out.println("✅ Clés RSA générées dans src/main/resources/keys/");
+  }
+}
+
+
+
+package com.szschoolmanager.util;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.StringReader;
+import java.security.GeneralSecurityException;
+import java.security.KeyFactory;
+import java.security.PrivateKey;
+import java.security.PublicKey;
+import java.security.spec.InvalidKeySpecException;
+import java.security.spec.PKCS8EncodedKeySpec;
+import java.security.spec.X509EncodedKeySpec;
+import java.util.Base64;
+import java.util.stream.Collectors;
+
+public final class PemUtils {
+
+    // 🔒 Constructeur privé pour empêcher l’instanciation (S1118)
+    private PemUtils() {
+        throw new UnsupportedOperationException("Utility class - cannot be instantiated");
+    }
+
+    private static String stripPemHeader(String pem, String beginMarker, String endMarker)
+            throws IOException {
+        try (BufferedReader reader = new BufferedReader(new StringReader(pem))) {
+            return reader
+                    .lines()
+                    .filter(line -> !line.contains(beginMarker) && !line.contains(endMarker))
+                    .collect(Collectors.joining());
+        }
+    }
+
+    public static PrivateKey parsePrivateKeyFromPem(String pem)
+            throws IOException, GeneralSecurityException {
+        try {
+            String cleanPem = stripPemHeader(pem, "-----BEGIN PRIVATE KEY", "-----END PRIVATE KEY");
+            byte[] decoded = Base64.getDecoder().decode(cleanPem);
+            PKCS8EncodedKeySpec keySpec = new PKCS8EncodedKeySpec(decoded);
+            KeyFactory kf = KeyFactory.getInstance("RSA");
+            return kf.generatePrivate(keySpec);
+        } catch (InvalidKeySpecException e) {
+            throw new GeneralSecurityException("Invalid RSA private key format", e);
+        }
+    }
+
+    public static PublicKey parsePublicKeyFromPem(String pem)
+            throws IOException, GeneralSecurityException {
+        try {
+            String cleanPem = stripPemHeader(pem, "-----BEGIN PUBLIC KEY", "-----END PUBLIC KEY");
+            byte[] decoded = Base64.getDecoder().decode(cleanPem);
+            X509EncodedKeySpec keySpec = new X509EncodedKeySpec(decoded);
+            KeyFactory kf = KeyFactory.getInstance("RSA");
+            return kf.generatePublic(keySpec);
+        } catch (InvalidKeySpecException e) {
+            throw new GeneralSecurityException("Invalid RSA public key format", e);
+        }
+    }
+}
+
+
+
+
+
+
+package com.szschoolmanager.Config;
+
+import io.swagger.v3.oas.models.Components;
+import io.swagger.v3.oas.models.OpenAPI;
+import io.swagger.v3.oas.models.info.Contact;
+import io.swagger.v3.oas.models.info.Info;
+import io.swagger.v3.oas.models.info.License;
+import io.swagger.v3.oas.models.security.SecurityRequirement;
+import io.swagger.v3.oas.models.security.SecurityScheme;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+/**
+ * 🌐 Swagger / OpenAPI Configuration ------------------------------------------------------- Adapté
+ * au projet MySchoolManager Mothership : - Sécurisé par JWT RSA (RS256) - Compatible avec Swagger
+ * UI et Spring Boot 3.5.6 - Prêt pour une utilisation React / Microservices
+ * -------------------------------------------------------
+ *
+ * @author Saad
+ */
+@Configuration
+public class SwaggerConfig {
+
+  @Bean
+  public OpenAPI mySchoolManagerOpenAPI() {
+    final String securitySchemeName = "bearerAuth";
+
+    return new OpenAPI()
+        .info(
+            new Info()
+                .title("🎓 MySchoolManager API — Mothership Core")
+                .version("v1.0.0")
+                .description(
+                    """
+                                Backend centralisé du projet **MySchoolManager Mothership**.
+
+                                🔐 Authentification : JWT RS256 (RSA)
+                                📦 Modules : Utilisateur, Employé, Filière, Modulex, Matière, etc.
+                                🧩 Extensible : Microservices additionnels (étudiants, paiements...)
+
+                                > Base solide, propre, évolutive et prête pour production.
+                                """)
+                .contact(
+                    new Contact()
+                        .name("Saad - Développeur")
+                        .url("https://github.com/saadxzhr")
+                        .email("contact@myschoolmanager.ma"))
+                .license(
+                    new License().name("MIT License").url("https://opensource.org/licenses/MIT")))
+        // Sécurité : Bearer JWT
+        .addSecurityItem(new SecurityRequirement().addList(securitySchemeName))
+        .components(
+            new Components()
+                .addSecuritySchemes(
+                    securitySchemeName,
+                    new SecurityScheme()
+                        .name(securitySchemeName)
+                        .type(SecurityScheme.Type.HTTP)
+                        .scheme("bearer")
+                        .bearerFormat("JWT")
+                        .description(
+                            "Utiliser le token d’authentification obtenu via `/api/v1/auth/login`.\nNe pas inclure le préfixe 'Bearer ' ici.")));
+  }
+}
+
+
+
+
+package com.szschoolmanager.DTO;
+
+import java.time.LocalDateTime;
+import java.util.Map;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class ErrorResponse {
+  private LocalDateTime timestamp;
+  private int status;
+  private String error;
+  private String message;
+  private Map<String, String> errors;
+  private String path;
+}
+
+
+
+
+package com.szschoolmanager.exception;
+
+import jakarta.persistence.EntityNotFoundException;
+import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.Map;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+
+/**
+ * 🌍 GlobalExceptionHandler Centralise toutes les exceptions pour fournir des réponses API
+ * cohérentes. Chaque erreur renvoie un objet ResponseDTO standardisé.
+ */
+@Slf4j
+@RestControllerAdvice
+public class GlobalExceptionHandler {
+
+  // 🔁 Doublon (ex: code déjà existant)
+  @ExceptionHandler(DuplicateResourceException.class)
+  public ResponseEntity<ResponseDTO<Void>> handleDuplicate(DuplicateResourceException ex) {
+    log.warn("Duplicate error: {}", ex.getMessage());
+    return ResponseEntity.status(HttpStatus.CONFLICT)
+        .body(new ResponseDTO<>("DUPLICATE_RESOURCE", ex.getMessage(), null, LocalDateTime.now()));
+  }
+
+  // 🚫 Ressource non trouvée
+  @ExceptionHandler({ResourceNotFoundException.class, EntityNotFoundException.class})
+  public ResponseEntity<ResponseDTO<Void>> handleNotFound(RuntimeException ex) {
+    log.warn("Resource not found: {}", ex.getMessage());
+    return ResponseEntity.status(HttpStatus.NOT_FOUND)
+        .body(new ResponseDTO<>("NOT_FOUND", ex.getMessage(), null, LocalDateTime.now()));
+  }
+
+  // ⚠️ Erreurs de validation DTO (ex: @NotNull, @Size...)
+  @ExceptionHandler(MethodArgumentNotValidException.class)
+  public ResponseEntity<ResponseDTO<Map<String, String>>> handleValidation(
+      MethodArgumentNotValidException ex) {
+
+    Map<String, String> errors = new HashMap<>();
+    ex.getBindingResult()
+        .getFieldErrors()
+        .forEach(err -> errors.put(err.getField(), err.getDefaultMessage()));
+
+    // ✅ Message utilisateur principal
+    String message =
+        errors.values().stream().findFirst().orElse("Les données envoyées sont invalides.");
+
+    log.warn("Validation error: {}", errors);
+
+    return ResponseEntity.badRequest()
+        .body(new ResponseDTO<>("VALIDATION_ERROR", message, errors, LocalDateTime.now()));
+  }
+
+  // 🧩 Mauvais type (ex: ID non numérique dans l’URL)
+  @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+  public ResponseEntity<ResponseDTO<Void>> handleTypeMismatch(
+      MethodArgumentTypeMismatchException ex) {
+    String message = "Type de paramètre invalide pour '" + ex.getName() + "'";
+    log.warn("Type mismatch: {}", message);
+    return ResponseEntity.badRequest()
+        .body(new ResponseDTO<>("TYPE_MISMATCH", message, null, LocalDateTime.now()));
+  }
+
+  // 🧠 Erreurs de validation métier (Business rules)
+  @ExceptionHandler(BusinessValidationException.class)
+  public ResponseEntity<ResponseDTO<Void>> handleBusinessValidation(
+      BusinessValidationException ex) {
+    log.warn("Business validation error: {}", ex.getMessage());
+    return ResponseEntity.badRequest()
+        .body(new ResponseDTO<>("VALIDATION_ERROR", ex.getMessage(), null, LocalDateTime.now()));
+  }
+
+  // 💣 Cas inattendu (NullPointerException, SQL, etc.)
+  @ExceptionHandler(Exception.class)
+  public ResponseEntity<ResponseDTO<Void>> handleGeneric(Exception ex) {
+    log.error("Unexpected error:", ex);
+    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+        .body(
+            new ResponseDTO<>(
+                "INTERNAL_ERROR", "Erreur interne du serveur.", null, LocalDateTime.now()));
+  }
+}
+
+
+package com.szschoolmanager.exception;
+
+import io.swagger.v3.oas.annotations.media.Schema;
+import java.time.LocalDateTime;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@AllArgsConstructor
+@NoArgsConstructor
+@Schema(description = "Structure standard des réponses de l'API")
+public class ResponseDTO<T> {
+  private String status;
+  private String message;
+  private T data;
+  private LocalDateTime timestamp = LocalDateTime.now();
+
+  public static <T> ResponseDTO<T> success(String message, T data) {
+    return new ResponseDTO<>("SUCCESS", message, data, LocalDateTime.now());
+  }
+
+  public static <T> ResponseDTO<T> error(String message) {
+    return new ResponseDTO<>("ERROR", message, null, LocalDateTime.now());
+  }
+}
+
+
+
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.5.6</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>com.szschoolmanager</groupId>
+    <artifactId>szschoolmanager</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <name>szschoolmanager</name>
+    <description>Project for myschool</description>
+
+    <properties>
+        <java.version>17</java.version>
+        <springdoc.version>2.7.0</springdoc.version> 
+        <mapstruct.version>1.5.5.Final</mapstruct.version>
+        <lombok.version>1.18.30</lombok.version>
+    </properties>
+
+    <dependencies>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+
+        <!-- Micrometer Prometheus -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-prometheus</artifactId>
+        </dependency>
+
+        <!-- Spring Boot Starters -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-thymeleaf</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+
+        <!-- Springdoc OpenAPI -->
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+            <version>2.7.0</version>  <!-- Or use ${springdoc.version} -->
+        </dependency>
+
+        <!-- Thymeleaf Extras for Security -->
+        <dependency>
+            <groupId>org.thymeleaf.extras</groupId>
+            <artifactId>thymeleaf-extras-springsecurity6</artifactId>
+        </dependency>
+
+        <!-- Database & Migration -->
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
+        <!-- JWT (jjwt) -->
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-api</artifactId>
+            <version>0.11.5</version>
+        </dependency>
+
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-impl</artifactId>
+            <version>0.11.5</version>
+            <scope>runtime</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-jackson</artifactId>
+            <version>0.11.5</version>
+            <scope>runtime</scope>
+        </dependency>
+
+        <!-- Nimbus (optional pour JWKS si tu veux) -->
+        <dependency>
+            <groupId>com.nimbusds</groupId>
+            <artifactId>nimbus-jose-jwt</artifactId>
+            <version>9.31</version>
+        </dependency>
+
+        <!-- Redis -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
+        </dependency>
+
+        <!-- Bucket4j -->
+        <dependency>
+            <groupId>com.bucket4j</groupId>
+            <artifactId>bucket4j-core</artifactId>
+            <version>8.10.1</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.bucket4j</groupId>
+            <artifactId>bucket4j-redis</artifactId>
+            <version>8.10.1</version>
+        </dependency>
+
+        <dependency>
+            <groupId>io.lettuce</groupId>
+            <artifactId>lettuce-core</artifactId>
+        </dependency>
+
+    
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-pool2</artifactId>
+        </dependency>
+
+
+        <!-- ADD Redisson client 👇 -->
+        <dependency>
+            <groupId>org.redisson</groupId>
+            <artifactId>redisson-spring-boot-starter</artifactId>
+            <version>3.25.2</version>
+        </dependency>
+
+        
+        <!-- <dependency>
+            <groupId>org.liquibase</groupId>
+            <artifactId>liquibase-core</artifactId>
+        </dependency> -->
+
+
+
+        <!-- Lombok -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <version>${lombok.version}</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- MapStruct -->
+        <dependency>
+            <groupId>org.mapstruct</groupId>
+            <artifactId>mapstruct</artifactId>
+            <version>${mapstruct.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.mapstruct</groupId>
+            <artifactId>mapstruct-processor</artifactId>
+            <version>${mapstruct.version}</version>
+            <scope>provided</scope>
+        </dependency>
+
+
+        <!-- Apache POI -->
+        <dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi-ooxml</artifactId>
+            <version>5.2.3</version>
+        </dependency>
+
+        <!-- Test Dependencies -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
+            <version>3.13.2</version>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- ArchUnit (tests d’architecture) -->
+        <!-- ArchUnit pour tests d'architecture (ex: interdépendances packages) -->
+        <dependency>
+            <groupId>com.tngtech.archunit</groupId>
+            <artifactId>archunit-junit5</artifactId>
+            <version>1.0.1</version>
+            <scope>test</scope>
+        </dependency>
+
+        
+    </dependencies>
+
+    <pluginRepositories>
+        <pluginRepository>
+            <id>central</id>
+            <url>https://repo.maven.apache.org/maven2</url>
+        </pluginRepository>
+        <pluginRepository>
+            <id>kth-releases</id>
+            <url>https://raw.githubusercontent.com/castor-software/depclean/mvn-repo/</url>
+        </pluginRepository>
+    </pluginRepositories>
+
+    <build>
+        <plugins>
+            <!-- Compiler plugin for MapStruct + Lombok -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.11.0</version>
+                <configuration>
+                    <source>17</source>
+                    <target>17</target>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                            <version>${lombok.version}</version>
+                        </path>
+                        <path>
+                            <groupId>org.mapstruct</groupId>
+                            <artifactId>mapstruct-processor</artifactId>
+                            <version>${mapstruct.version}</version>
+                        </path>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok-mapstruct-binding</artifactId>
+                            <version>0.2.0</version>
+                        </path>
+                    </annotationProcessorPaths>
+                    <compilerArgs>
+                        <arg>-Amapstruct.verbose=true</arg>
+                    </compilerArgs>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.1.0</version>
+            </plugin>
+
+            <!-- Spring Boot Maven plugin -->
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+
+            <!-- Maven Dependency Management -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-enforcer-plugin</artifactId>
+                <version>3.5.0</version>
+                <executions>
+                    <execution>
+                    <id>enforce</id>
+                    <goals><goal>enforce</goal></goals>
+                    <configuration>
+                        <rules>
+                        <requireMavenVersion>
+                            <version>[3.6.3,)</version>
+                        </requireMavenVersion>
+                        <requireJavaVersion>
+                            <version>[17,)</version>
+                        </requireJavaVersion>
+                        </rules>
+                    </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+
+            <plugin>
+            <groupId>com.diffplug.spotless</groupId>
+            <artifactId>spotless-maven-plugin</artifactId>
+            <version>2.43.0</version>
+            <configuration>
+                <formats>
+                <format>
+                    <includes>
+                    <include>*.md</include>
+                    </includes>
+                    <trimTrailingWhitespace/>
+                    <endWithNewline/>
+                </format>
+                </formats>
+                <java>
+                <googleJavaFormat>
+                    <version>1.19.2</version>
+                </googleJavaFormat>
+                <removeUnusedImports />
+                </java>
+            </configuration>
+            </plugin>
+
+            <plugin>
+                <groupId>se.kth.castor</groupId>
+                <artifactId>depclean-maven-plugin</artifactId>
+                <version>2.0.0</version>
+
+                <executions>
+                    <execution>
+                    <phase>verify</phase>
+                    <goals>
+                        <goal>depclean</goal>
+                    </goals>
+                    </execution>
+                </executions>
+
+                <configuration>
+                    <!-- Crée un pom-depclean.xml nettoyé -->
+                    <createBackupPom>true</createBackupPom>
+
+                    <!-- Garde les dépendances essentielles -->
+                    <excludeDependencies>
+                    <!-- Starter Spring Boot: gestion auto des transitive deps -->
+                    <excludeDependency>org.springframework.boot:spring-boot-starter*</excludeDependency>
+
+                    <!-- Swagger/OpenAPI -->
+                    <excludeDependency>org.springdoc:springdoc-openapi-starter-webmvc-ui</excludeDependency>
+
+                    <!-- Lombok -->
+                    <excludeDependency>org.projectlombok:lombok</excludeDependency>
+
+                    <!-- MapStruct -->
+                    <excludeDependency>org.mapstruct:mapstruct*</excludeDependency>
+
+                    <!-- JJWT -->
+                    <excludeDependency>io.jsonwebtoken:jjwt*</excludeDependency>
+
+                    <!-- Hibernate & JPA -->
+                    <excludeDependency>org.hibernate.orm:hibernate-core</excludeDependency>
+                    <excludeDependency>jakarta.persistence:jakarta.persistence-api</excludeDependency>
+
+                    <!-- PostgreSQL -->
+                    <excludeDependency>org.postgresql:postgresql</excludeDependency>
+                    </excludeDependencies>
+                </configuration>
+                </plugin>
+
+              
+           
+
+
+
+
+        </plugins>
+    </build>
+
+</project>
+
+
+
+
+# servers:
+#   errors:
+#     include-message : always
+#     include-binding-errors: always
+# spring:
+#   datasource:
+#     url: jdbc:postgresql://localhost:5433/etatdavbd
+#     username: postgres
+#     password: S@ad123
+# jpa:
+#   hibernate:
+#     ddl-auto: create-drop
+#   properties:
+#     properties:
+#       hibernate:
+#         dialect: org.hibernate.dialect.PostgreSQLDialect
+#         format-sql: true
+#     show-sql: true
+spring.application.name=backend
+spring.datasource.url=jdbc:postgresql://localhost:5434/szschoolmanager
+spring.datasource.username=postgres
+spring.datasource.password=S@ad123
+spring.datasource.driver-class-name=org.postgresql.Driver
+spring.jpa.hibernate.ddl-auto=validate
+# spring.liquibase.change-log=classpath:db/changelog/db.changelog-master.yaml
+# spring.liquibase.enabled=true
+# spring.flyway.enabled=false
+# spring.flyway.baseline-on-migrate=true
+# spring.flyway.locations=classpath:db/migration
+spring.jpa.show-sql=true
+spring.jpa.properties.hibernate.format_sql=true
+logging.level.org.hibernate.SQL=DEBUG
+logging.level.org.hibernate.type.descriptor.sql=TRACE
+spring.jpa.properties.hibernate.default_batch_fetch_size=30
+# spring.datasource.driver-class-name=cdata.jdbc.json.JSONDriver
+spring.jpa.hibernate.naming.physical-strategy=org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
+server.port=8089
+logging.level.org.springframework.web=DEBUG
+logging.level.org.hibernate=DEBUG
+logging.level.org.springframework.security=DEBUG
+spring.datasource.hikari.maximum-pool-size=15
+spring.datasource.hikari.connection-timeout=30000
+spring.datasource.hikari.idle-timeout=600000
+spring.datasource.hikari.max-lifetime=1800000
+
+spring.jpa.open-in-view=false
+spring.jpa.properties.hibernate.locale_resolver=default
+
+
+springdoc.api-docs.enabled=true
+springdoc.swagger-ui.enabled=true
+springdoc.swagger-ui.path=/swagger-ui.html
+springdoc.api-docs.path=/v3/api-docs
+springdoc.packages-to-scan=com.szschoolmanager
+springdoc.swagger-ui.persist-authorization=true
+springdoc.swagger-ui.display-request-duration=true
+
+
+
+# backend renvoie souvent des JSON (DTO paginés, etc.).
+server.compression.enabled=true
+server.compression.mime-types=application/json
+server.compression.min-response-size=1024
+# JWT Configuration
+app.jwt.secret=change_this_secret_to_a_long_random_string_please_—_store_in_env
+app.jwt.expiration-ms=86400000
+# app.jwt.secret=maCleSecreteTrèsSecurisée123
+# app.jwt.expiration-ms=86400000   # 1 jour en millisecondes
+
+
+# ===== JWT CONFIG =====
+jwt.algorithm=RS256
+# jwt.issuer=myschool
+jwt.access-token.exp-minutes=20
+
+# Ces deux lignes seront remplacées par des variables d’environnement en production
+# jwt.private-key-path=classpath:keys/private_key.pem
+# jwt.public-key-path=classpath:keys/public_key.pem
+
+
+# JWT 
+app.dev=true
+
+
+
+jwt.private-key-path=classpath:keys/private_key.pem
+jwt.public-key-path=classpath:keys/public_key.pem
+jwt.kid=rsa-key-1
+jwt.issuer=https://myschoolmanager.ma/api
+jwt.audience=myschoolmanager-frontend
+jwt.access-expiration-seconds=900
+jwt.refresh-expiration-days=7
+
+
+
+# Redis connection
+spring.data.redis.host=${REDIS_HOST:localhost}
+spring.data.redis.port=${REDIS_PORT:6379}
+spring.data.redis.timeout=2000
+spring.data.redis.lettuce.pool.max-active=8
+spring.data.redis.lettuce.pool.max-idle=8
+spring.data.redis.lettuce.pool.min-idle=1
+spring.data.redis.lettuce.pool.time-between-eviction-runs=60000
+
+# By default we fail-closed (recommended for prod). For local dev you can set to false.
+# app.redis.fail-closed=true
+# If you want to allow Redis outages during dev: (uncomment in dev)
+app.redis.fail-closed=false
+
+
+com.tngtech.archunit:archunit:1.0.1
+# spring.jmx.enabled=true
+# spring.jmx.server=mbeanServer
+# spring.devtools.livereload.enabled=true
+# spring.devtools.restart.enabled=true
+#restart.exclude.myheavy=static/**
+#restart.exclude.lib=public/lib/**
+#restart.exclude.somepackage=com/example/heavy/**
+
+# Actuator health endpoints (monitoring)
+management.endpoints.web.exposure.include=health,info,metrics,prometheus
+management.endpoint.health.show-details=always
+management.health.redis.enabled=true
+management.endpoints.web.base-path=/actuator
+management.prometheus.metrics.export.enabled=true
+
+
+
+spring.jpa.properties.hibernate.jdbc.batch_size=20
+spring.jpa.properties.hibernate.order_updates=true
+spring.jpa.properties.hibernate.order_inserts=true
+logging.level.org.hibernate.type.descriptor.sql.BasicBinder=TRACE
+
+
+# Cors
+
+app.cors.allowed-origins=http://localhost:5173,https://schoolmanager.ma
+
+
+# ✅ Active la prise en compte sécurisée des headers proxy
+server.forward-headers-strategy=framework
+
+
+
+### END FILE
+

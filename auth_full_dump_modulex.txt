@@ -1,0 +1,616 @@
+
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\modulex\Modulex.java
+
+package com.szschoolmanager.modulex;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.szschoolmanager.Model.Employe;
+import com.szschoolmanager.Model.Filiere;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EntityListeners;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
+import jakarta.persistence.Table;
+import jakarta.persistence.Version;
+import java.time.LocalDateTime;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.ToString;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+
+@Entity
+@Table(name = "modulex")
+@EntityListeners(AuditingEntityListener.class)
+@Getter
+@Setter
+// @Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class Modulex {
+
+  @Id
+  @GeneratedValue(strategy = GenerationType.IDENTITY)
+  private Long id;
+
+  @Version private Integer version;
+
+  @Column(name = "codemodule", unique = true, nullable = false)
+  private String codeModule;
+
+  @Column(name = "nommodule", nullable = false)
+  private String nomModule;
+
+  @Column(name = "description", columnDefinition = "TEXT")
+  private String description;
+
+  @Column(name = "nombreheures")
+  private Float nombreHeures;
+
+  @Column(name = "coefficient")
+  private Float coefficient;
+
+  @Column(name = "departementdattache")
+  private String departementDattache;
+
+  @Column(name = "semestre")
+  private Integer semestre;
+
+  @Column(name = "optionmodule")
+  private String optionModule;
+
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "coordinateur", referencedColumnName = "cin", nullable = false)
+  @JsonIgnore
+  @EqualsAndHashCode.Exclude
+  @ToString.Exclude
+  private Employe coordinateur;
+
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "codefiliere", referencedColumnName = "codefiliere", nullable = false)
+  @JsonIgnore
+  @EqualsAndHashCode.Exclude
+  @ToString.Exclude
+  private Filiere filiere;
+
+  @CreatedDate
+  @Column(name = "created_at", nullable = false, updatable = false)
+  private LocalDateTime createdAt;
+
+  @LastModifiedDate
+  @Column(name = "updated_at")
+  private LocalDateTime updatedAt;
+
+  @PrePersist
+  @PreUpdate
+  private void normalizeData() {
+    if (codeModule != null) codeModule = codeModule.trim();
+    if (departementDattache != null) departementDattache = departementDattache.trim();
+  }
+}
+
+
+### END FILE
+
+
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\modulex\ModulexController.java
+
+package com.szschoolmanager.modulex;
+
+import com.szschoolmanager.Service.EmployeService;
+import com.szschoolmanager.Service.FiliereService;
+import com.szschoolmanager.exception.ResponseDTO;
+import com.szschoolmanager.projection.EmployeProjection;
+import com.szschoolmanager.projection.FiliereProjection;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
+import java.util.List;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.ui.Model;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.ModelAndView;
+
+@CrossOrigin(origins = "*")
+@RestController
+@RequestMapping("/api/v1/modulex") // ✅ Versioning + ressource
+@RequiredArgsConstructor
+@Slf4j
+@Validated
+@Tag(name = "Modules", description = "Gestion des modules académiques")
+public class ModulexController {
+
+  private final ModulexService modulexService;
+  private final FiliereService filiereService;
+  private final EmployeService employeService;
+
+  // ===============================
+  // PAGE VIEW
+  // ===============================
+  @GetMapping
+  public ModelAndView modulex(Model model) {
+    return new ModelAndView("fragments/DIRECTION/modulex :: content");
+  }
+
+  // ===============================
+  // GET MODULES PAGINATED
+  // ===============================
+  @GetMapping("/list")
+  @ResponseBody
+  @Operation(summary = "Lister les modules", description = "Retourne une page de modules filtrée")
+  public ResponseEntity<ResponseDTO<Page<ModulexDTO>>> getModules(
+      @RequestParam(required = false) String filiereCode,
+      @RequestParam(required = false) String coordinateurCin,
+      @RequestParam(required = false) String departement,
+      @RequestParam(defaultValue = "0") int page,
+      @RequestParam(defaultValue = "20") int size) {
+    Page<ModulexDTO> result =
+        modulexService.getModulesPage(filiereCode, coordinateurCin, departement, page, size);
+    return ResponseEntity.ok(ResponseDTO.success("Page de modules chargée avec succès", result));
+  }
+
+  // ===============================
+  // CREATE MODULE
+  // ===============================
+  @PostMapping
+  @ResponseBody
+  @PreAuthorize("hasRole('DIRECTION')")
+  @Operation(
+      summary = "Créer un module",
+      description = "Ajoute un nouveau module avec validation complète")
+  public ResponseEntity<ResponseDTO<ModulexDTO>> createModule(@Valid @RequestBody ModulexDTO dto) {
+    log.info("Creating new module: {}", dto.getCodeModule());
+    ModulexDTO created = modulexService.createModule(dto);
+    return ResponseEntity.status(HttpStatus.CREATED)
+        .body(ResponseDTO.success("Module créé avec succès", created));
+  }
+
+  // ===============================
+  // UPDATE MODULE
+  // ===============================
+  @PutMapping("/{id}")
+  @ResponseBody
+  @PreAuthorize("hasRole('DIRECTION')")
+  @Operation(summary = "Modifier un module", description = "Met à jour un module existant")
+  public ResponseEntity<ResponseDTO<ModulexDTO>> updateModule(
+      @PathVariable @NotNull Long id, @Valid @RequestBody ModulexDTO dto) {
+    log.info("Updating module with id: {}", id);
+    ModulexDTO updated = modulexService.updateModule(id, dto);
+    return ResponseEntity.ok(ResponseDTO.success("Module mis à jour avec succès", updated));
+  }
+
+  // ===============================
+  // DELETE MODULE
+  // ===============================
+  @DeleteMapping("/{id}")
+  @ResponseBody
+  @PreAuthorize("hasRole('DIRECTION')")
+  @Operation(summary = "Supprimer un module", description = "Supprime un module existant")
+  public ResponseEntity<ResponseDTO<Void>> deleteModule(@PathVariable @Valid @NotNull Long id) {
+    log.info("Deleting module with id: {}", id);
+    modulexService.deleteModule(id);
+    return ResponseEntity.ok(ResponseDTO.success("Module supprimé avec succès", null));
+  }
+
+  // ===============================
+  // SELECT OPTIONS FOR FILTERING
+  // ===============================
+  @GetMapping("/filieres")
+  @ResponseBody
+  @Operation(summary = "Liste des filières")
+  public ResponseEntity<List<FiliereProjection>> getFilieres() {
+    return ResponseEntity.ok(filiereService.getFilieresProjection());
+  }
+
+  @GetMapping("/employes")
+  @ResponseBody
+  @Operation(summary = "Liste des coordinateurs")
+  public ResponseEntity<List<EmployeProjection>> getEmployes() {
+    return ResponseEntity.ok(employeService.getEmployesProjection());
+  }
+
+  @GetMapping("/departements")
+  @ResponseBody
+  @Operation(summary = "Liste des départements")
+  public ResponseEntity<List<String>> getDepartements() {
+    return ResponseEntity.ok(modulexService.getDistinctDepartements());
+  }
+}
+
+
+### END FILE
+
+
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\modulex\ModulexDTO.java
+
+package com.szschoolmanager.modulex;
+
+import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class ModulexDTO {
+
+  private Long id;
+
+  @Schema(description = "Code unique du module")
+  @NotBlank(message = "Le code du module est obligatoire")
+  @Pattern(
+      regexp = "^[a-zA-Z0-9_-]+$",
+      message = "Code Module ne doit contenir que lettres, chiffres, - ou _")
+  private String codeModule;
+
+  @Schema(description = "Nom du module")
+  @NotBlank(message = "Le nom du module est obligatoire")
+  private String nomModule;
+
+  private String description;
+
+  @Schema(description = "Nombre heures du module")
+  @NotNull(message = "Le nombre d'heures est obligatoire")
+  private Float nombreHeures;
+
+  @Schema(description = "Score du module")
+  @NotNull(message = "Le 'Score' est obligatoire")
+  private Float coefficient;
+
+  @Schema(description = "Departement d'attache")
+  @NotBlank(message = "Ajouter un Departement d'attache!")
+  @Pattern(
+      regexp = "^[a-zA-Z0-9_-]+$",
+      message = "Departement d'attache ne doit contenir que lettres, chiffres, - ou _")
+  private String departementDattache;
+
+  @Schema(description = "Coordinateur du module")
+  @NotBlank(message = "Selectionner un Coordinateur!")
+  private String coordinateurCin;
+
+  private String coordinateurNomPrenom;
+
+  @Schema(description = "Semestre du module")
+  @NotNull(message = "Le Semestre est obligatoire!")
+  private Integer semestre;
+
+  private String optionModule;
+
+  @Schema(description = "Filiere du module")
+  @NotBlank(message = "Selectionner une filière!")
+  private String codeFiliere;
+
+  private String nomFiliere;
+
+  // private LocalDateTime createdAt;
+  // private LocalDateTime updatedAt;
+  // private Integer version;
+}
+
+
+### END FILE
+
+
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\modulex\ModulexMapper.java
+
+package com.szschoolmanager.modulex;
+
+import com.szschoolmanager.Model.Employe;
+import java.util.List;
+import org.mapstruct.BeanMapping;
+import org.mapstruct.IterableMapping;
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
+import org.mapstruct.MappingTarget;
+import org.mapstruct.Named;
+import org.mapstruct.NullValuePropertyMappingStrategy;
+import org.mapstruct.ReportingPolicy;
+
+@Mapper(
+    componentModel = "spring",
+    nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE,
+    unmappedTargetPolicy = ReportingPolicy.IGNORE)
+public interface ModulexMapper {
+
+  // === Mapping Modulex → DTO pour l'affichage ===
+  @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
+  @Mapping(source = "filiere.codeFiliere", target = "codeFiliere")
+  @Mapping(source = "filiere.nomFiliere", target = "nomFiliere")
+  @Mapping(source = "coordinateur.cin", target = "coordinateurCin")
+  @Mapping(
+      source = "coordinateur",
+      target = "coordinateurNomPrenom",
+      qualifiedByName = "formatCoordinateurFullName")
+  @Named("toDto")
+  ModulexDTO toDto(Modulex modulex);
+
+  @Named("formatCoordinateurFullName")
+  default String formatCoordinateurFullName(Employe coord) {
+    return (coord != null) ? coord.getNom() + " " + coord.getPrenom() : null;
+  }
+
+  // méthode utilitaire inverse
+  @IterableMapping(qualifiedByName = "toDto")
+  List<ModulexDTO> toDtoList(List<Modulex> modules);
+
+  // === Mapping DTO → Modulex pour création ===
+  @Mapping(target = "filiere", ignore = true)
+  @Mapping(target = "coordinateur", ignore = true)
+  @Mapping(target = "createdAt", ignore = true)
+  @Mapping(target = "updatedAt", ignore = true)
+  @Mapping(target = "version", ignore = true)
+  Modulex toEntity(ModulexDTO dto);
+
+  // === Mise à jour partielle d'une entité existante ===
+  @Mapping(target = "filiere", ignore = true)
+  @Mapping(target = "coordinateur", ignore = true)
+  @Mapping(target = "createdAt", ignore = true)
+  @Mapping(target = "updatedAt", ignore = true)
+  @Mapping(target = "version", ignore = true)
+  void updateEntityFromDto(ModulexDTO dto, @MappingTarget Modulex ent);
+}
+
+
+### END FILE
+
+
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\modulex\ModulexProjection.java
+
+package com.szschoolmanager.modulex;
+// package com.szschoolmanager.Projection;
+
+// public interface ModulexProjection {
+
+//     // Infos du module
+//     Long getId();
+//     String getCodeModule();
+//     String getNomModule();
+//     String getDescription();
+//     Integer getNombreHeures();
+//     Float getCoefficient();
+//     String getOptionModule();
+//     String getDepartementDattache();
+//     Integer getSemestre();
+
+//     // ⭐ Infos du coordonateur (depuis la relation)
+//     String getCoordonateurCin();
+//     String getCoordonateurNom();
+//     String getCoordonateurPrenom();
+
+//     // ⭐ Méthode calculée pour le nom complet
+//     default String getCoordonateurNomComplet() {
+//         if (getCoordonateurNom() == null || getCoordonateurPrenom() == null) {
+//             return "Non assigné";
+//         }
+//         return getCoordonateurNom() + " " + getCoordonateurPrenom();
+//     }
+
+//     // ⭐ Infos de la filière (depuis la relation)
+//     String getCodeFiliere();
+//     String getNomFiliere();
+// }
+
+
+### END FILE
+
+
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\modulex\ModulexRepository.java
+
+package com.szschoolmanager.modulex;
+
+import java.util.List;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
+@Repository
+public interface ModulexRepository extends JpaRepository<Modulex, Long> {
+  @Query(
+      value =
+          """
+                SELECT new com.szschoolmanager.modulex.ModulexDTO(
+                    m.id,
+                    m.codeModule,
+                    m.nomModule,
+                    m.description,
+                    m.nombreHeures,
+                    m.coefficient,
+                    m.departementDattache,
+                    c.cin,
+                    CONCAT(c.nom, ' ', c.prenom),
+                    m.semestre,
+                    m.optionModule,
+                    f.codeFiliere,
+                    f.nomFiliere
+                )
+                FROM Modulex m
+                LEFT JOIN m.filiere f
+                LEFT JOIN m.coordinateur c
+                WHERE (:filiereCode IS NULL OR :filiereCode = '' OR f.codeFiliere = :filiereCode)
+                AND (:coordinateurCin IS NULL OR :coordinateurCin = '' OR c.cin = :coordinateurCin)
+                AND (:departement IS NULL OR :departement = '' OR m.departementDattache = :departement)
+            """,
+      countQuery =
+          """
+                SELECT count(m.id)
+                FROM Modulex m
+                LEFT JOIN m.filiere f
+                LEFT JOIN m.coordinateur c
+                WHERE (:filiereCode IS NULL OR :filiereCode = '' OR f.codeFiliere = :filiereCode)
+                AND (:coordinateurCin IS NULL OR :coordinateurCin = '' OR c.cin = :coordinateurCin)
+                AND (:departement IS NULL OR :departement = '' OR m.departementDattache = :departement)
+            """)
+  Page<ModulexDTO> findFiltered(
+      @Param("filiereCode") String filiereCode,
+      @Param("coordinateurCin") String coordinateurCin,
+      @Param("departement") String departement,
+      Pageable pageable);
+
+  // Charger juste les noms des departement
+  @Query(
+      "SELECT DISTINCT m.departementDattache FROM Modulex m WHERE m.departementDattache IS NOT NULL")
+  List<String> findDistinctDepartements();
+
+  // Verifier si module existe
+  boolean existsByCodeModule(String codeModule);
+}
+
+
+### END FILE
+
+
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\modulex\ModulexService.java
+
+package com.szschoolmanager.modulex;
+
+import com.szschoolmanager.Model.Employe;
+import com.szschoolmanager.Model.Filiere;
+import com.szschoolmanager.Service.EmployeService;
+import com.szschoolmanager.Service.FiliereService;
+import com.szschoolmanager.exception.DuplicateResourceException;
+import com.szschoolmanager.exception.ResourceNotFoundException;
+import java.util.List;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.*;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+@RequiredArgsConstructor
+@Transactional
+public class ModulexService {
+
+  private static final String ENTITY_NAME = "Module";
+
+  private final ModulexRepository modulexRepository;
+  private final ModulexMapper modulexMapper;
+  private final EmployeService employeService;
+  private final FiliereService filiereService;
+
+  // ======================================
+  // GET PAGINATED MODULES
+  // ======================================
+  @Transactional(readOnly = true)
+  public Page<ModulexDTO> getModulesPage(
+      String filiereCode, String coordinateurCin, String departement, int page, int size) {
+    Pageable pageable =
+        PageRequest.of(
+            page,
+            size,
+            Sort.by("filiere.codeFiliere").ascending().and(Sort.by("codeModule").ascending()));
+
+    Page<ModulexDTO> result =
+        modulexRepository.findFiltered(filiereCode, coordinateurCin, departement, pageable);
+
+    return result;
+  }
+
+  // ======================================
+  // CREATE MODULE
+  // ======================================
+  public ModulexDTO createModule(ModulexDTO dto) {
+    // Vérifier l’unicité du code
+    if (modulexRepository.existsByCodeModule(dto.getCodeModule())) {
+      throw new DuplicateResourceException(
+          "Module avec code " + dto.getCodeModule() + " existe déjà!");
+    }
+    // Mapper DTO → Entity
+    Modulex module = modulexMapper.toEntity(dto);
+    // Gerrer Filiere et coordinteur
+    setModuleRelationships(module, dto);
+
+    // Sauvegarder en base
+    Modulex saved = modulexRepository.save(module);
+    // Mapper Entity → DTO
+    return modulexMapper.toDto(saved);
+  }
+
+  // ======================================
+  // UPDATE MODULE
+  // ======================================
+  public ModulexDTO updateModule(Long id, ModulexDTO dto) {
+    // 1. Récupérer le module existant
+    Modulex ent =
+        modulexRepository
+            .findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException("Module non trouvé avec id : " + id));
+    // 2. Mettre à jour les champs simples via MapStruct
+    modulexMapper.updateEntityFromDto(dto, ent);
+
+    setModuleRelationships(ent, dto);
+    // 5. Sauvegarder et renvoyer
+    Modulex saved = modulexRepository.save(ent);
+    return modulexMapper.toDto(saved);
+  }
+
+  // ======================================
+  // DELETE MODULE
+  // ======================================
+  public void deleteModule(Long id) {
+    if (!modulexRepository.existsById(id)) {
+      throw new ResourceNotFoundException(ENTITY_NAME + " non trouvé avec id: " + id);
+    }
+    modulexRepository.deleteById(id);
+  }
+
+  // ======================================
+  // DISTINCT DEPARTEMENTS
+  // ======================================
+  @Transactional(readOnly = true)
+  public List<String> getDistinctDepartements() {
+    return modulexRepository.findDistinctDepartements();
+  }
+
+  // ======================================
+  // PRIVATE: SET FILIERE & COORDINATEUR
+  // ======================================
+  private void setModuleRelationships(Modulex module, ModulexDTO dto) {
+    // Filiere
+    // Charger seulement si différente
+    if (module.getFiliere() == null
+        || !dto.getCodeFiliere().equals(module.getFiliere().getCodeFiliere())) {
+      Filiere filiere = filiereService.getByCodeFiliere(dto.getCodeFiliere());
+      module.setFiliere(filiere);
+    }
+
+    // === Gestion du Coordinateur ===
+    // verificatin null sur dto
+    // Charger seulement si différent
+    if (module.getCoordinateur() == null
+        || !dto.getCoordinateurCin().equals(module.getCoordinateur().getCin())) {
+      Employe coord = employeService.getEmployeByCin(dto.getCoordinateurCin());
+      module.setCoordinateur(coord);
+    }
+  }
+}
+
+
+### END FILE
+

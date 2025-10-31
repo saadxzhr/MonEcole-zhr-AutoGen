@@ -1,10 +1,12 @@
 package com.szschoolmanager.auth.service;
 
 import com.szschoolmanager.auth.dto.TokensDTO;
+import com.szschoolmanager.auth.model.RefreshToken;
 import com.szschoolmanager.auth.model.Utilisateur;
 import io.jsonwebtoken.*;
-import io.jsonwebtoken.security.SignatureException;
 import jakarta.annotation.PostConstruct;
+import jakarta.servlet.http.HttpServletRequest;
+import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -18,18 +20,21 @@ import java.security.interfaces.RSAPublicKey;
 import java.security.spec.*;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.util.*;
+
+
 
 @Slf4j
 @Service
 public class JwtService {
 
+  // --- Configuration JWT ---
   @Value("${jwt.private-key-path}")
   private String privateKeyPath;
 
   @Value("${jwt.public-key-path}")
   private String publicKeyPath;
-
 
   @Value("${jwt.issuer}")
   private String issuer;
@@ -44,47 +49,49 @@ public class JwtService {
   @Value("${jwt.kid}")
   private String configuredKid;
 
+  // --- Runtime state ---
   private PrivateKey privateKey;
   @Getter private RSAPublicKey publicKey;
 
+  // --- Dependencies ---
   private final StringRedisTemplate stringRedisTemplate;
+  private final RefreshTokenService refreshTokenService;
 
-  public JwtService(StringRedisTemplate stringRedisTemplate) {
-    this.stringRedisTemplate = stringRedisTemplate;
+  public JwtService(StringRedisTemplate stringRedisTemplate,
+                    RefreshTokenService refreshTokenService) {
+      this.stringRedisTemplate = stringRedisTemplate;
+      this.refreshTokenService = refreshTokenService;
   }
 
+  // --- Initialization ---
   @PostConstruct
   public void init() {
     try {
       this.privateKey = loadPrivateKey(privateKeyPath);
       this.publicKey = (RSAPublicKey) loadPublicKey(publicKeyPath);
-      if (privateKey == null || publicKey == null) {
+      if (privateKey == null || publicKey == null)
         throw new IllegalStateException("RSA keys not loaded correctly");
-      }
-      log.info("🔐 JWT Service initialized with kid={} issuer={} audience={}", configuredKid, issuer, audience);
+      log.info("🔐 JWT initialized kid={} issuer={} audience={}", configuredKid, issuer, audience);
     } catch (Exception e) {
       log.error("Failed to init JwtService: {}", e.getMessage(), e);
       throw new IllegalStateException(e);
     }
   }
 
+  // --- Key loaders ---
   private PrivateKey loadPrivateKey(String path) throws Exception {
     try (InputStream is = getClass().getClassLoader().getResourceAsStream(path.replace("classpath:", ""))) {
       if (is == null) throw new FileNotFoundException("Private key not found at " + path);
-      byte[] bytes = is.readAllBytes();
-      byte[] normalized = normalizeKey(bytes, true);
-      PKCS8EncodedKeySpec spec = new PKCS8EncodedKeySpec(normalized);
-      return KeyFactory.getInstance("RSA").generatePrivate(spec);
+      byte[] normalized = normalizeKey(is.readAllBytes(), true);
+      return KeyFactory.getInstance("RSA").generatePrivate(new PKCS8EncodedKeySpec(normalized));
     }
   }
 
   private PublicKey loadPublicKey(String path) throws Exception {
     try (InputStream is = getClass().getClassLoader().getResourceAsStream(path.replace("classpath:", ""))) {
       if (is == null) throw new FileNotFoundException("Public key not found at " + path);
-      byte[] bytes = is.readAllBytes();
-      byte[] normalized = normalizeKey(bytes, false);
-      X509EncodedKeySpec spec = new X509EncodedKeySpec(normalized);
-      return KeyFactory.getInstance("RSA").generatePublic(spec);
+      byte[] normalized = normalizeKey(is.readAllBytes(), false);
+      return KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(normalized));
     }
   }
 
@@ -99,6 +106,7 @@ public class JwtService {
     return input;
   }
 
+  // --- JWT Generation ---
   public String generateAccessToken(Utilisateur user) {
     Instant now = Instant.now();
     String jti = UUID.randomUUID().toString();
@@ -110,45 +118,72 @@ public class JwtService {
         .setSubject(user.getUsername())
         .setId(jti)
         .claim("role", user.getRole())
-        .claim("cin", user.getCin())
-        .claim("authorities", List.of("ROLE_" + user.getRole().toUpperCase())) 
+        .claim("authorities", List.of("ROLE_" + user.getRole().toUpperCase()))
         .setIssuedAt(Date.from(now))
+        .setNotBefore(Date.from(now))
         .setExpiration(Date.from(now.plusSeconds(accessExpirationSeconds)))
         .signWith(privateKey, SignatureAlgorithm.RS256)
         .compact();
   }
 
   /**
-   * Parse token using currently loaded public key. Caller must handle exceptions.
-   * If you later add multi-key rotation, implement SigningKeyResolver here to pick key by kid.
+   * Génère un couple (access + refresh) complet et prêt à production.
    */
-  public Jws<Claims> parseToken(String token) {
-    JwtParser parser = Jwts.parserBuilder()
-        .setSigningKey(publicKey)
-        .build();
-    Jws<Claims> jws = parser.parseClaimsJws(token);
+  public TokensDTO generateTokens(Utilisateur user, HttpServletRequest request) {
+      String accessToken = generateAccessToken(user);
+      String clientIp = extractClientIp(request);
+      String userAgent = (request != null && request.getHeader("User-Agent") != null)
+              ? request.getHeader("User-Agent") : "unknown-client";
 
+      RefreshToken refreshEntity = refreshTokenService.createRefreshToken(user, userAgent, clientIp);
+      String rawRefresh = refreshEntity.getToken();
+
+      log.info("🔐 Tokens générés pour [{}] depuis IP [{}], agent [{}]",
+              user.getUsername(), clientIp, userAgent);
+
+      long refreshExpiresIn = refreshEntity.getExpiresAt() != null
+          ? Duration.between(
+                Instant.now(),
+                refreshEntity.getExpiresAt().atZone(ZoneId.systemDefault()).toInstant()
+            ).getSeconds()
+          : Duration.ofDays(30).getSeconds();
+
+
+      return new TokensDTO(accessToken, rawRefresh, accessExpirationSeconds, refreshExpiresIn);
+  }
+
+  public TokensDTO generateTokens(Utilisateur user) {
+      return generateTokens(user, null);
+  }
+
+  // --- Helpers ---
+  private String extractClientIp(HttpServletRequest request) {
+      try {
+          if (request == null) return "unknown";
+          String xfHeader = request.getHeader("X-Forwarded-For");
+          if (xfHeader != null && !xfHeader.isBlank())
+              return xfHeader.split(",")[0].trim();
+          return request.getRemoteAddr() != null ? request.getRemoteAddr() : "unknown";
+      } catch (Exception e) {
+          log.warn("Failed to extract IP: {}", e.getMessage());
+          return "unknown";
+      }
+  }
+
+  // --- JWT parsing ---
+  public Jws<Claims> parseToken(String token) {
+    JwtParser parser = Jwts.parserBuilder().setSigningKey(publicKey).build();
+    Jws<Claims> jws = parser.parseClaimsJws(token);
     Claims c = jws.getBody();
     if (!issuer.equals(c.getIssuer())) throw new JwtException("Invalid issuer");
     if (c.getAudience() == null || !c.getAudience().contains(audience)) throw new JwtException("Invalid audience");
     return jws;
   }
 
-  public String getUsernameFromToken(String token) {
-    return parseToken(token).getBody().getSubject();
-  }
-
-  public String getRoleFromToken(String token) {
-    return parseToken(token).getBody().get("role", String.class);
-  }
-
-  public String getCinFromToken(String token) {
-    return parseToken(token).getBody().get("cin", String.class);
-  }
-
-  public String getJti(String token) {
-    return parseToken(token).getBody().getId();
-  }
+  public String getUsernameFromToken(String token) { return parseToken(token).getBody().getSubject(); }
+  public String getRoleFromToken(String token) { return parseToken(token).getBody().get("role", String.class); }
+  // public String getCinFromToken(String token) { return parseToken(token).getBody().get("cin", String.class); }
+  public String getJti(String token) { return parseToken(token).getBody().getId(); }
 
   public boolean isTokenValid(String token, String username) {
     try {
@@ -156,46 +191,17 @@ public class JwtService {
       return claims.getSubject().equals(username)
           && claims.getExpiration().after(new Date());
     } catch (JwtException | IllegalArgumentException e) {
-      log.warn("Invalid JWT token: {}", e.getMessage());
+      log.warn("Invalid JWT: {}", e.getMessage());
       return false;
     }
   }
 
-  /**
-   * Blacklist an access token jti in Redis atomically with TTL.
-   */
-  public void blacklistAccessTokenJti(String jti, java.time.Duration ttl) {
+  public void blacklistAccessTokenJti(String jti, Duration ttl) {
     try {
-      if (ttl.isNegative() || ttl.isZero()) return;
+      if (ttl == null || ttl.isZero() || ttl.isNegative()) return;
       stringRedisTemplate.opsForValue().set("blacklist:access:" + jti, "revoked", ttl);
     } catch (Exception e) {
       log.warn("Failed to write blacklist jti={} into redis: {}", jti, e.getMessage());
     }
   }
-
-
-  /**
- * Génère un couple (access + refresh) et les retourne dans un DTO.
- * Le refresh token est stocké en Redis avec TTL pour invalidation future.
- */
-  public TokensDTO generateTokens(Utilisateur user) {
-      String accessToken = generateAccessToken(user);
-
-      // Génération d’un refresh token simple (JWT non signé ici, peut être un UUID)
-      String refreshToken = UUID.randomUUID().toString();
-      String redisKey = "refresh:" + user.getUsername() + ":" + refreshToken;
-
-      try {
-          // Durée de vie du refresh = 30 jours
-          Duration refreshTtl = Duration.ofDays(30);
-          stringRedisTemplate.opsForValue().set(redisKey, "valid", refreshTtl);
-          log.info("🧩 Refresh token stocké dans Redis pour {} (TTL {} jours)", user.getUsername(), 30);
-      } catch (Exception e) {
-          log.error("⚠️ Échec d’écriture du refresh token dans Redis : {}", e.getMessage());
-      }
-
-      // Retourne les deux tokens dans un DTO standard
-      return new TokensDTO(accessToken, refreshToken, accessExpirationSeconds, 30 * 24 * 3600);
-  }
-
 }

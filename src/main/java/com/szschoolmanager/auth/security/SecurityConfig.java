@@ -4,7 +4,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
+import org.springframework.security.authorization.AuthorizationDecision;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -12,6 +14,8 @@ import org.springframework.security.config.annotation.web.configurers.AbstractHt
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.AuthenticationProvider;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
@@ -28,6 +32,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
   @RequiredArgsConstructor
   @Configuration
@@ -35,9 +40,9 @@ import java.util.Objects;
   @EnableMethodSecurity(prePostEnabled = true)
   public class SecurityConfig {
 
-    private final RateLimitFilter rateLimitFilter;
     private final UserDetailsService userDetailsService;
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final Environment environment;
 
     // 👉 Externalisation des origines CORS via application.properties
     // Exemple :
@@ -61,25 +66,42 @@ import java.util.Objects;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-      http.csrf(AbstractHttpConfigurer::disable)
-          .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-          .authorizeHttpRequests(auth -> auth
-              .requestMatchers(AUTH_WHITELIST).permitAll()
-              .requestMatchers(SWAGGER_WHITELIST).permitAll()
-              .requestMatchers(ACTUATOR_WHITELIST).permitAll()
-              .anyRequest().authenticated())
-          .exceptionHandling(ex -> ex.authenticationEntryPoint(restAuthenticationEntryPoint()))
-          .sessionManagement(sess -> sess.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-          .authenticationProvider(daoAuthenticationProvider(passwordEncoder()));;
+        return http
+            .csrf(AbstractHttpConfigurer::disable)
+            .cors(Customizer.withDefaults())
+            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .authorizeHttpRequests(auth -> auth
+                // Auth endpoints publics
+                .requestMatchers("/api/v1/auth/**").permitAll()
 
-      // Add rate limiter before auth filter
-      // RateLimitFilter → JwtAuthenticationFilter → UsernamePasswordAuthenticationFilter
-      http.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
-      http.addFilterBefore(rateLimitFilter, JwtAuthenticationFilter.class);
+                // Swagger : accessible uniquement en profil dev
+                .requestMatchers(
+                    "/swagger-ui/**",
+                    "/v3/api-docs/**",
+                    "/swagger-resources/**",
+                    "/webjars/**"
+                ).access((authentication, context) -> {
+                    boolean devProfileActive = Arrays.asList(environment.getActiveProfiles()).contains("dev");
+                    return new AuthorizationDecision(devProfileActive);
+                })
 
+                // Actuator
+                .requestMatchers("/actuator/health", "/actuator/info").permitAll()
+                .requestMatchers("/actuator/**").hasRole("ADMIN")
 
-      return http.build();
+                // Erreurs et fichiers statiques
+                .requestMatchers("/error", "/favicon.ico").permitAll()
+
+                // Tout le reste = JWT obligatoire
+                .anyRequest().authenticated()
+            )
+            .authenticationProvider(daoAuthenticationProvider(passwordEncoder()))// ✅ correspond à ton bean réel
+            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class) // ✅ nom réel de ton filtre
+            .build();
     }
+
+
+
 
     @Bean
     public UrlBasedCorsConfigurationSource corsConfigurationSource() {

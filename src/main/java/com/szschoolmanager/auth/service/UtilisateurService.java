@@ -23,6 +23,7 @@ public class UtilisateurService {
   private final UtilisateurRepository repo;
   private final UtilisateurMapper mapper;
   private final PasswordEncoder passwordEncoder;
+  private final DatabaseUserDetailsService userDetailsService;
 
   public PasswordEncoder passwordEncoder() {
     return passwordEncoder;
@@ -31,6 +32,7 @@ public class UtilisateurService {
   @Transactional
   public void save(Utilisateur utilisateur) {
     repo.save(utilisateur);
+    userDetailsService.invalidateUserCache(utilisateur.getUsername());
   }
 
   public UserDetails buildUserDetails(Utilisateur u) {
@@ -64,7 +66,7 @@ public class UtilisateurService {
 
     Utilisateur utilisateur = mapper.toEntity(dto);
     utilisateur.setPassword(passwordEncoder.encode(dto.getPassword()));
-
+  
     // Rôle dynamique (aucun enum)
     if (dto.getRole() == null || dto.getRole().isBlank()) {
       utilisateur.setRole("USER");
@@ -74,6 +76,7 @@ public class UtilisateurService {
 
     utilisateur.setForceChangePassword(true);
     repo.save(utilisateur);
+    userDetailsService.invalidateUserCache(utilisateur.getUsername());
     return ResponseEntity.ok(ResponseDTO.success("Utilisateur créé", mapper.toResponseDTO(utilisateur)));
   }
 
@@ -108,6 +111,7 @@ public class UtilisateurService {
     }
 
     repo.save(u);
+    userDetailsService.invalidateUserCache(u.getUsername());
     return ResponseEntity.ok(ResponseDTO.success("Utilisateur mis à jour avec succès", mapper.toResponseDTO(u)));
   }
 
@@ -127,6 +131,7 @@ public class UtilisateurService {
     u.setPassword(passwordEncoder.encode(dto.getNewPassword()));
     u.setForceChangePassword(false);
     repo.save(u);
+    userDetailsService.invalidateUserCache(u.getUsername());
     return ResponseEntity.ok(ResponseDTO.success("Mot de passe modifié", null));
   }
 

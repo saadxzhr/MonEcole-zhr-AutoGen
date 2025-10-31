@@ -17,6 +17,7 @@ import java.security.MessageDigest;
 import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -40,24 +41,28 @@ public class RefreshTokenService {
     // ----------------- CREATE -----------------
     @Transactional
     public RefreshToken createRefreshToken(Utilisateur user, String userAgent, String ipAddress) {
+        Objects.requireNonNull(user, "Utilisateur ne peut pas être nul");
+
         try {
-            // enforce max active sessions by revoking oldest if needed
-            List<RefreshToken> active = refreshTokenRepository.findAllByUtilisateurIdAndRevokedFalse(user.getId());
-            if (active.size() >= MAX_ACTIVE_SESSIONS) {
-                active.stream()
-                      .min(Comparator.comparing(RefreshToken::getCreatedAt))
-                      .ifPresent(oldest -> {
-                          oldest.setRevoked(true);
-                          refreshTokenRepository.saveAndFlush(oldest);
-                          log.info("Oldest refresh token revoked for user {}", user.getUsername());
-                      });
+            // 🔒 1. Lock active tokens to ensure atomic behavior
+            List<RefreshToken> activeTokens = refreshTokenRepository.findActiveTokensForUpdate(user);
+
+            // 🧹 2. Enforce max active sessions
+            if (activeTokens.size() >= MAX_ACTIVE_SESSIONS) {
+                int revokeCount = activeTokens.size() - MAX_ACTIVE_SESSIONS + 1;
+                activeTokens.stream()
+                        .sorted(Comparator.comparing(RefreshToken::getCreatedAt))
+                        .limit(revokeCount)
+                        .forEach(t -> t.setRevoked(true));
+                refreshTokenRepository.saveAllAndFlush(activeTokens);
+                log.info("Revoked {} old refresh tokens for user {}", revokeCount, user.getUsername());
             }
 
-            // generate raw + hashed
+            // 🔑 3. Generate secure token (raw + hashed)
             String raw = generateRawToken();
             String hashed = hashToken(raw);
 
-            // persist hashed token
+            // 🧱 4. Build entity (hash only)
             RefreshToken entity = RefreshToken.builder()
                     .utilisateur(user)
                     .token(hashed)
@@ -70,13 +75,13 @@ public class RefreshTokenService {
                     .ipAddress(shorten(ipAddress))
                     .build();
 
-            RefreshToken saved = refreshTokenRepository.saveAndFlush(entity);
+            RefreshToken saved = refreshTokenRepository.save(entity); // one persist call only
 
-            // return detached object that contains raw token for frontend (NOT persisted)
+            // 🎁 5. Return detached copy with raw token for frontend
             return RefreshToken.builder()
                     .id(saved.getId())
                     .utilisateur(user)
-                    .token(raw)
+                    .token(raw) // raw never persisted
                     .createdAt(saved.getCreatedAt())
                     .expiresAt(saved.getExpiresAt())
                     .revoked(saved.isRevoked())
@@ -85,11 +90,17 @@ public class RefreshTokenService {
                     .ipAddress(saved.getIpAddress())
                     .jti(saved.getJti())
                     .build();
+
         } catch (Exception e) {
-            log.error("Error creating refresh token", e);
+            log.error("❌ Error creating refresh token for user {}: {}", 
+                    user != null ? user.getUsername() : "unknown", e.getMessage(), e);
             throw new BusinessValidationException("Erreur lors de la création du refresh token");
         }
     }
+
+    
+
+
 
     // ----------------- VALIDATE -----------------
     @Transactional(readOnly = true)
