@@ -34,6 +34,30 @@ public class UtilisateurService {
     userDetailsService.invalidateUserCache(utilisateur.getUsername());
   }
 
+
+    // Safe garde: encode password if not encoded
+  @Transactional
+  public boolean upgradePasswordIfNeeded(String username, String rawPassword) {
+    Optional<Utilisateur> opt = repo.findByUsernameForUpdate(username);
+    if (opt.isEmpty()) {
+      return false;
+    }
+    
+    Utilisateur u = opt.get();
+    boolean encoded = u.getPassword().startsWith("$2a$");
+    
+    if (!encoded) {
+      u.setPassword(passwordEncoder.encode(rawPassword));
+      repo.save(u);
+      userDetailsService.invalidateUserCache(username);
+      return true;
+    }
+    return false;
+  }
+  
+
+
+  
   public UserDetails buildUserDetails(Utilisateur u) {
     return org.springframework.security.core.userdetails.User.builder()
         .username(u.getUsername())

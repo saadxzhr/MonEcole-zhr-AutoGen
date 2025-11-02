@@ -1,6 +1,9 @@
 package com.szschoolmanager.auth.security;
 
 import com.szschoolmanager.auth.util.ErrorUtil;
+
+import jakarta.annotation.PostConstruct;
+
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
@@ -44,19 +47,19 @@ public class SecurityConfig {
   // app.cors.allowed-origins=http://localhost:5173,https://schoolmanager.ma
   @Value("${app.cors.allowed-origins:http://localhost:5173}")
   private String[] allowedOrigins;
+  
 
-  private static final String[] SWAGGER_WHITELIST = {
-    "/v3/api-docs/**",
-    "/swagger-ui/**",
-    "/swagger-ui.html",
-    "/swagger-resources/**",
-    "/webjars/**",
-    "/favicon.ico"
-  };
-
-  private static final String[] AUTH_WHITELIST = {"/api/v1/auth/**"};
-
-  private static final String[] ACTUATOR_WHITELIST = {"/actuator/**"};
+  @PostConstruct
+  void validateCorsConfig() {
+      List<String> activeProfiles = Arrays.asList(environment.getActiveProfiles());
+      if (activeProfiles.contains("prod")) {
+          for (String origin : allowedOrigins) {
+              if ("*".equals(origin) || origin.contains("*")) {
+                  throw new IllegalStateException("⚠️ Wildcard CORS not allowed in production!");
+              }
+          }
+      }
+  }
 
   @Bean
   public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {

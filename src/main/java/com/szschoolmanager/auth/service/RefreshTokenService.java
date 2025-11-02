@@ -22,10 +22,13 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.codec.binary.Hex;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.env.Environment;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.redis.core.StringRedisTemplate;
 
 /**
  * Complete RefreshTokenService (production-ready). - Stores hashed tokens in DB and returns raw
@@ -39,9 +42,22 @@ public class RefreshTokenService {
 
   private final RefreshTokenRepository refreshTokenRepository;
   private final UtilisateurRepository utilisateurRepository;
+  private final StringRedisTemplate redisTemplate;
+  private final Environment environment;
 
-  private static final int REFRESH_TOKEN_DAYS = 7;
-  private static final int MAX_ACTIVE_SESSIONS = 3;
+
+  
+
+  @Value("${jwt.refresh-days:7}") 
+  private int refreshTokenDays;
+
+  @Value("${app.security.max-active-sessions:3}") 
+  private int maxActiveSessions;
+
+  @Value("${jwt.expiry-grace-seconds:30}")
+  private int expiryGraceSeconds;
+
+
 
   // ----------------- CREATE -----------------
   @Transactional
@@ -60,8 +76,8 @@ public class RefreshTokenService {
       List<RefreshToken> activeTokens = refreshTokenRepository.findActiveTokensForUpdate(fullUser);
 
       // 🧹 2. Enforce max active sessions
-      if (activeTokens.size() >= MAX_ACTIVE_SESSIONS) {
-        int revokeCount = activeTokens.size() - MAX_ACTIVE_SESSIONS + 1;
+      if (activeTokens.size() >= maxActiveSessions) {
+        int revokeCount = activeTokens.size() - maxActiveSessions + 1;
         activeTokens.stream()
             .sorted(Comparator.comparing(RefreshToken::getCreatedAt))
             .limit(revokeCount)
@@ -81,7 +97,7 @@ public class RefreshTokenService {
               .token(hashed)
               .jti(UUID.randomUUID().toString())
               .createdAt(LocalDateTime.now())
-              .expiresAt(LocalDateTime.now().plusDays(REFRESH_TOKEN_DAYS))
+              .expiresAt(LocalDateTime.now().plusDays(refreshTokenDays))
               .revoked(false)
               .reused(false)
               .userAgent(userAgent)
@@ -122,13 +138,14 @@ public class RefreshTokenService {
     if (rawToken == null || rawToken.isBlank()) {
       throw new BusinessValidationException("Aucun refresh token fourni");
     }
+
     String hashed = hashToken(rawToken);
     RefreshToken rt =
         refreshTokenRepository
             .findLightByToken(hashed)
             .orElseThrow(() -> new BusinessValidationException("Token invalide"));
 
-    if (rt.isExpired()) throw new BusinessValidationException("Token expiré");
+    if (rt.isExpiredWithGrace(expiryGraceSeconds)) throw new BusinessValidationException("Token expiré (grace period dépassé)");
     if (rt.isRevoked()) throw new BusinessValidationException("Token révoqué");
     return rt;
   }
@@ -145,37 +162,65 @@ public class RefreshTokenService {
     if (presentedRaw == null || presentedRaw.isBlank()) {
       throw new BusinessValidationException("Aucun refresh token fourni");
     }
+     String hashed = hashToken(presentedRaw);
 
-    String hashed = hashToken(presentedRaw);
-    RefreshToken stored =
-        refreshTokenRepository
-            .findDetailedByToken(hashed)
-            .orElseThrow(() -> new BusinessValidationException("Token invalide"));
-    // This line forces Hibernate to initialize the lazy proxy before leaving the transaction
-    // boundary
-    stored.getUtilisateur().getUsername();
-
-    // normal rotation
-    if (!stored.isRevoked()) {
-      stored.setRevoked(true);
-      refreshTokenRepository.saveAndFlush(stored);
-      return createRefreshToken(stored.getUtilisateur(), userAgent, ipAddress, accessJti);
+    String lockKey = "rotate:lock:" + hashed;
+    Boolean acquired = redisTemplate.opsForValue().setIfAbsent(lockKey, "1", Duration.ofSeconds(5));
+    if (!Boolean.TRUE.equals(acquired)) {
+        throw new BusinessValidationException("Concurrent rotation detected");
     }
 
-    // reuse detected
-    if (!stored.isReused()) {
-      stored.setReused(true);
-      refreshTokenRepository.saveAndFlush(stored);
-    }
-    revokeAllActiveSessionsForUserCommitted(stored.getUtilisateur().getId());
+    try {
 
-    throw new BusinessValidationException("Refresh token reuse detected - all sessions revoked");
+       
+        RefreshToken stored =
+            refreshTokenRepository
+                .findDetailedByToken(hashed)
+                .orElseThrow(() -> new BusinessValidationException("Token invalide"));
+        // This line forces Hibernate to initialize the lazy proxy before leaving the transaction
+        // boundary
+        stored.getUtilisateur().getUsername();
+
+        // normal rotation
+        if (!stored.isRevoked()) {
+          stored.setRevoked(true);
+          refreshTokenRepository.saveAndFlush(stored);
+          return createRefreshToken(stored.getUtilisateur(), userAgent, ipAddress, accessJti);
+        }
+
+        // reuse detected
+        if (!stored.isReused()) {
+          stored.setReused(true);
+          refreshTokenRepository.saveAndFlush(stored);
+        }
+        revokeAllActiveSessionsForUserCommitted(stored.getUtilisateur().getId());
+
+        throw new BusinessValidationException("Refresh token reuse detected - all sessions revoked");
+
+      } finally {
+      try {
+          redisTemplate.delete(lockKey);
+      } catch (Exception ex) {
+          log.warn("Unable to delete rotate lock {}: {}", lockKey, ex.getMessage());
+      }
+    }
   }
+
+
+
+
+
 
   @Transactional
   public void saveAccessJtiLink(Long refreshId, String accessJti) {
     refreshTokenRepository.updateAccessJti(refreshId, accessJti);
   }
+
+
+
+
+
+
 
   // ----------------- REVOKE ONE -----------------
   @Transactional
@@ -203,8 +248,16 @@ public class RefreshTokenService {
    * Commits the bulk revocation in its own transaction so the revoke persists even if caller rolls
    * back. Uses the repository bulk query (revokeAllByUserId).
    */
+  @Async
   @Transactional(propagation = Propagation.REQUIRES_NEW)
   public int revokeAllActiveSessionsForUserCommitted(Long userId) {
+     // Ne lance en async que si profil prod
+    List<String> profiles = List.of(environment.getActiveProfiles());
+    if (!profiles.contains("prod")) {
+        log.debug("Async revocation skipped (non-prod profile)");
+        return refreshTokenRepository.revokeAllByUserId(userId);
+    }
+
     int count = refreshTokenRepository.revokeAllByUserId(userId);
     log.info("Committed revocation of {} refresh tokens for user id={}", count, userId);
     return count;
@@ -276,7 +329,7 @@ public class RefreshTokenService {
   }
 
   public long getRefreshExpirationSeconds() {
-    return Duration.ofDays(REFRESH_TOKEN_DAYS).getSeconds();
+    return Duration.ofDays(refreshTokenDays).getSeconds();
   }
 
   @Transactional(readOnly = true)

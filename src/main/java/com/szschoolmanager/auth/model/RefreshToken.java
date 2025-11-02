@@ -50,7 +50,14 @@ public class RefreshToken {
   @Column(nullable = false)
   private boolean reused = false;
 
-  public boolean isExpired() {
-    return LocalDateTime.now().isAfter(expiresAt);
+  // public boolean isExpired() {
+  //   return LocalDateTime.now().isAfter(expiresAt);
+  // }
+
+
+  public boolean isExpiredWithGrace(int graceSeconds) {
+      return LocalDateTime.now().isAfter(expiresAt.plusSeconds(graceSeconds));
   }
+
+
 }

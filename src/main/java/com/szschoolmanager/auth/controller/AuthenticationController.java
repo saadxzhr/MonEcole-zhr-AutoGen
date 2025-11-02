@@ -46,6 +46,18 @@ public class AuthenticationController {
   @Value("${jwt.refresh-days:7}")
   private int refreshDays;
 
+/*************  ✨ Windsurf Command ⭐  *************/
+/**
+ * Login endpoint.
+ * 
+ * @param dto AuthRequestDTO containing username and password
+ * @param request HttpServletRequest
+ * @param response HttpServletResponse
+ * @return ResponseEntity containing ResponseDTO with AuthResponseDTO as body, and HTTP status code 200 OK
+ * @throws BadCredentialsException if username or password are invalid
+ * @throws Exception if any other error occurs
+ */
+/*******  6652b453-87e0-423e-b4a2-2e8b2018f75f  *******/  
   @PostMapping("/login")
   @Transactional
   public ResponseEntity<ResponseDTO<AuthResponseDTO>> login(
@@ -69,9 +81,7 @@ public class AuthenticationController {
       if (!matches) throw new BadCredentialsException("Identifiants invalides");
 
       if (!encoded) {
-        utilisateur.setPassword(utilisateurService.passwordEncoder().encode(dto.getPassword()));
-        utilisateurService.save(utilisateur);
-        userDetailsService.invalidateUserCache(utilisateur.getUsername());
+        utilisateurService.upgradePasswordIfNeeded(dto.getUsername(), dto.getPassword());
       }
 
       // 3️⃣ Génération sécurisée des tokens via JwtService

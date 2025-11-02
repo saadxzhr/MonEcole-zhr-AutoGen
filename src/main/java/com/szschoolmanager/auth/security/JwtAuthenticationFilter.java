@@ -26,13 +26,16 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
+import org.slf4j.MDC;
+import java.util.UUID;
+
 
 /**
  * Filtre JWT : secure, minimal, sans fallback DB automatique. - Vérifie signature/expiration via
  * JwtService - Vérifie blacklist Redis (fail-closed configurable) - Reconstruit Authentication
  * depuis les claims "authorities"
  *
- * <p>IMPORTANT : Les rôles restent dynamiques côté génération du token.
+ * note : Les rôles restent dynamiques côté génération du token.
  */
 @Slf4j
 @Order(1)
@@ -58,97 +61,105 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
   private boolean failClosed;
 
   @Override
-  protected void doFilterInternal(
-      @NonNull HttpServletRequest request,
-      @NonNull HttpServletResponse response,
-      @NonNull FilterChain chain)
-      throws ServletException, IOException {
+  protected void doFilterInternal(@NonNull HttpServletRequest request,
+                                  @NonNull HttpServletResponse response,
+                                  @NonNull FilterChain chain)
+                                  throws ServletException, IOException {
 
-    String path = request.getRequestURI();
-
-    // 1) Whitelist rapide
-    if (WHITELIST.stream().anyMatch(path::startsWith)) {
-      chain.doFilter(request, response);
-      return;
-    }
-
-    // 2) Header Authorization
-    String authHeader = request.getHeader(HttpHeaders.AUTHORIZATION);
-    if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-      chain.doFilter(request, response);
-      return;
-    }
-
-    // 3) Extraction & validations basiques
-    String token = authHeader.substring(7).trim();
-    if (token.isEmpty()) {
-      meterRegistry.counter("jwt.auth.failure").increment();
-      meterRegistry.counter("jwt.auth.empty").increment();
-      log.warn("JWT token manquant — ip={}", request.getRemoteAddr());
-      ErrorUtil.writeJsonError(response, HttpStatus.BAD_REQUEST, "Missing token");
-      return;
-    }
-
-    if (token.length() > MAX_TOKEN_LENGTH) {
-      meterRegistry.counter("jwt.auth.failure").increment();
-      meterRegistry.counter("jwt.auth.oversized").increment();
-      log.warn("JWT trop long ({} octets) — ip={}", token.length(), request.getRemoteAddr());
-      ErrorUtil.writeJsonError(response, HttpStatus.BAD_REQUEST, "Token too large");
-      return;
-    }
-
-    // 4) Vérification cryptographique (signature / expiration)
-    Jws<Claims> jws;
     try {
-      jws = jwtService.parseToken(token);
-    } catch (Exception e) {
-      meterRegistry.counter("jwt.auth.failure").increment();
-      log.warn("JWT invalide/expiré : {}", e.getMessage());
-      ErrorUtil.writeJsonError(response, HttpStatus.UNAUTHORIZED, "Invalid or expired token");
-      return;
-    }
+        String correlationId = UUID.randomUUID().toString();
+        MDC.put("correlationId", correlationId);
+        response.setHeader("X-Correlation-ID", correlationId);
 
-    Claims claims = jws.getBody();
-    String username = claims.getSubject();
-    // vérifier la blacklist
-    String jti = claims.getId();
 
-    if (jti != null && jwtService.isAccessTokenBlacklisted(jti)) {
-      log.warn("Access token JTI {} is blacklisted", jti);
-      ErrorUtil.writeJsonError(response, HttpStatus.UNAUTHORIZED, "Access token revoked");
-      return;
-    }
+        String path = request.getRequestURI();
 
-    // 6) Reconstruction du SecurityContext **depuis le JWT uniquement**
-    if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-      try {
-        List<GrantedAuthority> authorities = extractAuthorities(claims);
-
-        if (authorities.isEmpty()) {
-          // Avertissement — cela signifie que le token a été généré sans authorities
-          meterRegistry.counter("jwt.auth.db.fallback").increment();
-          log.warn("Aucun rôle dans le JWT pour user={} — vérifier génération du token", username);
+        // 1) Whitelist rapide
+        if (WHITELIST.stream().anyMatch(path::startsWith)) {
+          chain.doFilter(request, response);
+          return;
         }
 
-        UsernamePasswordAuthenticationToken auth =
-            new UsernamePasswordAuthenticationToken(username, null, authorities);
+        // 2) Header Authorization
+        String authHeader = request.getHeader(HttpHeaders.AUTHORIZATION);
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+          chain.doFilter(request, response);
+          return;
+        }
 
-        auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-        SecurityContextHolder.getContext().setAuthentication(auth);
+        // 3) Extraction & validations basiques
+        String token = authHeader.substring(7).trim();
+        if (token.isEmpty()) {
+          meterRegistry.counter("jwt.auth.failure").increment();
+          meterRegistry.counter("jwt.auth.empty").increment();
+          log.warn("JWT token manquant — ip={}", request.getRemoteAddr());
+          ErrorUtil.writeJsonError(response, HttpStatus.BAD_REQUEST, "Missing token");
+          return;
+        }
 
-        meterRegistry.counter("jwt.auth.success").increment();
-        log.debug("Auth réussie user={} ip={}", username, request.getRemoteAddr());
-      } catch (Exception e) {
-        meterRegistry.counter("jwt.auth.failure").increment();
-        log.error(
-            "Erreur construction SecurityContext pour user={} : {}", username, e.getMessage(), e);
-        ErrorUtil.writeJsonError(response, HttpStatus.UNAUTHORIZED, "Authentication context error");
-        return;
+        if (token.length() > MAX_TOKEN_LENGTH) {
+          meterRegistry.counter("jwt.auth.failure").increment();
+          meterRegistry.counter("jwt.auth.oversized").increment();
+          log.warn("JWT trop long ({} octets) — ip={}", token.length(), request.getRemoteAddr());
+          ErrorUtil.writeJsonError(response, HttpStatus.BAD_REQUEST, "Token too large");
+          return;
+        }
+
+        // 4) Vérification cryptographique (signature / expiration)
+        Jws<Claims> jws;
+        try {
+          jws = jwtService.parseToken(token);
+        } catch (Exception e) {
+          meterRegistry.counter("jwt.auth.failure").increment();
+          log.warn("JWT invalide/expiré : {}", e.getMessage());
+          ErrorUtil.writeJsonError(response, HttpStatus.UNAUTHORIZED, "Invalid or expired token");
+          return;
+        }
+
+        Claims claims = jws.getBody();
+        String username = claims.getSubject();
+        // vérifier la blacklist
+        String jti = claims.getId();
+
+        if (jti != null && jwtService.isAccessTokenBlacklisted(jti)) {
+          log.warn("Access token JTI {} is blacklisted", jti);
+          ErrorUtil.writeJsonError(response, HttpStatus.UNAUTHORIZED, "Access token revoked");
+          return;
+        }
+
+        // 6) Reconstruction du SecurityContext **depuis le JWT uniquement**
+        if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+          try {
+            List<GrantedAuthority> authorities = extractAuthorities(claims);
+
+            if (authorities.isEmpty()) {
+              // Avertissement — cela signifie que le token a été généré sans authorities
+              meterRegistry.counter("jwt.auth.db.fallback").increment();
+              log.warn("Aucun rôle dans le JWT pour user={} — vérifier génération du token", username);
+            }
+
+            UsernamePasswordAuthenticationToken auth =
+                new UsernamePasswordAuthenticationToken(username, null, authorities);
+
+            auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+            SecurityContextHolder.getContext().setAuthentication(auth);
+
+            meterRegistry.counter("jwt.auth.success").increment();
+            log.debug("Auth réussie user={} ip={}", username, request.getRemoteAddr());
+          } catch (Exception e) {
+            meterRegistry.counter("jwt.auth.failure").increment();
+            log.error(
+                "Erreur construction SecurityContext pour user={} : {}", username, e.getMessage(), e);
+            ErrorUtil.writeJsonError(response, HttpStatus.UNAUTHORIZED, "Authentication context error");
+            return;
+          }
+        }
+
+        // Continue la chaîne de filtres
+        chain.doFilter(request, response);
+    } finally {
+          MDC.clear();
       }
-    }
-
-    // Continue la chaîne de filtres
-    chain.doFilter(request, response);
   }
 
   // --- utilitaires ---

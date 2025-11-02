@@ -14,7 +14,8 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long> {
 
-  Optional<RefreshToken> findRawByToken(String token);
+  @Query("SELECT r FROM RefreshToken r JOIN FETCH r.utilisateur WHERE r.token = :token")
+  Optional<RefreshToken> findRawByToken(@Param("token") String token);
 
   @Query("SELECT r FROM RefreshToken r JOIN FETCH r.utilisateur u WHERE r.token = :token")
   Optional<RefreshToken> findDetailedByToken(@Param("token") String token);
