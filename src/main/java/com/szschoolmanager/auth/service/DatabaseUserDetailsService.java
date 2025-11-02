@@ -2,10 +2,8 @@ package com.szschoolmanager.auth.service;
 
 import com.szschoolmanager.auth.model.Utilisateur;
 import com.szschoolmanager.security.SecurityConstants;
-
 import java.util.List;
 import lombok.RequiredArgsConstructor;
-
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -29,11 +27,13 @@ public class DatabaseUserDetailsService implements UserDetailsService {
     return User.builder()
         .username(u.getUsername())
         .password(u.getPassword())
-        .authorities(List.of(new SimpleGrantedAuthority(SecurityConstants.ROLE_PREFIX + u.getRole().toUpperCase())))
+        .authorities(
+            List.of(
+                new SimpleGrantedAuthority(
+                    SecurityConstants.ROLE_PREFIX + u.getRole().toUpperCase())))
         .build();
   }
 
   @CacheEvict(value = "userDetails", key = "#username")
-  public void invalidateUserCache(String username) {
-  }
+  public void invalidateUserCache(String username) {}
 }

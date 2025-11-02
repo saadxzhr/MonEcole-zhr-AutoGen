@@ -1,5 +1,3 @@
 package com.szschoolmanager.auth.model;
 
-public class ClientIp {
-
-}
+public class ClientIp {}

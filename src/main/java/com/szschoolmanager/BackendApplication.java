@@ -7,13 +7,13 @@ import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
 import org.springframework.data.redis.repository.configuration.EnableRedisRepositories;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
-
-
 @EnableJpaAuditing
 @SpringBootApplication
 @EnableScheduling
 @EnableCaching
-@EnableRedisRepositories(basePackages = "com.szschoolmanager.auth.redis", considerNestedRepositories = true)
+@EnableRedisRepositories(
+    basePackages = "com.szschoolmanager.auth.redis",
+    considerNestedRepositories = true)
 public class BackendApplication {
 
   public static void main(String[] args) {
@@ -56,18 +56,15 @@ public class BackendApplication {
 // mvn spotless:apply	Formate automatiquement tous les fichiers
 // mvn clean install -Dspotless.apply.skip=false	Compile et applique le formatage
 
-
-//🧩 3️⃣ DepClean 🧹 (plugin avancé et précis — recommandé)
+// 🧩 3️⃣ DepClean 🧹 (plugin avancé et précis — recommandé)
 // mvn depclean:report
 // mvn depclean:clean
 // mvn se.kth.castor:depclean-maven-plugin:depclean
 
 // redis 6379
 
-
 // jWT
 // refresh tokens exposés en JSON → déplacer vers Secure HttpOnly cookie en prod ;
-
 
 // git add .
 // git commit -m “jwt auth 99.4%”
@@ -75,4 +72,3 @@ public class BackendApplication {
 
 // postman
 // https://www.getpostman.com/collections/PMAK-68f69f44ad6ba20001901958-840e3aa623d3968709c4a8363b6e947778
-

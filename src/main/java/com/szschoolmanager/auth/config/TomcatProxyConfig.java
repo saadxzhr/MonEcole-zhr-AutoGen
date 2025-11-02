@@ -6,20 +6,19 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * ✅ Configuration production-ready
- * Active la traduction des IPs réelles derrière proxy (Nginx, Cloudflare, etc.)
- * Aucun impact négatif en dev local — safe à laisser activé.
+ * ✅ Configuration production-ready Active la traduction des IPs réelles derrière proxy (Nginx,
+ * Cloudflare, etc.) Aucun impact négatif en dev local — safe à laisser activé.
  */
 @Configuration
 public class TomcatProxyConfig {
 
-    @Bean
-    public TomcatServletWebServerFactory tomcatCustomizer() {
-        TomcatServletWebServerFactory factory = new TomcatServletWebServerFactory();
-        RemoteIpValve valve = new RemoteIpValve();
-        valve.setRemoteIpHeader("X-Forwarded-For");
-        valve.setProtocolHeader("X-Forwarded-Proto");
-        factory.addContextValves(valve);
-        return factory;
-    }
+  @Bean
+  public TomcatServletWebServerFactory tomcatCustomizer() {
+    TomcatServletWebServerFactory factory = new TomcatServletWebServerFactory();
+    RemoteIpValve valve = new RemoteIpValve();
+    valve.setRemoteIpHeader("X-Forwarded-For");
+    valve.setProtocolHeader("X-Forwarded-Proto");
+    factory.addContextValves(valve);
+    return factory;
+  }
 }

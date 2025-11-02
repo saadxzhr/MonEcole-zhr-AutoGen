@@ -5,16 +5,9 @@ import com.szschoolmanager.auth.model.RefreshToken;
 import com.szschoolmanager.auth.model.Utilisateur;
 import com.szschoolmanager.security.SecurityConstants;
 import com.szschoolmanager.util.HttpRequestUtils;
-
 import io.jsonwebtoken.*;
 import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.HttpServletRequest;
-import lombok.Getter;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.stereotype.Service;
-
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.security.*;
@@ -25,18 +18,19 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.*;
-
-
+import lombok.Getter;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.stereotype.Service;
 
 @Slf4j
 @Service
 public class JwtService {
 
-
-   // --- Dependencies ---
+  // --- Dependencies ---
   private final StringRedisTemplate stringRedisTemplate;
   private final RefreshTokenService refreshTokenService;
-
 
   // --- Configuration JWT ---
   @Value("${jwt.private-key-path}")
@@ -63,12 +57,10 @@ public class JwtService {
   @Getter private RSAPublicKey publicKey;
   private JwtParser jwtParser;
 
- 
-
-  public JwtService(StringRedisTemplate stringRedisTemplate,
-                    RefreshTokenService refreshTokenService) {
-      this.stringRedisTemplate = stringRedisTemplate;
-      this.refreshTokenService = refreshTokenService;
+  public JwtService(
+      StringRedisTemplate stringRedisTemplate, RefreshTokenService refreshTokenService) {
+    this.stringRedisTemplate = stringRedisTemplate;
+    this.refreshTokenService = refreshTokenService;
   }
 
   // --- Initialization ---
@@ -77,19 +69,18 @@ public class JwtService {
     try {
       PrivateKey priv = loadPrivateKey(privateKeyPath);
       if (!(priv instanceof RSAPrivateKey))
-          throw new IllegalStateException("Clé privée non RSA : " + privateKeyPath);
+        throw new IllegalStateException("Clé privée non RSA : " + privateKeyPath);
       this.privateKey = (RSAPrivateKey) priv;
 
       PublicKey loaded = loadPublicKey(publicKeyPath);
       if (!(loaded instanceof RSAPublicKey)) {
-          throw new IllegalStateException("La clé publique fournie n'est pas une clé RSA compatible (chemin=" 
-              + publicKeyPath + "). Vérifiez le format PEM/DER et que la clé est une clé RSA.");
+        throw new IllegalStateException(
+            "La clé publique fournie n'est pas une clé RSA compatible (chemin="
+                + publicKeyPath
+                + "). Vérifiez le format PEM/DER et que la clé est une clé RSA.");
       }
       this.publicKey = (RSAPublicKey) loaded;
-      this.jwtParser = Jwts.parserBuilder()
-                          .setSigningKey(publicKey)
-                          .requireIssuer(issuer)
-                          .build();
+      this.jwtParser = Jwts.parserBuilder().setSigningKey(publicKey).requireIssuer(issuer).build();
     } catch (Exception e) {
       log.error("Failed to init JwtService: {}", e.getMessage(), e);
       throw new IllegalStateException(e);
@@ -98,7 +89,8 @@ public class JwtService {
 
   // --- Key loaders ---
   private PrivateKey loadPrivateKey(String path) throws Exception {
-    try (InputStream is = getClass().getClassLoader().getResourceAsStream(path.replace("classpath:", ""))) {
+    try (InputStream is =
+        getClass().getClassLoader().getResourceAsStream(path.replace("classpath:", ""))) {
       if (is == null) throw new FileNotFoundException("Private key not found at " + path);
       byte[] normalized = normalizeKey(is.readAllBytes(), true);
       return KeyFactory.getInstance("RSA").generatePrivate(new PKCS8EncodedKeySpec(normalized));
@@ -106,7 +98,8 @@ public class JwtService {
   }
 
   private PublicKey loadPublicKey(String path) throws Exception {
-    try (InputStream is = getClass().getClassLoader().getResourceAsStream(path.replace("classpath:", ""))) {
+    try (InputStream is =
+        getClass().getClassLoader().getResourceAsStream(path.replace("classpath:", ""))) {
       if (is == null) throw new FileNotFoundException("Public key not found at " + path);
       byte[] normalized = normalizeKey(is.readAllBytes(), false);
       return KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(normalized));
@@ -144,56 +137,58 @@ public class JwtService {
         .compact();
   }
 
-  /**
-   * Génère un couple (access + refresh) complet et prêt à production.
-   */
+  /** Génère un couple (access + refresh) complet et prêt à production. */
   public TokensDTO generateTokens(Utilisateur user, HttpServletRequest request) {
-      String accessToken = generateAccessToken(user);
-      String clientIp = HttpRequestUtils.extractClientIP(request);
+    String accessToken = generateAccessToken(user);
+    String clientIp = HttpRequestUtils.extractClientIP(request);
 
-      
-      String userAgent = (request != null && request.getHeader("User-Agent") != null)
-              ? request.getHeader("User-Agent") : "unknown-client";
-      String accessJti = extractJti(accessToken);
-      RefreshToken refreshEntity = refreshTokenService.createRefreshToken(user, userAgent, clientIp, accessJti);
-      String rawRefresh = refreshEntity.getToken();
-      
+    String userAgent =
+        (request != null && request.getHeader("User-Agent") != null)
+            ? request.getHeader("User-Agent")
+            : "unknown-client";
+    String accessJti = extractJti(accessToken);
+    RefreshToken refreshEntity =
+        refreshTokenService.createRefreshToken(user, userAgent, clientIp, accessJti);
+    String rawRefresh = refreshEntity.getToken();
 
-      log.info("🔐 Tokens générés pour [{}] depuis IP [{}], agent [{}]",
-              user.getUsername(), clientIp, userAgent);
+    log.info(
+        "🔐 Tokens générés pour [{}] depuis IP [{}], agent [{}]",
+        user.getUsername(),
+        clientIp,
+        userAgent);
 
-      long refreshExpiresIn = refreshEntity.getExpiresAt() != null
-          ? Duration.between(
-                Instant.now(),
-                refreshEntity.getExpiresAt().atZone(ZoneId.systemDefault()).toInstant()
-            ).getSeconds()
-          : Duration.ofDays(30).getSeconds();
+    long refreshExpiresIn =
+        refreshEntity.getExpiresAt() != null
+            ? Duration.between(
+                    Instant.now(),
+                    refreshEntity.getExpiresAt().atZone(ZoneId.systemDefault()).toInstant())
+                .getSeconds()
+            : Duration.ofDays(30).getSeconds();
 
-
-      return new TokensDTO(accessToken, rawRefresh, accessExpirationSeconds, refreshExpiresIn);
+    return new TokensDTO(accessToken, rawRefresh, accessExpirationSeconds, refreshExpiresIn);
   }
 
   public TokensDTO generateTokens(Utilisateur user) {
-      return generateTokens(user, null);
+    return generateTokens(user, null);
   }
 
   // --- JWT parsing ---
   public Jws<Claims> parseToken(String token) {
-      Jws<Claims> jws = jwtParser.parseClaimsJws(token);
-  Claims c = jws.getBody();
-  if (c.getAudience() == null || !c.getAudience().contains(audience))
+    Jws<Claims> jws = jwtParser.parseClaimsJws(token);
+    Claims c = jws.getBody();
+    if (c.getAudience() == null || !c.getAudience().contains(audience))
       throw new JwtException("Invalid audience");
-  return jws;
+    return jws;
   }
 
-    private String extractJti(String token) {
-      return parseToken(token).getBody().getId();
+  private String extractJti(String token) {
+    return parseToken(token).getBody().getId();
   }
+
   public boolean isTokenValid(String token, String username) {
     try {
       Claims claims = parseToken(token).getBody();
-      return username.equals(claims.getSubject())
-          && claims.getExpiration().after(new Date());
+      return username.equals(claims.getSubject()) && claims.getExpiration().after(new Date());
     } catch (JwtException | IllegalArgumentException e) {
       log.warn("Invalid JWT: {}", e.getMessage());
       return false;
@@ -211,16 +206,15 @@ public class JwtService {
 
   public boolean isAccessTokenBlacklisted(String jti) {
     try {
-        String key = "blacklist:access:" + jti;
-        return Boolean.TRUE.equals(stringRedisTemplate.hasKey(key));
+      String key = "blacklist:access:" + jti;
+      return Boolean.TRUE.equals(stringRedisTemplate.hasKey(key));
     } catch (Exception e) {
-        log.warn("Failed to check blacklist for jti {}: {}", jti, e.getMessage());
-        return false;
+      log.warn("Failed to check blacklist for jti {}: {}", jti, e.getMessage());
+      return false;
     }
-}
-
-public long getAccessExpirationSeconds() {
-      return accessExpirationSeconds;
   }
 
+  public long getAccessExpirationSeconds() {
+    return accessExpirationSeconds;
+  }
 }

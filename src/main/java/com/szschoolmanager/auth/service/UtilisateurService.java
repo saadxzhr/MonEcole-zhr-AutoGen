@@ -6,7 +6,7 @@ import com.szschoolmanager.auth.model.Utilisateur;
 import com.szschoolmanager.auth.repository.UtilisateurRepository;
 import com.szschoolmanager.exception.ResponseDTO;
 import com.szschoolmanager.security.SecurityConstants;
-
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.*;
 import org.springframework.http.ResponseEntity;
@@ -14,8 +14,6 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -40,11 +38,14 @@ public class UtilisateurService {
     return org.springframework.security.core.userdetails.User.builder()
         .username(u.getUsername())
         .password(u.getPassword())
-        .authorities(SecurityConstants.ROLE_PREFIX + (u.getRole() == null ? "USER" : u.getRole().toUpperCase()))
+        .authorities(
+            SecurityConstants.ROLE_PREFIX
+                + (u.getRole() == null ? "USER" : u.getRole().toUpperCase()))
         .build();
   }
 
-  public ResponseEntity<ResponseDTO<Page<UtilisateurResponseDTO>>> list(int page, int size, String roleFilter) {
+  public ResponseEntity<ResponseDTO<Page<UtilisateurResponseDTO>>> list(
+      int page, int size, String roleFilter) {
     Pageable pageable = PageRequest.of(page, size, Sort.by("id").descending());
     Page<Utilisateur> p;
 
@@ -67,7 +68,7 @@ public class UtilisateurService {
 
     Utilisateur utilisateur = mapper.toEntity(dto);
     utilisateur.setPassword(passwordEncoder.encode(dto.getPassword()));
-  
+
     // Rôle dynamique (aucun enum)
     if (dto.getRole() == null || dto.getRole().isBlank()) {
       utilisateur.setRole("USER");
@@ -78,11 +79,13 @@ public class UtilisateurService {
     utilisateur.setForceChangePassword(true);
     repo.save(utilisateur);
     userDetailsService.invalidateUserCache(utilisateur.getUsername());
-    return ResponseEntity.ok(ResponseDTO.success("Utilisateur créé", mapper.toResponseDTO(utilisateur)));
+    return ResponseEntity.ok(
+        ResponseDTO.success("Utilisateur créé", mapper.toResponseDTO(utilisateur)));
   }
 
   @Transactional
-  public ResponseEntity<ResponseDTO<UtilisateurResponseDTO>> update(Long id, UtilisateurUpdateDTO dto) {
+  public ResponseEntity<ResponseDTO<UtilisateurResponseDTO>> update(
+      Long id, UtilisateurUpdateDTO dto) {
     Optional<Utilisateur> opt = repo.findById(id);
     if (opt.isEmpty()) {
       return ResponseEntity.badRequest().body(ResponseDTO.error("Utilisateur introuvable"));
@@ -113,11 +116,13 @@ public class UtilisateurService {
 
     repo.save(u);
     userDetailsService.invalidateUserCache(u.getUsername());
-    return ResponseEntity.ok(ResponseDTO.success("Utilisateur mis à jour avec succès", mapper.toResponseDTO(u)));
+    return ResponseEntity.ok(
+        ResponseDTO.success("Utilisateur mis à jour avec succès", mapper.toResponseDTO(u)));
   }
 
   @Transactional
-  public ResponseEntity<ResponseDTO<String>> changePassword(Long id, ChangePasswordDTO dto, boolean verifyOld) {
+  public ResponseEntity<ResponseDTO<String>> changePassword(
+      Long id, ChangePasswordDTO dto, boolean verifyOld) {
     Optional<Utilisateur> opt = repo.findById(id);
     if (opt.isEmpty()) {
       return ResponseEntity.badRequest().body(ResponseDTO.error("Utilisateur introuvable"));

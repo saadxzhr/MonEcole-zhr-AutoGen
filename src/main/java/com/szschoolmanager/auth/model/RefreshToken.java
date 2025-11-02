@@ -27,13 +27,12 @@ public class RefreshToken {
   @Column(name = "created_at", nullable = false)
   private LocalDateTime createdAt;
 
-   @Column(name = "expires_at", nullable = false)
+  @Column(name = "expires_at", nullable = false)
   private LocalDateTime expiresAt;
 
   @Builder.Default
   @Column(nullable = false)
   private boolean revoked = false;
-
 
   @Column(nullable = false, length = 100)
   private String userAgent;

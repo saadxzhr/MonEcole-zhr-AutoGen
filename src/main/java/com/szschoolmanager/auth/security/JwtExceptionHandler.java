@@ -1,14 +1,11 @@
 package com.szschoolmanager.auth.security;
 
+import com.szschoolmanager.auth.exception.AccountLockedException;
 import io.jsonwebtoken.JwtException;
-import lombok.extern.slf4j.Slf4j;
-
 import java.util.Map;
-
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
-
-import com.szschoolmanager.auth.exception.AccountLockedException;
 
 @RestControllerAdvice
 @Slf4j
@@ -23,11 +20,11 @@ public class JwtExceptionHandler {
 
   @ExceptionHandler(AccountLockedException.class)
   public ResponseEntity<Map<String, Object>> handleAccountLocked(AccountLockedException ex) {
-      return ResponseEntity.status(HttpStatus.LOCKED).body(Map.of(
-          "status", "error",
-          "message", ex.getMessage(),
-          "code", HttpStatus.LOCKED.value()
-      ));
+    return ResponseEntity.status(HttpStatus.LOCKED)
+        .body(
+            Map.of(
+                "status", "error",
+                "message", ex.getMessage(),
+                "code", HttpStatus.LOCKED.value()));
   }
-
 }

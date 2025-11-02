@@ -15,44 +15,44 @@ import java.util.stream.Collectors;
 
 public final class PemUtils {
 
-    // 🔒 Constructeur privé pour empêcher l’instanciation (S1118)
-    private PemUtils() {
-        throw new UnsupportedOperationException("Utility class - cannot be instantiated");
-    }
+  // 🔒 Constructeur privé pour empêcher l’instanciation (S1118)
+  private PemUtils() {
+    throw new UnsupportedOperationException("Utility class - cannot be instantiated");
+  }
 
-    private static String stripPemHeader(String pem, String beginMarker, String endMarker)
-            throws IOException {
-        try (BufferedReader reader = new BufferedReader(new StringReader(pem))) {
-            return reader
-                    .lines()
-                    .filter(line -> !line.contains(beginMarker) && !line.contains(endMarker))
-                    .collect(Collectors.joining());
-        }
+  private static String stripPemHeader(String pem, String beginMarker, String endMarker)
+      throws IOException {
+    try (BufferedReader reader = new BufferedReader(new StringReader(pem))) {
+      return reader
+          .lines()
+          .filter(line -> !line.contains(beginMarker) && !line.contains(endMarker))
+          .collect(Collectors.joining());
     }
+  }
 
-    public static PrivateKey parsePrivateKeyFromPem(String pem)
-            throws IOException, GeneralSecurityException {
-        try {
-            String cleanPem = stripPemHeader(pem, "-----BEGIN PRIVATE KEY", "-----END PRIVATE KEY");
-            byte[] decoded = Base64.getDecoder().decode(cleanPem);
-            PKCS8EncodedKeySpec keySpec = new PKCS8EncodedKeySpec(decoded);
-            KeyFactory kf = KeyFactory.getInstance("RSA");
-            return kf.generatePrivate(keySpec);
-        } catch (InvalidKeySpecException e) {
-            throw new GeneralSecurityException("Invalid RSA private key format", e);
-        }
+  public static PrivateKey parsePrivateKeyFromPem(String pem)
+      throws IOException, GeneralSecurityException {
+    try {
+      String cleanPem = stripPemHeader(pem, "-----BEGIN PRIVATE KEY", "-----END PRIVATE KEY");
+      byte[] decoded = Base64.getDecoder().decode(cleanPem);
+      PKCS8EncodedKeySpec keySpec = new PKCS8EncodedKeySpec(decoded);
+      KeyFactory kf = KeyFactory.getInstance("RSA");
+      return kf.generatePrivate(keySpec);
+    } catch (InvalidKeySpecException e) {
+      throw new GeneralSecurityException("Invalid RSA private key format", e);
     }
+  }
 
-    public static PublicKey parsePublicKeyFromPem(String pem)
-            throws IOException, GeneralSecurityException {
-        try {
-            String cleanPem = stripPemHeader(pem, "-----BEGIN PUBLIC KEY", "-----END PUBLIC KEY");
-            byte[] decoded = Base64.getDecoder().decode(cleanPem);
-            X509EncodedKeySpec keySpec = new X509EncodedKeySpec(decoded);
-            KeyFactory kf = KeyFactory.getInstance("RSA");
-            return kf.generatePublic(keySpec);
-        } catch (InvalidKeySpecException e) {
-            throw new GeneralSecurityException("Invalid RSA public key format", e);
-        }
+  public static PublicKey parsePublicKeyFromPem(String pem)
+      throws IOException, GeneralSecurityException {
+    try {
+      String cleanPem = stripPemHeader(pem, "-----BEGIN PUBLIC KEY", "-----END PUBLIC KEY");
+      byte[] decoded = Base64.getDecoder().decode(cleanPem);
+      X509EncodedKeySpec keySpec = new X509EncodedKeySpec(decoded);
+      KeyFactory kf = KeyFactory.getInstance("RSA");
+      return kf.generatePublic(keySpec);
+    } catch (InvalidKeySpecException e) {
+      throw new GeneralSecurityException("Invalid RSA public key format", e);
     }
+  }
 }

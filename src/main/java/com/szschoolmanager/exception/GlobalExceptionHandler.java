@@ -88,20 +88,23 @@ public class GlobalExceptionHandler {
 
   // 🧩 Fallback ultime : capture les erreurs non interceptées (conversion, content-type...)
   @ExceptionHandler(HttpMessageNotWritableException.class)
-  public ResponseEntity<ResponseDTO<Void>> handleConverterIssue(HttpMessageNotWritableException ex) {
+  public ResponseEntity<ResponseDTO<Void>> handleConverterIssue(
+      HttpMessageNotWritableException ex) {
     log.error("Erreur de conversion HTTP (fallback): {}", ex.getMessage());
     return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-        .body(new ResponseDTO<>("INTERNAL_ERROR", "Erreur de conversion de réponse JSON.", null, LocalDateTime.now()));
+        .body(
+            new ResponseDTO<>(
+                "INTERNAL_ERROR",
+                "Erreur de conversion de réponse JSON.",
+                null,
+                LocalDateTime.now()));
   }
-
 
   @ExceptionHandler(AuthorizationDeniedException.class)
   public ResponseEntity<ResponseDTO<Void>> handleAccessDenied(AuthorizationDeniedException ex) {
-      log.warn("Accès refusé : {}", ex.getMessage());
-      return ResponseEntity
-          .status(HttpStatus.FORBIDDEN)
-          .body(ResponseDTO.error("Accès refusé : vous n'êtes pas autorisé à effectuer cette action"));
+    log.warn("Accès refusé : {}", ex.getMessage());
+    return ResponseEntity.status(HttpStatus.FORBIDDEN)
+        .body(
+            ResponseDTO.error("Accès refusé : vous n'êtes pas autorisé à effectuer cette action"));
   }
-
-
 }

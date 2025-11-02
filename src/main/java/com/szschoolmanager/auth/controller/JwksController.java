@@ -1,16 +1,13 @@
 package com.szschoolmanager.auth.controller;
 
+import com.szschoolmanager.auth.service.JwtService;
 import java.math.BigInteger;
 import java.util.Base64;
 import java.util.Map;
-
+import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-
-import com.szschoolmanager.auth.service.JwtService;
-
-import lombok.RequiredArgsConstructor;
 
 @RestController
 @RequestMapping("/.well-known")
@@ -25,14 +22,20 @@ public class JwksController {
     // n and e in Base64URL
     String n = base64Url(rsa.getModulus());
     String e = base64Url(rsa.getPublicExponent());
-    Map<String, Object> jwk = Map.of(
-        "kty", "RSA",
-        "kid", jwtService.getConfiguredKid(), // add getter or expose configuredKid
-        "use", "sig",
-        "alg", "RS256",
-        "n", n,
-        "e", e
-    );
+    Map<String, Object> jwk =
+        Map.of(
+            "kty",
+            "RSA",
+            "kid",
+            jwtService.getConfiguredKid(), // add getter or expose configuredKid
+            "use",
+            "sig",
+            "alg",
+            "RS256",
+            "n",
+            n,
+            "e",
+            e);
     return Map.of("keys", java.util.List.of(jwk));
   }
 
