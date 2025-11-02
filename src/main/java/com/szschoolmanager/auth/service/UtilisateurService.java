@@ -5,6 +5,7 @@ import com.szschoolmanager.auth.mapper.UtilisateurMapper;
 import com.szschoolmanager.auth.model.Utilisateur;
 import com.szschoolmanager.auth.repository.UtilisateurRepository;
 import com.szschoolmanager.exception.ResponseDTO;
+import com.szschoolmanager.security.SecurityConstants;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.*;
@@ -39,7 +40,7 @@ public class UtilisateurService {
     return org.springframework.security.core.userdetails.User.builder()
         .username(u.getUsername())
         .password(u.getPassword())
-        .authorities("ROLE_" + (u.getRole() == null ? "USER" : u.getRole().toUpperCase()))
+        .authorities(SecurityConstants.ROLE_PREFIX + (u.getRole() == null ? "USER" : u.getRole().toUpperCase()))
         .build();
   }
 

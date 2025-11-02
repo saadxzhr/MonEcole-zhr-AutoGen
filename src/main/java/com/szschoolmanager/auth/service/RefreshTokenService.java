@@ -3,10 +3,14 @@ package com.szschoolmanager.auth.service;
 import com.szschoolmanager.auth.model.RefreshToken;
 import com.szschoolmanager.auth.model.Utilisateur;
 import com.szschoolmanager.auth.repository.RefreshTokenRepository;
+import com.szschoolmanager.auth.repository.UtilisateurRepository;
 import com.szschoolmanager.exception.BusinessValidationException;
+
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+import org.apache.commons.codec.binary.Hex;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -17,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Comparator;
@@ -41,6 +46,7 @@ import javax.crypto.spec.SecretKeySpec;
 public class RefreshTokenService {
 
     private final RefreshTokenRepository refreshTokenRepository;
+    private final UtilisateurRepository utilisateurRepository;
     
     private static final int REFRESH_TOKEN_DAYS = 7;
     private static final int MAX_ACTIVE_SESSIONS = 3;
@@ -51,8 +57,12 @@ public class RefreshTokenService {
         Objects.requireNonNull(user, "Utilisateur ne peut pas être nul");
 
         try {
+            // ✅ Re-fetch user to ensure it's fully initialized (no lazy proxy)
+            Utilisateur fullUser = utilisateurRepository.findById(user.getId())
+                .orElseThrow(() -> new BusinessValidationException("Utilisateur introuvable"));
+
             // 🔒 1. Lock active tokens to ensure atomic behavior
-            List<RefreshToken> activeTokens = refreshTokenRepository.findActiveTokensForUpdate(user);
+            List<RefreshToken> activeTokens = refreshTokenRepository.findActiveTokensForUpdate(fullUser);
 
             // 🧹 2. Enforce max active sessions
             if (activeTokens.size() >= MAX_ACTIVE_SESSIONS) {
@@ -69,17 +79,18 @@ public class RefreshTokenService {
             String raw = generateRawToken();
             String hashed = hashToken(raw);
 
+            
             // 🧱 4. Build entity (hash only)
             RefreshToken entity = RefreshToken.builder()
-                    .utilisateur(user)
+                    .utilisateur(fullUser)
                     .token(hashed)
                     .jti(UUID.randomUUID().toString())
                     .createdAt(LocalDateTime.now())
                     .expiresAt(LocalDateTime.now().plusDays(REFRESH_TOKEN_DAYS))
                     .revoked(false)
                     .reused(false)
-                    .userAgent(shorten(userAgent))
-                    .ipAddress(shorten(ipAddress))
+                    .userAgent(userAgent)
+                    .ipAddress(ipAddress)
                     .accessJti(accessJti)
                     .build();
 
@@ -88,7 +99,7 @@ public class RefreshTokenService {
             // 🎁 5. Return detached copy with raw token for frontend
             return RefreshToken.builder()
                     .id(saved.getId())
-                    .utilisateur(user)
+                    .utilisateur(fullUser)
                     .token(raw) // raw never persisted
                     .createdAt(saved.getCreatedAt())
                     .expiresAt(saved.getExpiresAt())
@@ -118,9 +129,11 @@ public class RefreshTokenService {
             throw new BusinessValidationException("Aucun refresh token fourni");
         }
         String hashed = hashToken(rawToken);
-        RefreshToken rt = refreshTokenRepository.findDetailedByToken(hashed)
+        RefreshToken rt = refreshTokenRepository.findLightByToken(hashed)
                 .orElseThrow(() -> new BusinessValidationException("Token invalide"));
+
         if (rt.isExpired()) throw new BusinessValidationException("Token expiré");
+        if (rt.isRevoked()) throw new BusinessValidationException("Token révoqué");
         return rt;
     }
 
@@ -140,6 +153,8 @@ public class RefreshTokenService {
         String hashed = hashToken(presentedRaw);
         RefreshToken stored = refreshTokenRepository.findDetailedByToken(hashed)
                 .orElseThrow(() -> new BusinessValidationException("Token invalide"));
+        // This line forces Hibernate to initialize the lazy proxy before leaving the transaction boundary
+        stored.getUtilisateur().getUsername();
 
         // normal rotation
         if (!stored.isRevoked()) {
@@ -211,7 +226,10 @@ public class RefreshTokenService {
 
     // ----------------- HELPERS -----------------
     private static String generateRawToken() {
-        return UUID.randomUUID().toString().replace("-", "") + UUID.randomUUID().toString().replace("-", "");
+        SecureRandom random = new SecureRandom();
+        byte[] bytes = new byte[32];
+        random.nextBytes(bytes);
+        return Hex.encodeHexString(bytes);
     }
 
 
@@ -221,6 +239,13 @@ public class RefreshTokenService {
     // this secret should come from your config (never hard-coded)
     @Value("${app.security.token-hash-secret}")
     private String tokenHashSecret;
+
+    @PostConstruct
+    void validateSecret() {
+        if (tokenHashSecret == null || tokenHashSecret.length() < 32) {
+            throw new IllegalStateException("Token hash secret must be at least 32 characters long");
+        }
+    }
 
 
     private String hashToken(String rawToken) {
@@ -236,19 +261,23 @@ public class RefreshTokenService {
         }
     }
 
-    private static String shorten(String s) {
-        if (s == null) return "";
-        return s.length() <= 200 ? s : s.substring(0, 200);
-    }
+    // private static String shorten(String s) {
+    //     if (s == null) return "";
+    //     return s.length() <= 200 ? s : s.substring(0, 200);
+    // }
 
 
     @Scheduled(cron = "0 0 2 * * ?") // 2 AM daily
     @Transactional
     public void cleanupExpiredTokens() {
-        int deleted = refreshTokenRepository
-            .deleteByExpiresAtBefore(LocalDateTime.now());
-        log.info("🧹 Deleted {} expired refresh tokens", deleted);
+        try {
+            int deleted = refreshTokenRepository.deleteByExpiresAtBefore(LocalDateTime.now());
+            log.info("🧹 Deleted {} expired refresh tokens", deleted);
+        } catch (Exception e) {
+            log.error("Error while cleaning up expired refresh tokens", e);
+        }
     }
+
 
      public long getRefreshExpirationSeconds() {
         return Duration.ofDays(REFRESH_TOKEN_DAYS).getSeconds();

@@ -3,10 +3,12 @@ package com.szschoolmanager.auth.service;
 import com.szschoolmanager.auth.dto.TokensDTO;
 import com.szschoolmanager.auth.model.RefreshToken;
 import com.szschoolmanager.auth.model.Utilisateur;
+import com.szschoolmanager.security.SecurityConstants;
+import com.szschoolmanager.util.HttpRequestUtils;
+
 import io.jsonwebtoken.*;
 import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.HttpServletRequest;
-import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -134,7 +136,7 @@ public class JwtService {
         .setSubject(user.getUsername())
         .setId(jti)
         .claim("role", user.getRole())
-        .claim("authorities", List.of("ROLE_" + user.getRole().toUpperCase()))
+        .claim("authorities", List.of(SecurityConstants.ROLE_PREFIX + user.getRole().toUpperCase()))
         .setIssuedAt(Date.from(now))
         .setNotBefore(Date.from(now))
         .setExpiration(Date.from(now.plusSeconds(accessExpirationSeconds)))
@@ -147,7 +149,8 @@ public class JwtService {
    */
   public TokensDTO generateTokens(Utilisateur user, HttpServletRequest request) {
       String accessToken = generateAccessToken(user);
-      String clientIp = extractClientIp(request);
+      String clientIp = HttpRequestUtils.extractClientIP(request);
+
       
       String userAgent = (request != null && request.getHeader("User-Agent") != null)
               ? request.getHeader("User-Agent") : "unknown-client";
@@ -174,20 +177,6 @@ public class JwtService {
       return generateTokens(user, null);
   }
 
-  // --- Helpers ---
-  private String extractClientIp(HttpServletRequest request) {
-      try {
-          if (request == null) return "unknown";
-          String xfHeader = request.getHeader("X-Forwarded-For");
-          if (xfHeader != null && !xfHeader.isBlank())
-              return xfHeader.split(",")[0].trim();
-          return request.getRemoteAddr() != null ? request.getRemoteAddr() : "unknown";
-      } catch (Exception e) {
-          log.warn("Failed to extract IP: {}", e.getMessage());
-          return "unknown";
-      }
-  }
-
   // --- JWT parsing ---
   public Jws<Claims> parseToken(String token) {
       Jws<Claims> jws = jwtParser.parseClaimsJws(token);
@@ -196,10 +185,6 @@ public class JwtService {
       throw new JwtException("Invalid audience");
   return jws;
   }
-
-  // public String getUsernameFromToken(String token) { return parseToken(token).getBody().getSubject(); }
-  // public String getRoleFromToken(String token) { return parseToken(token).getBody().get("role", String.class); }
-  // public String getJti(String token) { return parseToken(token).getBody().getId(); }
 
     private String extractJti(String token) {
       return parseToken(token).getBody().getId();

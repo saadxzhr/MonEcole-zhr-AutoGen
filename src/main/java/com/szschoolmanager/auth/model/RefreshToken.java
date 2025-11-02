@@ -18,16 +18,16 @@ public class RefreshToken {
   private Long id;
 
   @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "utilisateurId", referencedColumnName = "id", nullable = false)
+  @JoinColumn(name = "utilisateur_id", referencedColumnName = "id", nullable = false)
   private Utilisateur utilisateur;
 
   @Column(nullable = false, unique = true)
   private String token;
 
-  @Column(nullable = false)
+  @Column(name = "created_at", nullable = false)
   private LocalDateTime createdAt;
 
-  @Column(nullable = false)
+   @Column(name = "expires_at", nullable = false)
   private LocalDateTime expiresAt;
 
   @Builder.Default

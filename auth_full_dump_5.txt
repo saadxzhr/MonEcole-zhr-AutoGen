@@ -1,4 +1,88 @@
 
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\BackendApplication.java
+
+package com.szschoolmanager;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.cache.annotation.EnableCaching;
+import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
+import org.springframework.data.redis.repository.configuration.EnableRedisRepositories;
+import org.springframework.scheduling.annotation.EnableScheduling;
+
+// @EnableJpaAuditing
+
+@SpringBootApplication
+@EnableScheduling
+@EnableCaching
+@EnableRedisRepositories(basePackages = "com.szschoolmanager.auth.redis", considerNestedRepositories = true)
+public class BackendApplication {
+
+  public static void main(String[] args) {
+    SpringApplication.run(BackendApplication.class, args);
+  }
+
+  class StringUtils {}
+}
+// Crée la table en SQL dans Flyway (Vx__table_module.sql).
+// Crée l’entité correspondante.
+// Crée le repository + service.
+// Crée le DTO si nécessaire (colonnes provenant d’autres tables).
+// Crée les endpoints REST pour CRUD.
+// JS/Thymeleaf pour afficher et gérer les formulaires.
+
+// ✅ Entities (JPA classiques)
+// ✅ Record DTOs (Java 17+)
+// ✅ MapStruct (mapping auto)
+// ✅ Services (logique métier)
+// ✅ Controllers (REST + Thymeleaf)
+
+// spring.jpa.properties.hibernate.default_batch_fetch_size=50
+// spring.jpa.open-in-view=false
+
+//
+
+// ./mvnw compile exec:java -Dexec.mainClass="com.szschoolmanager.tools.GenerateRSAKeys"
+// mvn exec:java "-Dexec.mainClass=com.szschoolmanager.tools.GenerateRSAKeys"
+
+// Lets you instantly check which dependencies are outdated.
+// mvn versions:display-dependency-updates
+// mvn versions:display-plugin-updates
+
+// OWASP Dependency-Check
+// Scans all dependencies for known security vulnerabilities (CVE database).
+// mvn clean verify -DskipTests
+// → Generates a report under target/dependency-check-report.html.
+
+// mvn spotless:check	Vérifie si ton code est bien formaté
+// mvn spotless:apply	Formate automatiquement tous les fichiers
+// mvn clean install -Dspotless.apply.skip=false	Compile et applique le formatage
+
+
+//🧩 3️⃣ DepClean 🧹 (plugin avancé et précis — recommandé)
+// mvn depclean:report
+// mvn depclean:clean
+// mvn se.kth.castor:depclean-maven-plugin:depclean
+
+// redis 6379
+
+
+// jWT
+// refresh tokens exposés en JSON → déplacer vers Secure HttpOnly cookie en prod ;
+
+
+// git add .
+// git commit -m “jwt auth 99.3%”
+// git push
+
+// postman
+// https://www.getpostman.com/collections/PMAK-68f69f44ad6ba20001901958-840e3aa623d3968709c4a8363b6e947778
+
+
+
+### END FILE
+
+
 ### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\auth\config\RateLimitConstants.java
 
 package com.szschoolmanager.auth.config;
@@ -242,136 +326,6 @@ public class RateLimitFilter extends OncePerRequestFilter {
      */
     private record RateLimitConfig(int limit, Duration window) {}
 }
-
-### END FILE
-
-
-### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\auth\config\RateLimitFilterTest.java
-
-// package com.szschoolmanager.auth.config;
-
-// import org.junit.jupiter.api.Test;
-// import org.junit.jupiter.api.extension.ExtendWith;
-// import org.mockito.InjectMocks;
-// import org.mockito.Mock;
-// import org.mockito.junit.jupiter.MockitoExtension;
-// import org.springframework.data.redis.core.StringRedisTemplate;
-// import org.springframework.data.redis.core.script.RedisScript;
-// import org.springframework.mock.web.MockFilterChain;
-// import org.springframework.mock.web.MockHttpServletRequest;
-// import org.springframework.mock.web.MockHttpServletResponse;
-
-// import java.util.Collections;
-
-// import static org.junit.jupiter.api.Assertions.*;
-// import static org.mockito.ArgumentMatchers.*;
-// import static org.mockito.Mockito.*;
-
-// @ExtendWith(MockitoExtension.class)
-// class RateLimitFilterTest {
-
-//     @Mock
-//     private StringRedisTemplate redisTemplate;
-
-//     @Mock
-//     private RedisScript<Long> rateLimitScript;
-
-//     @InjectMocks
-//     private RateLimitFilter rateLimitFilter;
-
-//     @Test
-//     void shouldAllowRequestWhenUnderLimit() throws Exception {
-//         MockHttpServletRequest request = new MockHttpServletRequest();
-//         request.setRequestURI("/api/v1/auth/login");
-//         request.setRemoteAddr("192.168.1.1");
-
-//         MockHttpServletResponse response = new MockHttpServletResponse();
-//         MockFilterChain filterChain = new MockFilterChain();
-
-//         when(redisTemplate.execute(
-//             any(RedisScript.class),
-//             anyList(),
-//             anyString(),
-//             anyString()
-//         )).thenReturn(3L); // Under limit
-
-//         rateLimitFilter.doFilterInternal(request, response, filterChain);
-
-//         assertEquals(200, response.getStatus());
-//         assertNotNull(filterChain.getRequest());
-//     }
-
-//     @Test
-//     void shouldRejectRequestWhenOverLimit() throws Exception {
-//         MockHttpServletRequest request = new MockHttpServletRequest();
-//         request.setRequestURI("/api/v1/auth/login");
-//         request.setRemoteAddr("192.168.1.1");
-
-//         MockHttpServletResponse response = new MockHttpServletResponse();
-//         MockFilterChain filterChain = new MockFilterChain();
-
-//         when(redisTemplate.execute(
-//             any(RedisScript.class),
-//             anyList(),
-//             anyString(),
-//             anyString()
-//         )).thenReturn(6L); // Over limit (5)
-
-//         rateLimitFilter.doFilterInternal(request, response, filterChain);
-
-//         assertEquals(429, response.getStatus());
-//         assertTrue(response.getContentAsString().contains("Too many requests"));
-//     }
-
-//     @Test
-//     void shouldFailClosedWhenRedisUnavailable() throws Exception {
-//         MockHttpServletRequest request = new MockHttpServletRequest();
-//         request.setRequestURI("/api/v1/auth/login");
-//         request.setRemoteAddr("192.168.1.1");
-
-//         MockHttpServletResponse response = new MockHttpServletResponse();
-//         MockFilterChain filterChain = new MockFilterChain();
-
-//         when(redisTemplate.execute(
-//             any(RedisScript.class),
-//             anyList(),
-//             anyString(),
-//             anyString()
-//         )).thenThrow(new org.springframework.data.redis.RedisConnectionFailureException("Connection refused"));
-
-//         rateLimitFilter.doFilterInternal(request, response, filterChain);
-
-//         assertEquals(503, response.getStatus());
-//         assertTrue(response.getContentAsString().contains("Service temporarily unavailable"));
-//     }
-
-//     @Test
-//     void shouldExtractClientIpFromXForwardedFor() throws Exception {
-//         MockHttpServletRequest request = new MockHttpServletRequest();
-//         request.setRequestURI("/api/v1/auth/login");
-//         request.addHeader("X-Forwarded-For", "203.0.113.1, 198.51.100.1");
-//         request.setRemoteAddr("192.168.1.1");
-
-//         MockHttpServletResponse response = new MockHttpServletResponse();
-//         MockFilterChain filterChain = new MockFilterChain();
-
-//         when(redisTemplate.execute(
-//             any(RedisScript.class),
-//             eq(Collections.singletonList("rl:203.0.113.1:/api/v1/auth/login")),
-//             anyString(),
-//             anyString()
-//         )).thenReturn(1L);
-
-//         rateLimitFilter.doFilterInternal(request, response, filterChain);
-
-//         verify(redisTemplate).execute(
-//             any(RedisScript.class),
-//             eq(Collections.singletonList("rl:203.0.113.1:/api/v1/auth/login")),
-//             anyString(),
-//             anyString()
-//         );
-//     }
-// }
 
 ### END FILE
 
@@ -658,6 +612,7 @@ import com.szschoolmanager.auth.model.Utilisateur;
 import com.szschoolmanager.auth.service.DatabaseUserDetailsService;
 import com.szschoolmanager.auth.service.JwtService;
 import com.szschoolmanager.auth.service.RefreshTokenService;
+import com.szschoolmanager.auth.service.TokenOrchestratorService;
 import com.szschoolmanager.auth.service.UtilisateurService;
 import com.szschoolmanager.exception.BusinessValidationException;
 import com.szschoolmanager.exception.ResponseDTO;
@@ -686,6 +641,7 @@ import java.time.Instant;
 @RequiredArgsConstructor
 public class AuthenticationController {
 
+  private final TokenOrchestratorService tokenOrchestratorService;
   private final JwtService jwtService;
   private final UtilisateurService utilisateurService;
   private final RefreshTokenService refreshTokenService;
@@ -769,7 +725,7 @@ public class AuthenticationController {
 
 
   
- @PostMapping("/refresh")
+@PostMapping("/refresh")
 public ResponseEntity<ResponseDTO<AuthResponseDTO>> refreshToken(
     @RequestHeader(value = "Refresh-Token", required = false) String headerRefresh,
     HttpServletRequest request,
@@ -781,15 +737,26 @@ public ResponseEntity<ResponseDTO<AuthResponseDTO>> refreshToken(
     if (presented == null || presented.isBlank())
       throw new BusinessValidationException("Aucun refresh token fourni");
 
-    // 2️⃣ Rotate token (detect reuse and revoke if needed)
-    RefreshToken newRt = refreshTokenService.rotateRefreshToken(
-        presented,
-        request.getHeader("User-Agent"),
-        getClientIP(request)
+    
+    // 1️⃣ Validate RT (to get user safely)
+    Utilisateur user = refreshTokenService.validateRefreshToken(presented).getUtilisateur();
+
+    // 2️⃣ Rotate (detect reuse first)
+    RefreshToken newRt = tokenOrchestratorService.rotateWithAccessHandling(
+        presented, request.getHeader("User-Agent"), getClientIP(request), null
     );
 
-    // 3️⃣ Generate new access token
-    String newAccessToken = jwtService.generateAccessToken(newRt.getUtilisateur());
+    // 3️⃣ Generate new access token only if rotation succeeded
+    String newAccessToken = jwtService.generateAccessToken(user);
+    String newAccessJti = jwtService.parseToken(newAccessToken).getBody().getId();
+
+
+    // 4️⃣ Update the new refresh token with this access JTI (sync link)
+    newRt.setAccessJti(newAccessJti);
+    refreshTokenService.saveAccessJtiLink(newRt.getId(), newAccessJti);
+
+
+
 
     // 4️⃣ Return refresh cookie in production mode
     if (!devMode) {
@@ -820,6 +787,8 @@ public ResponseEntity<ResponseDTO<AuthResponseDTO>> refreshToken(
     return ResponseEntity.badRequest().body(ResponseDTO.error(e.getMessage()));
   }
 }
+
+
 private String getPresentedToken(String headerRefresh, HttpServletRequest request) {
   String presented = headerRefresh;
   if (presented == null || presented.isBlank()) {
@@ -1143,39 +1112,6 @@ public class UtilisateurCreateDTO {
 ### END FILE
 
 
-### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\auth\dto\UtilisateurDTO.java
-
-// package com.szschoolmanager.auth.dto;
-
-// import jakarta.validation.constraints.NotBlank;
-// import jakarta.validation.constraints.NotNull;
-// import lombok.*;
-
-// @Data
-// @Builder
-// @NoArgsConstructor
-// @AllArgsConstructor
-// public class UtilisateurDTO {
-
-//   private Long id;
-
-//   @NotBlank(message = "Le nom d’utilisateur est obligatoire")
-//   private String username;
-
-//   @NotBlank(message = "Le mot de passe est obligatoire")
-//   private String password;
-
-//   @NotNull(message = "Le rôle est obligatoire")
-//   private String role;
-
-//   @NotBlank(message = "Le CIN est obligatoire")
-//   private String cin;
-// }
-
-
-### END FILE
-
-
 ### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\auth\dto\UtilisateurResponseDTO.java
 
 package com.szschoolmanager.auth.dto;
@@ -1280,70 +1216,6 @@ public interface UtilisateurMapper {
 ### END FILE
 
 
-### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\auth\model\AuditLog.java
-
-// package com.szschoolmanager.auth.model;
-
-// import jakarta.persistence.*;
-// import lombok.*;
-// import java.time.LocalDateTime;
-
-// @Entity
-// @Table(
-//     name = "auditLogs"
-//     // indexes = {
-//     //     @Index(name = "idx_username", columnList = "username"),
-//     //     @Index(name = "idx_action", columnList = "action"),
-//     //     @Index(name = "idx_created_at", columnList = "created_at")
-//     // }
-// )
-// @Data
-// @NoArgsConstructor
-// @AllArgsConstructor
-// @Builder
-// public class AuditLog {
-
-//     @Id
-//     @GeneratedValue(strategy = GenerationType.IDENTITY)
-//     private Long id;
-
-//     @Column(name = "username", nullable = false)
-//     private String username;
-
-//     @Column(name = "action", nullable = false)
-//     private String action; // LOGIN_SUCCESS, LOGIN_FAILED, PASSWORD_CHANGED, etc.
-
-//     @Column(name = "ipAddress")
-//     private String ipAddress;
-
-//     @Column(name = "userAgent")
-//     private String userAgent;
-
-//     @Column(name = "details", columnDefinition = "TEXT")
-//     private String details;
-
-//     @Column(name = "severity")
-//     @Enumerated(EnumType.STRING)
-//     private Severity severity = Severity.INFO;
-
-//     @Column(name = "createdAt", nullable = false)
-//     private LocalDateTime createdAt;
-
-//     @PrePersist
-//     protected void onCreate() {
-//         if (createdAt == null) {
-//             createdAt = LocalDateTime.now();
-//         }
-//     }
-
-//     public enum Severity {
-//         INFO, WARNING, ERROR, CRITICAL
-//     }
-// }
-
-### END FILE
-
-
 ### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\auth\model\BaseEntity.java
 
 // com/myschool/backend/utilisateur/model/BaseEntity.java
@@ -1435,6 +1307,9 @@ public class RefreshToken {
   @Column(nullable = false, unique = true, length = 255)
   private String jti;
 
+  @Column(nullable = false, length = 255)
+  private String accessJti;
+
   @Builder.Default
   @Column(nullable = false)
   private boolean reused = false;
@@ -1489,28 +1364,6 @@ public class Utilisateur extends BaseEntity {
 ### END FILE
 
 
-### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\auth\repository\AuditLogRepository.java
-
-// package com.szschoolmanager.auth.repository;
-
-// import org.springframework.stereotype.Repository;
-
-// import com.szschoolmanager.auth.model.AuditLog;
-
-// @Repository
-// public class AuditLogRepository {
-
-//     public void save(AuditLog entry) {
-//         // TODO Auto-generated method stub
-//         throw new UnsupportedOperationException("Unimplemented method 'save'");
-//     }
-
-// }
-
-
-### END FILE
-
-
 ### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\auth\repository\RefreshTokenRepository.java
 
 package com.szschoolmanager.auth.repository;
@@ -1531,10 +1384,10 @@ import java.util.List;
 @Repository
 public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long> {
 
-    Optional<RefreshToken> findByToken(String token);
+    Optional<RefreshToken> findRawByToken(String token);
 
     @Query("SELECT r FROM RefreshToken r JOIN FETCH r.utilisateur WHERE r.token = :token")
-    Optional<RefreshToken> findByTokenWithUser(String token);
+    Optional<RefreshToken> findDetailedByToken(String token);
 
     List<RefreshToken> findAllByUtilisateurIdAndRevokedFalse(Long userId);
 
@@ -1549,9 +1402,21 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long
     @Query("DELETE FROM RefreshToken t WHERE t.expiresAt < :now")
     int deleteByExpiresAtBefore(LocalDateTime now);
 
+/*************  ✨ Windsurf Command ⭐  *************/
+    /**
+     * Find all active refresh tokens for a user, ordered by creation time.
+     * This method is thread-safe thanks to the PESSIMISTIC_WRITE lock.
+     * @param utilisateur the user for which to find active refresh tokens
+     * @return a list of active refresh tokens
+     */
+/*******  c728544a-c91e-4fb0-9f23-c7f5eb8bc80b  *******/
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT r FROM RefreshToken r WHERE r.utilisateur = :utilisateur AND r.revoked = false ORDER BY r.createdAt ASC")
     List<RefreshToken> findActiveTokensForUpdate(@Param("utilisateur") Utilisateur utilisateur);
+
+    @Modifying
+    @Query("UPDATE RefreshToken r SET r.accessJti = :accessJti WHERE r.id = :id")
+    void updateAccessJti(@Param("id") Long id, @Param("accessJti") String accessJti);
 
 }
 
@@ -1594,6 +1459,8 @@ public interface UtilisateurRepository extends JpaRepository<Utilisateur, Long> 
 package com.szschoolmanager.auth.security;
 
 import com.szschoolmanager.auth.service.JwtService;
+import com.szschoolmanager.auth.util.ErrorUtil;
+
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jws;
 import jakarta.servlet.FilterChain;
@@ -1637,8 +1504,13 @@ import java.util.List;
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
+    
+    private final JwtService jwtService;
+    private final MeterRegistry meterRegistry;
+
+    
     private static final List<String> WHITELIST = List.of(
-            "/api/v1/auth",
+            "/api/v1/auth/",
             "/v3/api-docs",
             "/swagger-ui",
             "/swagger-ui.html",
@@ -1646,15 +1518,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             "/webjars/"
     );
 
-    private static final String BLACKLIST_PREFIX = "blacklist:access:";
     private static final int MAX_TOKEN_LENGTH = 8192;
 
     @Value("${app.redis.fail-closed:true}")
     private boolean failClosed;
 
-    private final JwtService jwtService;
-    private final StringRedisTemplate stringRedisTemplate;
-    private final MeterRegistry meterRegistry;
 
     @Override
     protected void doFilterInternal(@NonNull HttpServletRequest request,
@@ -1683,7 +1551,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             meterRegistry.counter("jwt.auth.failure").increment();
             meterRegistry.counter("jwt.auth.empty").increment();
             log.warn("JWT token manquant — ip={}", request.getRemoteAddr());
-            respondError(response, HttpStatus.BAD_REQUEST, "Missing token");
+            ErrorUtil.writeJsonError(response, HttpStatus.BAD_REQUEST, "Missing token");
             return;
         }
 
@@ -1691,7 +1559,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             meterRegistry.counter("jwt.auth.failure").increment();
             meterRegistry.counter("jwt.auth.oversized").increment();
             log.warn("JWT trop long ({} octets) — ip={}", token.length(), request.getRemoteAddr());
-            respondError(response, HttpStatus.BAD_REQUEST, "Token too large");
+            ErrorUtil.writeJsonError(response, HttpStatus.BAD_REQUEST, "Token too large");
             return;
         }
 
@@ -1702,43 +1570,22 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         } catch (Exception e) {
             meterRegistry.counter("jwt.auth.failure").increment();
             log.warn("JWT invalide/expiré : {}", e.getMessage());
-            respondError(response, HttpStatus.UNAUTHORIZED, "Invalid or expired token");
+            ErrorUtil.writeJsonError(response, HttpStatus.UNAUTHORIZED, "Invalid or expired token");
             return;
         }
 
         Claims claims = jws.getBody();
         String username = claims.getSubject();
+        // vérifier la blacklist
         String jti = claims.getId();
 
-        // 5) Blacklist (revoked tokens) — atomic check via Redis key existence
-        if (jti != null) {
-            try {
-                if (Boolean.TRUE.equals(stringRedisTemplate.hasKey(BLACKLIST_PREFIX + jti))) {
-                    meterRegistry.counter("jwt.auth.blacklisted").increment();
-                    log.info("Token blacklisté jti={} ip={}", jti, request.getRemoteAddr());
-                    respondError(response, HttpStatus.UNAUTHORIZED, "Token revoked");
-                    return;
-                }
-            } catch (RedisConnectionFailureException ex) {
-                // Fail-closed configurable : en prod on préfère bloquer pour éviter bypass
-                log.error("Redis indisponible (failClosed={}) pour jti={} ip={}", failClosed, jti, request.getRemoteAddr(), ex);
-                meterRegistry.counter("jwt.auth.redis.unavailable").increment();
-                if (failClosed) {
-                    respondError(response, HttpStatus.SERVICE_UNAVAILABLE, "Authentication temporarily unavailable");
-                    return;
-                } else {
-                    log.warn("Redis indisponible mais failClosed=false → mode DEV, on continue");
-                }
-            } catch (Exception ex) {
-                log.error("Erreur vérif blacklist jti={} ip={}", jti, request.getRemoteAddr(), ex);
-                meterRegistry.counter("jwt.auth.redis.error").increment();
-                if (failClosed) {
-                    respondError(response, HttpStatus.SERVICE_UNAVAILABLE, "Auth service temporarily unavailable");
-                    return;
-                }
-            }
+        if (jti != null && jwtService.isAccessTokenBlacklisted(jti)) {
+            log.warn("Access token JTI {} is blacklisted", jti);
+            ErrorUtil.writeJsonError(response, HttpStatus.UNAUTHORIZED, "Access token revoked");
+            return;
         }
 
+        
         // 6) Reconstruction du SecurityContext **depuis le JWT uniquement**
         if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
             try {
@@ -1761,7 +1608,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             } catch (Exception e) {
                 meterRegistry.counter("jwt.auth.failure").increment();
                 log.error("Erreur construction SecurityContext pour user={} : {}", username, e.getMessage(), e);
-                respondError(response, HttpStatus.UNAUTHORIZED, "Authentication context error");
+                ErrorUtil.writeJsonError(response, HttpStatus.UNAUTHORIZED, "Authentication context error");
                 return;
             }
         }
@@ -1789,13 +1636,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         return out;
     }
 
-    private void respondError(HttpServletResponse response, HttpStatus status, String message) throws IOException {
-        response.setStatus(status.value());
-        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-        response.setCharacterEncoding("UTF-8");
-        response.getWriter().write(String.format("{\"status\":\"error\",\"message\":\"%s\",\"code\":%d}", message, status.value()));
-        response.getWriter().flush();
-    }
+    // private void respondError(HttpServletResponse response, HttpStatus status, String message) throws IOException {
+    //     response.setStatus(status.value());
+    //     response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+    //     response.setCharacterEncoding("UTF-8");
+    //     response.getWriter().write(String.format("{\"status\":\"error\",\"message\":\"%s\",\"code\":%d}", message, status.value()));
+    //     response.getWriter().flush();
+    // }
 }
 
 
@@ -1912,7 +1759,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
+import org.springframework.security.authorization.AuthorizationDecision;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -1920,14 +1769,20 @@ import org.springframework.security.config.annotation.web.configurers.AbstractHt
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.AuthenticationProvider;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.cors.*;
+import com.szschoolmanager.auth.util.ErrorUtil;
+import org.springframework.http.HttpStatus;
+
 
 import com.szschoolmanager.auth.config.RateLimitFilter;
 
@@ -1936,6 +1791,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
   @RequiredArgsConstructor
   @Configuration
@@ -1943,9 +1799,9 @@ import java.util.Objects;
   @EnableMethodSecurity(prePostEnabled = true)
   public class SecurityConfig {
 
-    private final RateLimitFilter rateLimitFilter;
     private final UserDetailsService userDetailsService;
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final Environment environment;
 
     // 👉 Externalisation des origines CORS via application.properties
     // Exemple :
@@ -1969,25 +1825,46 @@ import java.util.Objects;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-      http.csrf(AbstractHttpConfigurer::disable)
-          .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-          .authorizeHttpRequests(auth -> auth
-              .requestMatchers(AUTH_WHITELIST).permitAll()
-              .requestMatchers(SWAGGER_WHITELIST).permitAll()
-              .requestMatchers(ACTUATOR_WHITELIST).permitAll()
-              .anyRequest().authenticated())
-          .exceptionHandling(ex -> ex.authenticationEntryPoint(restAuthenticationEntryPoint()))
-          .sessionManagement(sess -> sess.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-          .authenticationProvider(daoAuthenticationProvider(passwordEncoder()));;
+        return http
+            .csrf(AbstractHttpConfigurer::disable)
+            .cors(Customizer.withDefaults())
+            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .authorizeHttpRequests(auth -> auth
+                // Auth endpoints publics
+                .requestMatchers("/api/v1/auth/**").permitAll()
 
-      // Add rate limiter before auth filter
-      // RateLimitFilter → JwtAuthenticationFilter → UsernamePasswordAuthenticationFilter
-      http.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
-      http.addFilterBefore(rateLimitFilter, JwtAuthenticationFilter.class);
+                // Swagger : accessible uniquement en profil dev
+                .requestMatchers(
+                    "/swagger-ui/**",
+                    "/v3/api-docs/**",
+                    "/swagger-resources/**",
+                    "/webjars/**"
+                ).access((authentication, context) -> {
+                    boolean devProfileActive = Arrays.asList(environment.getActiveProfiles()).contains("dev");
+                    return new AuthorizationDecision(devProfileActive);
+                })
 
+                // Actuator
+                .requestMatchers("/actuator/health", "/actuator/info").permitAll()
+                .requestMatchers("/actuator/**").hasRole("ADMIN")
 
-      return http.build();
+                // Erreurs et fichiers statiques
+                .requestMatchers("/error", "/favicon.ico").permitAll()
+
+                // Tout le reste = JWT obligatoire
+                .anyRequest().authenticated()
+            )
+            .exceptionHandling(ex -> ex
+                  .authenticationEntryPoint(restAuthenticationEntryPoint())
+                  .accessDeniedHandler(restAccessDeniedHandler())
+              )
+            .authenticationProvider(daoAuthenticationProvider(passwordEncoder()))// ✅ correspond à ton bean réel
+            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class) // ✅ nom réel de ton filtre
+            .build();
     }
+
+
+
 
     @Bean
     public UrlBasedCorsConfigurationSource corsConfigurationSource() {
@@ -2027,62 +1904,19 @@ import java.util.Objects;
     @Bean
     public AuthenticationEntryPoint restAuthenticationEntryPoint() {
       return (request, response, authException) -> {
-        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         String message = Objects.requireNonNullElse(authException.getMessage(), "Unauthorized");
-        String body = String.format("{\"status\":\"error\",\"message\":\"%s\"}", message.replace("\"", "'"));
-        response.getWriter().write(body);
+        ErrorUtil.writeJsonError(response, HttpStatus.UNAUTHORIZED, message);
       };
+    }
+
+    @Bean
+    public AccessDeniedHandler restAccessDeniedHandler() {
+        return (request, response, accessDeniedException) ->
+            ErrorUtil.writeJsonError(response, HttpStatus.FORBIDDEN,
+                "Accès refusé : vous n'êtes pas autorisé à effectuer cette action");
     }
   }
 
-
-### END FILE
-
-
-### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\auth\service\AuditLogService.java
-
-// package com.szschoolmanager.auth.service;
-
-// import com.szschoolmanager.auth.model.AuditLog;
-// import com.szschoolmanager.auth.repository.AuditLogRepository;
-// import lombok.RequiredArgsConstructor;
-// import lombok.extern.slf4j.Slf4j;
-// import org.springframework.scheduling.annotation.Async;
-// import org.springframework.stereotype.Service;
-
-// @Service
-// @RequiredArgsConstructor
-// @Slf4j
-// public class AuditLogService {
-
-//     private final AuditLogRepository auditLogRepository;
-
-//     @Async
-//     public void log(String action, String username, String ip, String userAgent) {
-//         log(action, username, ip, userAgent, null, AuditLog.Severity.INFO);
-//     }
-
-//     @Async
-//     public void log(String action, String username, String ip, String userAgent, 
-//                     String details, AuditLog.Severity severity) {
-//         try {
-//             AuditLog entry = AuditLog.builder()
-//                 .username(username)
-//                 .action(action)
-//                 .ipAddress(ip)
-//                 .userAgent(userAgent)
-//                 .details(details)
-//                 .severity(severity)
-//                 .build();
-            
-//             auditLogRepository.save(entry);
-//             log.info("📝 Audit: {} - {} from {}", action, username, ip);
-//         } catch (Exception e) {
-//             log.error("❌ Failed to save audit log: {}", e.getMessage());
-//         }
-//     }
-// }
 
 ### END FILE
 
@@ -2229,6 +2063,7 @@ import org.springframework.stereotype.Service;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.security.*;
+import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
 import java.security.spec.*;
 import java.time.Duration;
@@ -2241,6 +2076,12 @@ import java.util.*;
 @Slf4j
 @Service
 public class JwtService {
+
+
+   // --- Dependencies ---
+  private final StringRedisTemplate stringRedisTemplate;
+  private final RefreshTokenService refreshTokenService;
+
 
   // --- Configuration JWT ---
   @Value("${jwt.private-key-path}")
@@ -2265,10 +2106,9 @@ public class JwtService {
   // --- Runtime state ---
   private PrivateKey privateKey;
   @Getter private RSAPublicKey publicKey;
+  private JwtParser jwtParser;
 
-  // --- Dependencies ---
-  private final StringRedisTemplate stringRedisTemplate;
-  private final RefreshTokenService refreshTokenService;
+ 
 
   public JwtService(StringRedisTemplate stringRedisTemplate,
                     RefreshTokenService refreshTokenService) {
@@ -2280,11 +2120,21 @@ public class JwtService {
   @PostConstruct
   public void init() {
     try {
-      this.privateKey = loadPrivateKey(privateKeyPath);
-      this.publicKey = (RSAPublicKey) loadPublicKey(publicKeyPath);
-      if (privateKey == null || publicKey == null)
-        throw new IllegalStateException("RSA keys not loaded correctly");
-      log.info("🔐 JWT initialized kid={} issuer={} audience={}", configuredKid, issuer, audience);
+      PrivateKey priv = loadPrivateKey(privateKeyPath);
+      if (!(priv instanceof RSAPrivateKey))
+          throw new IllegalStateException("Clé privée non RSA : " + privateKeyPath);
+      this.privateKey = (RSAPrivateKey) priv;
+
+      PublicKey loaded = loadPublicKey(publicKeyPath);
+      if (!(loaded instanceof RSAPublicKey)) {
+          throw new IllegalStateException("La clé publique fournie n'est pas une clé RSA compatible (chemin=" 
+              + publicKeyPath + "). Vérifiez le format PEM/DER et que la clé est une clé RSA.");
+      }
+      this.publicKey = (RSAPublicKey) loaded;
+      this.jwtParser = Jwts.parserBuilder()
+                          .setSigningKey(publicKey)
+                          .requireIssuer(issuer)
+                          .build();
     } catch (Exception e) {
       log.error("Failed to init JwtService: {}", e.getMessage(), e);
       throw new IllegalStateException(e);
@@ -2345,11 +2195,13 @@ public class JwtService {
   public TokensDTO generateTokens(Utilisateur user, HttpServletRequest request) {
       String accessToken = generateAccessToken(user);
       String clientIp = extractClientIp(request);
+      
       String userAgent = (request != null && request.getHeader("User-Agent") != null)
               ? request.getHeader("User-Agent") : "unknown-client";
-
-      RefreshToken refreshEntity = refreshTokenService.createRefreshToken(user, userAgent, clientIp);
+      String accessJti = extractJti(accessToken);
+      RefreshToken refreshEntity = refreshTokenService.createRefreshToken(user, userAgent, clientIp, accessJti);
       String rawRefresh = refreshEntity.getToken();
+      
 
       log.info("🔐 Tokens générés pour [{}] depuis IP [{}], agent [{}]",
               user.getUsername(), clientIp, userAgent);
@@ -2385,23 +2237,24 @@ public class JwtService {
 
   // --- JWT parsing ---
   public Jws<Claims> parseToken(String token) {
-    JwtParser parser = Jwts.parserBuilder().setSigningKey(publicKey).build();
-    Jws<Claims> jws = parser.parseClaimsJws(token);
-    Claims c = jws.getBody();
-    if (!issuer.equals(c.getIssuer())) throw new JwtException("Invalid issuer");
-    if (c.getAudience() == null || !c.getAudience().contains(audience)) throw new JwtException("Invalid audience");
-    return jws;
+      Jws<Claims> jws = jwtParser.parseClaimsJws(token);
+  Claims c = jws.getBody();
+  if (c.getAudience() == null || !c.getAudience().contains(audience))
+      throw new JwtException("Invalid audience");
+  return jws;
   }
 
-  public String getUsernameFromToken(String token) { return parseToken(token).getBody().getSubject(); }
-  public String getRoleFromToken(String token) { return parseToken(token).getBody().get("role", String.class); }
-  public String getCinFromToken(String token) { return parseToken(token).getBody().get("cin", String.class); }
-  public String getJti(String token) { return parseToken(token).getBody().getId(); }
+  // public String getUsernameFromToken(String token) { return parseToken(token).getBody().getSubject(); }
+  // public String getRoleFromToken(String token) { return parseToken(token).getBody().get("role", String.class); }
+  // public String getJti(String token) { return parseToken(token).getBody().getId(); }
 
+    private String extractJti(String token) {
+      return parseToken(token).getBody().getId();
+  }
   public boolean isTokenValid(String token, String username) {
     try {
       Claims claims = parseToken(token).getBody();
-      return claims.getSubject().equals(username)
+      return username.equals(claims.getSubject())
           && claims.getExpiration().after(new Date());
     } catch (JwtException | IllegalArgumentException e) {
       log.warn("Invalid JWT: {}", e.getMessage());
@@ -2417,6 +2270,21 @@ public class JwtService {
       log.warn("Failed to write blacklist jti={} into redis: {}", jti, e.getMessage());
     }
   }
+
+  public boolean isAccessTokenBlacklisted(String jti) {
+    try {
+        String key = "blacklist:access:" + jti;
+        return Boolean.TRUE.equals(stringRedisTemplate.hasKey(key));
+    } catch (Exception e) {
+        log.warn("Failed to check blacklist for jti {}: {}", jti, e.getMessage());
+        return false;
+    }
+}
+
+public long getAccessExpirationSeconds() {
+      return accessExpirationSeconds;
+  }
+
 }
 
 
@@ -2631,19 +2499,26 @@ import com.szschoolmanager.exception.BusinessValidationException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
 
 /**
  * Complete RefreshTokenService (production-ready).
@@ -2658,13 +2533,13 @@ import java.util.UUID;
 public class RefreshTokenService {
 
     private final RefreshTokenRepository refreshTokenRepository;
-
+    
     private static final int REFRESH_TOKEN_DAYS = 7;
     private static final int MAX_ACTIVE_SESSIONS = 3;
 
     // ----------------- CREATE -----------------
     @Transactional
-    public RefreshToken createRefreshToken(Utilisateur user, String userAgent, String ipAddress) {
+    public RefreshToken createRefreshToken(Utilisateur user, String userAgent, String ipAddress, String accessJti) {
         Objects.requireNonNull(user, "Utilisateur ne peut pas être nul");
 
         try {
@@ -2697,6 +2572,7 @@ public class RefreshTokenService {
                     .reused(false)
                     .userAgent(shorten(userAgent))
                     .ipAddress(shorten(ipAddress))
+                    .accessJti(accessJti)
                     .build();
 
             RefreshToken saved = refreshTokenRepository.save(entity); // one persist call only
@@ -2713,6 +2589,7 @@ public class RefreshTokenService {
                     .userAgent(saved.getUserAgent())
                     .ipAddress(saved.getIpAddress())
                     .jti(saved.getJti())
+                    .accessJti(accessJti)
                     .build();
 
         } catch (Exception e) {
@@ -2733,12 +2610,12 @@ public class RefreshTokenService {
             throw new BusinessValidationException("Aucun refresh token fourni");
         }
         String hashed = hashToken(rawToken);
-        RefreshToken rt = refreshTokenRepository.findByTokenWithUser(hashed)
+        RefreshToken rt = refreshTokenRepository.findDetailedByToken(hashed)
                 .orElseThrow(() -> new BusinessValidationException("Token invalide"));
-        if (rt.isRevoked()) throw new BusinessValidationException("Token déjà révoqué");
         if (rt.isExpired()) throw new BusinessValidationException("Token expiré");
         return rt;
     }
+
 
     // ----------------- ROTATE -----------------
     /**
@@ -2747,34 +2624,37 @@ public class RefreshTokenService {
      * - If presented token is already revoked -> mark reused, commit revocations for user (REQUIRES_NEW), then throw.
      */
     @Transactional(noRollbackFor = BusinessValidationException.class)
-    public RefreshToken rotateRefreshToken(String presentedRaw, String userAgent, String ipAddress) {
+    public RefreshToken rotateRefreshToken(String presentedRaw, String userAgent, String ipAddress, String accessJti) {
         if (presentedRaw == null || presentedRaw.isBlank()) {
             throw new BusinessValidationException("Aucun refresh token fourni");
         }
 
         String hashed = hashToken(presentedRaw);
-        RefreshToken stored = refreshTokenRepository.findByTokenWithUser(hashed)
+        RefreshToken stored = refreshTokenRepository.findDetailedByToken(hashed)
                 .orElseThrow(() -> new BusinessValidationException("Token invalide"));
 
         // normal rotation
         if (!stored.isRevoked()) {
             stored.setRevoked(true);
             refreshTokenRepository.saveAndFlush(stored);
-            return createRefreshToken(stored.getUtilisateur(), userAgent, ipAddress);
+            return createRefreshToken(stored.getUtilisateur(), userAgent, ipAddress, accessJti);
         }
 
         // reuse detected
         if (!stored.isReused()) {
             stored.setReused(true);
             refreshTokenRepository.saveAndFlush(stored);
-            revokeAllActiveSessionsForUserCommitted(stored.getUtilisateur().getId());
         }
+        revokeAllActiveSessionsForUserCommitted(stored.getUtilisateur().getId());
 
-
-        // throw here cause rollback problem > no changes commited on db level
-        // fixed by (noRollbackFor = BusinessValidationException.class)
         throw new BusinessValidationException("Refresh token reuse detected - all sessions revoked");
     }
+
+    @Transactional
+    public void saveAccessJtiLink(Long refreshId, String accessJti) {
+        refreshTokenRepository.updateAccessJti(refreshId, accessJti);
+    }
+
 
     // ----------------- REVOKE ONE -----------------
     @Transactional
@@ -2784,7 +2664,7 @@ public class RefreshTokenService {
             return;
         }
         String hashed = hashToken(rawToken);
-        Optional<RefreshToken> optional = refreshTokenRepository.findByTokenWithUser(hashed);
+        Optional<RefreshToken> optional = refreshTokenRepository.findDetailedByToken(hashed);
         optional.ifPresent(rt -> {
             if (!rt.isRevoked()) {
                 rt.setRevoked(true);
@@ -2826,17 +2706,25 @@ public class RefreshTokenService {
         return UUID.randomUUID().toString().replace("-", "") + UUID.randomUUID().toString().replace("-", "");
     }
 
-    private static String hashToken(String token) {
+
+    private static final String HMAC_ALGO = "HmacSHA256";
+    private static final Charset UTF8 = StandardCharsets.UTF_8;
+
+    // this secret should come from your config (never hard-coded)
+    @Value("${app.security.token-hash-secret}")
+    private String tokenHashSecret;
+
+
+    private String hashToken(String rawToken) {
         try {
-            MessageDigest md = MessageDigest.getInstance("SHA-256");
-            byte[] h = md.digest(token.getBytes(StandardCharsets.UTF_8));
-            StringBuilder hex = new StringBuilder(h.length * 2);
-            for (byte b : h) {
-                hex.append(String.format("%02x", b));
-            }
+            Mac hmac = Mac.getInstance(HMAC_ALGO);
+            hmac.init(new SecretKeySpec(tokenHashSecret.getBytes(UTF8), HMAC_ALGO));
+            byte[] digest = hmac.doFinal(rawToken.getBytes(UTF8));
+            StringBuilder hex = new StringBuilder(digest.length * 2);
+            for (byte b : digest) hex.append(String.format("%02x", b));
             return hex.toString();
         } catch (Exception e) {
-            throw new IllegalStateException("Erreur lors du hachage du refresh token", e);
+            throw new IllegalStateException("Erreur lors du hachage sécurisé du refresh token", e);
         }
     }
 
@@ -2854,6 +2742,90 @@ public class RefreshTokenService {
         log.info("🧹 Deleted {} expired refresh tokens", deleted);
     }
 
+     public long getRefreshExpirationSeconds() {
+        return Duration.ofDays(REFRESH_TOKEN_DAYS).getSeconds();
+    }
+
+
+    @Transactional(readOnly = true)
+    public RefreshToken findByRawToken(String rawToken) {
+        if (rawToken == null || rawToken.isBlank()) {
+            return null;
+        }
+        String hashed = hashToken(rawToken);
+        return refreshTokenRepository.findRawByToken(hashed).orElse(null);
+    }
+
+
+}
+
+
+### END FILE
+
+
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\auth\service\TokenOrchestratorService.java
+
+package com.szschoolmanager.auth.service;
+
+import java.time.Duration;
+
+import org.springframework.stereotype.Service;
+
+import com.szschoolmanager.auth.dto.TokensDTO;
+import com.szschoolmanager.auth.model.RefreshToken;
+import com.szschoolmanager.auth.model.Utilisateur;
+import com.szschoolmanager.exception.BusinessValidationException;
+
+import jakarta.servlet.http.HttpServletRequest;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+
+
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class TokenOrchestratorService {
+
+    private final JwtService jwtService;
+    private final RefreshTokenService refreshTokenService;
+
+    /**
+     * Gère la rotation du refresh token, la détection de réutilisation,
+     * et le blacklistage du access token lié.
+     */
+    public RefreshToken rotateWithAccessHandling(String presentedRaw,
+                                                 String userAgent,
+                                                 String ipAddress,
+                                                 String accessJti) {
+
+        try {
+            RefreshToken newRt = refreshTokenService.rotateRefreshToken(
+                    presentedRaw, userAgent, ipAddress, accessJti);
+            return newRt;
+
+        } catch (BusinessValidationException e) {
+
+            // 🔒 Cas : le refresh token a été réutilisé (reuse detected)
+            if (e.getMessage().toLowerCase().contains("reuse")) {
+                RefreshToken reused = refreshTokenService.findByRawToken(presentedRaw);
+                if (reused != null && reused.getAccessJti() != null) {
+                    try {
+                        jwtService.blacklistAccessTokenJti(
+                                reused.getAccessJti(),
+                                Duration.ofSeconds(jwtService.getAccessExpirationSeconds())
+                        );
+                        log.warn("🚫 Access token JTI blacklisted due to refresh reuse for user {}",
+                                reused.getUtilisateur().getUsername());
+                    } catch (Exception ex) {
+                        log.error("❌ Failed to blacklist reused access token JTI: {}", ex.getMessage());
+                    }
+                }
+            }
+            throw e; // rethrow pour que le contrôleur sache que c’est une reuse
+        }
+    }
+
+    
 }
 
 
@@ -3059,38 +3031,63 @@ public class UtilisateurService {
 }
 
 
+### END FILE
 
 
-package com.szschoolmanager.tools;
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\auth\util\ErrorUtil.java
 
-import java.io.FileOutputStream;
-import java.security.KeyPair;
-import java.security.KeyPairGenerator;
-import java.security.PrivateKey;
-import java.security.PublicKey;
+package com.szschoolmanager.auth.util;
 
-public class GenerateRSAKeys {
-  public static void main(String[] args) throws Exception {
-    KeyPairGenerator generator = KeyPairGenerator.getInstance("RSA");
-    generator.initialize(2048);
-    KeyPair pair = generator.generateKeyPair();
-    PrivateKey privateKey = pair.getPrivate();
-    PublicKey publicKey = pair.getPublic();
+import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 
-    try (FileOutputStream out = new FileOutputStream("src/main/resources/keys/private_key.pem")) {
-      out.write(privateKey.getEncoded());
+import java.io.IOException;
+
+/**
+ * Utilitaire centralisé pour écrire des réponses d'erreur JSON sécurisées.
+ */
+public final class ErrorUtil {
+
+    private static final ObjectMapper MAPPER = new ObjectMapper();
+
+    private ErrorUtil() {}
+
+    public static void writeJsonError(HttpServletResponse response, HttpStatus status, String message) {
+        try {
+            response.setStatus(status.value());
+            response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+            response.setCharacterEncoding("UTF-8");
+            var body = new ErrorResponse("error", message, status.value());
+            response.getWriter().write(MAPPER.writeValueAsString(body));
+            response.getWriter().flush();
+        } catch (IOException e) {
+            // En dernier recours, renvoyer le statut sans body
+            response.setStatus(status.value());
+        }
     }
-    try (FileOutputStream out = new FileOutputStream("src/main/resources/keys/public_key.pem")) {
-      out.write(publicKey.getEncoded());
-    }
 
-    System.out.println("✅ Clés RSA générées dans src/main/resources/keys/");
-  }
+    // petit DTO immuable pour la structure d'erreur
+    public static final class ErrorResponse {
+        public final String status;
+        public final String message;
+        public final int code;
+        public ErrorResponse(String status, String message, int code) {
+            this.status = status;
+            this.message = message;
+            this.code = code;
+        }
+    }
 }
 
 
+### END FILE
 
-package com.szschoolmanager.util;
+
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\auth\util\PemUtils.java
+
+package com.szschoolmanager.auth.util;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -3150,9 +3147,10 @@ public final class PemUtils {
 }
 
 
+### END FILE
 
 
-
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\Config\SwaggerConfig.java
 
 package com.szschoolmanager.Config;
 
@@ -3220,7 +3218,10 @@ public class SwaggerConfig {
 }
 
 
+### END FILE
 
+
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\DTO\ErrorResponse.java
 
 package com.szschoolmanager.DTO;
 
@@ -3245,7 +3246,75 @@ public class ErrorResponse {
 }
 
 
+### END FILE
 
+
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\DTO\FiliereDTO.java
+
+package com.szschoolmanager.DTO;
+
+import com.szschoolmanager.Model.PlanningType;
+import lombok.*;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class FiliereDTO {
+  private Long id;
+  private String codeFiliere;
+  private String nomFiliere;
+  private String niveau;
+  private Integer dureeHeures;
+  private String description;
+  private String responsableCin;
+  private String responsableNomComplet; // concat nom + prenom
+  private PlanningType planninType;
+  private Boolean actif;
+}
+
+
+### END FILE
+
+
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\exception\BusinessValidationException.java
+
+package com.szschoolmanager.exception;
+
+public class BusinessValidationException extends RuntimeException {
+  public BusinessValidationException(String message) {
+    super(message);
+  }
+}
+
+
+### END FILE
+
+
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\exception\DuplicateResourceException.java
+
+package com.szschoolmanager.exception;
+
+public class DuplicateResourceException extends RuntimeException {
+
+  public DuplicateResourceException() {
+    super();
+  }
+
+  public DuplicateResourceException(String message) {
+    super(message);
+  }
+
+  public DuplicateResourceException(String message, Throwable cause) {
+    super(message, cause);
+  }
+}
+
+
+### END FILE
+
+
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\exception\GlobalExceptionHandler.java
 
 package com.szschoolmanager.exception;
 
@@ -3256,6 +3325,8 @@ import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotWritableException;
+import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
@@ -3332,8 +3403,46 @@ public class GlobalExceptionHandler {
             new ResponseDTO<>(
                 "INTERNAL_ERROR", "Erreur interne du serveur.", null, LocalDateTime.now()));
   }
+
+  // 🧩 Fallback ultime : capture les erreurs non interceptées (conversion, content-type...)
+  @ExceptionHandler(HttpMessageNotWritableException.class)
+  public ResponseEntity<ResponseDTO<Void>> handleConverterIssue(HttpMessageNotWritableException ex) {
+    log.error("Erreur de conversion HTTP (fallback): {}", ex.getMessage());
+    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+        .body(new ResponseDTO<>("INTERNAL_ERROR", "Erreur de conversion de réponse JSON.", null, LocalDateTime.now()));
+  }
+
+
+  @ExceptionHandler(AuthorizationDeniedException.class)
+  public ResponseEntity<ResponseDTO<Void>> handleAccessDenied(AuthorizationDeniedException ex) {
+      log.warn("Accès refusé : {}", ex.getMessage());
+      return ResponseEntity
+          .status(HttpStatus.FORBIDDEN)
+          .body(ResponseDTO.error("Accès refusé : vous n'êtes pas autorisé à effectuer cette action"));
+  }
+
+
 }
 
+
+### END FILE
+
+
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\exception\ResourceNotFoundException.java
+
+package com.szschoolmanager.exception;
+
+public class ResourceNotFoundException extends RuntimeException {
+  public ResourceNotFoundException(String message) {
+    super(message);
+  }
+}
+
+
+### END FILE
+
+
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\exception\ResponseDTO.java
 
 package com.szschoolmanager.exception;
 
@@ -3363,525 +3472,1346 @@ public class ResponseDTO<T> {
 }
 
 
+### END FILE
 
-<?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
-
-    <modelVersion>4.0.0</modelVersion>
-
-    <parent>
-        <groupId>org.springframework.boot</groupId>
-        <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.5.6</version>
-        <relativePath/>
-    </parent>
-
-    <groupId>com.szschoolmanager</groupId>
-    <artifactId>szschoolmanager</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
-    <name>szschoolmanager</name>
-    <description>Project for myschool</description>
-
-    <properties>
-        <java.version>17</java.version>
-        <springdoc.version>2.7.0</springdoc.version> 
-        <mapstruct.version>1.5.5.Final</mapstruct.version>
-        <lombok.version>1.18.30</lombok.version>
-    </properties>
-
-    <dependencies>
-
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-actuator</artifactId>
-        </dependency>
-
-        <!-- Micrometer Prometheus -->
-        <dependency>
-            <groupId>io.micrometer</groupId>
-            <artifactId>micrometer-registry-prometheus</artifactId>
-        </dependency>
-
-        <!-- Spring Boot Starters -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-data-jpa</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-web</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-thymeleaf</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-security</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-validation</artifactId>
-        </dependency>
-
-        <!-- Springdoc OpenAPI -->
-        <dependency>
-            <groupId>org.springdoc</groupId>
-            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
-            <version>2.7.0</version>  <!-- Or use ${springdoc.version} -->
-        </dependency>
-
-        <!-- Thymeleaf Extras for Security -->
-        <dependency>
-            <groupId>org.thymeleaf.extras</groupId>
-            <artifactId>thymeleaf-extras-springsecurity6</artifactId>
-        </dependency>
-
-        <!-- Database & Migration -->
-        <dependency>
-            <groupId>org.postgresql</groupId>
-            <artifactId>postgresql</artifactId>
-            <scope>runtime</scope>
-        </dependency>
-
-        <!-- JWT (jjwt) -->
-        <dependency>
-            <groupId>io.jsonwebtoken</groupId>
-            <artifactId>jjwt-api</artifactId>
-            <version>0.11.5</version>
-        </dependency>
-
-        <dependency>
-            <groupId>io.jsonwebtoken</groupId>
-            <artifactId>jjwt-impl</artifactId>
-            <version>0.11.5</version>
-            <scope>runtime</scope>
-        </dependency>
-
-        <dependency>
-            <groupId>io.jsonwebtoken</groupId>
-            <artifactId>jjwt-jackson</artifactId>
-            <version>0.11.5</version>
-            <scope>runtime</scope>
-        </dependency>
-
-        <!-- Nimbus (optional pour JWKS si tu veux) -->
-        <dependency>
-            <groupId>com.nimbusds</groupId>
-            <artifactId>nimbus-jose-jwt</artifactId>
-            <version>9.31</version>
-        </dependency>
-
-        <!-- Redis -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-data-redis</artifactId>
-        </dependency>
-
-        <!-- Bucket4j -->
-        <dependency>
-            <groupId>com.bucket4j</groupId>
-            <artifactId>bucket4j-core</artifactId>
-            <version>8.10.1</version>
-        </dependency>
-
-        <dependency>
-            <groupId>com.bucket4j</groupId>
-            <artifactId>bucket4j-redis</artifactId>
-            <version>8.10.1</version>
-        </dependency>
-
-        <dependency>
-            <groupId>io.lettuce</groupId>
-            <artifactId>lettuce-core</artifactId>
-        </dependency>
-
-    
-        <dependency>
-            <groupId>org.apache.commons</groupId>
-            <artifactId>commons-pool2</artifactId>
-        </dependency>
-
-
-        <!-- ADD Redisson client 👇 -->
-        <dependency>
-            <groupId>org.redisson</groupId>
-            <artifactId>redisson-spring-boot-starter</artifactId>
-            <version>3.25.2</version>
-        </dependency>
-
-        
-        <!-- <dependency>
-            <groupId>org.liquibase</groupId>
-            <artifactId>liquibase-core</artifactId>
-        </dependency> -->
-
-
-
-        <!-- Lombok -->
-        <dependency>
-            <groupId>org.projectlombok</groupId>
-            <artifactId>lombok</artifactId>
-            <version>${lombok.version}</version>
-            <scope>provided</scope>
-        </dependency>
-
-        <!-- MapStruct -->
-        <dependency>
-            <groupId>org.mapstruct</groupId>
-            <artifactId>mapstruct</artifactId>
-            <version>${mapstruct.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>org.mapstruct</groupId>
-            <artifactId>mapstruct-processor</artifactId>
-            <version>${mapstruct.version}</version>
-            <scope>provided</scope>
-        </dependency>
-
-
-        <!-- Apache POI -->
-        <dependency>
-            <groupId>org.apache.poi</groupId>
-            <artifactId>poi-ooxml</artifactId>
-            <version>5.2.3</version>
-        </dependency>
-
-        <!-- Test Dependencies -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-test</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework.security</groupId>
-            <artifactId>spring-security-test</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.assertj</groupId>
-            <artifactId>assertj-core</artifactId>
-            <version>3.13.2</version>
-            <scope>test</scope>
-        </dependency>
-
-        <!-- ArchUnit (tests d’architecture) -->
-        <!-- ArchUnit pour tests d'architecture (ex: interdépendances packages) -->
-        <dependency>
-            <groupId>com.tngtech.archunit</groupId>
-            <artifactId>archunit-junit5</artifactId>
-            <version>1.0.1</version>
-            <scope>test</scope>
-        </dependency>
-
-        
-    </dependencies>
-
-    <pluginRepositories>
-        <pluginRepository>
-            <id>central</id>
-            <url>https://repo.maven.apache.org/maven2</url>
-        </pluginRepository>
-        <pluginRepository>
-            <id>kth-releases</id>
-            <url>https://raw.githubusercontent.com/castor-software/depclean/mvn-repo/</url>
-        </pluginRepository>
-    </pluginRepositories>
-
-    <build>
-        <plugins>
-            <!-- Compiler plugin for MapStruct + Lombok -->
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.11.0</version>
-                <configuration>
-                    <source>17</source>
-                    <target>17</target>
-                    <annotationProcessorPaths>
-                        <path>
-                            <groupId>org.projectlombok</groupId>
-                            <artifactId>lombok</artifactId>
-                            <version>${lombok.version}</version>
-                        </path>
-                        <path>
-                            <groupId>org.mapstruct</groupId>
-                            <artifactId>mapstruct-processor</artifactId>
-                            <version>${mapstruct.version}</version>
-                        </path>
-                        <path>
-                            <groupId>org.projectlombok</groupId>
-                            <artifactId>lombok-mapstruct-binding</artifactId>
-                            <version>0.2.0</version>
-                        </path>
-                    </annotationProcessorPaths>
-                    <compilerArgs>
-                        <arg>-Amapstruct.verbose=true</arg>
-                    </compilerArgs>
-                </configuration>
-            </plugin>
-            <plugin>
-                <groupId>org.codehaus.mojo</groupId>
-                <artifactId>exec-maven-plugin</artifactId>
-                <version>3.1.0</version>
-            </plugin>
-
-            <!-- Spring Boot Maven plugin -->
-            <plugin>
-                <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-maven-plugin</artifactId>
-            </plugin>
-
-            <!-- Maven Dependency Management -->
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-enforcer-plugin</artifactId>
-                <version>3.5.0</version>
-                <executions>
-                    <execution>
-                    <id>enforce</id>
-                    <goals><goal>enforce</goal></goals>
-                    <configuration>
-                        <rules>
-                        <requireMavenVersion>
-                            <version>[3.6.3,)</version>
-                        </requireMavenVersion>
-                        <requireJavaVersion>
-                            <version>[17,)</version>
-                        </requireJavaVersion>
-                        </rules>
-                    </configuration>
-                    </execution>
-                </executions>
-            </plugin>
-
-
-            <plugin>
-            <groupId>com.diffplug.spotless</groupId>
-            <artifactId>spotless-maven-plugin</artifactId>
-            <version>2.43.0</version>
-            <configuration>
-                <formats>
-                <format>
-                    <includes>
-                    <include>*.md</include>
-                    </includes>
-                    <trimTrailingWhitespace/>
-                    <endWithNewline/>
-                </format>
-                </formats>
-                <java>
-                <googleJavaFormat>
-                    <version>1.19.2</version>
-                </googleJavaFormat>
-                <removeUnusedImports />
-                </java>
-            </configuration>
-            </plugin>
-
-            <plugin>
-                <groupId>se.kth.castor</groupId>
-                <artifactId>depclean-maven-plugin</artifactId>
-                <version>2.0.0</version>
-
-                <executions>
-                    <execution>
-                    <phase>verify</phase>
-                    <goals>
-                        <goal>depclean</goal>
-                    </goals>
-                    </execution>
-                </executions>
-
-                <configuration>
-                    <!-- Crée un pom-depclean.xml nettoyé -->
-                    <createBackupPom>true</createBackupPom>
-
-                    <!-- Garde les dépendances essentielles -->
-                    <excludeDependencies>
-                    <!-- Starter Spring Boot: gestion auto des transitive deps -->
-                    <excludeDependency>org.springframework.boot:spring-boot-starter*</excludeDependency>
-
-                    <!-- Swagger/OpenAPI -->
-                    <excludeDependency>org.springdoc:springdoc-openapi-starter-webmvc-ui</excludeDependency>
-
-                    <!-- Lombok -->
-                    <excludeDependency>org.projectlombok:lombok</excludeDependency>
-
-                    <!-- MapStruct -->
-                    <excludeDependency>org.mapstruct:mapstruct*</excludeDependency>
-
-                    <!-- JJWT -->
-                    <excludeDependency>io.jsonwebtoken:jjwt*</excludeDependency>
-
-                    <!-- Hibernate & JPA -->
-                    <excludeDependency>org.hibernate.orm:hibernate-core</excludeDependency>
-                    <excludeDependency>jakarta.persistence:jakarta.persistence-api</excludeDependency>
-
-                    <!-- PostgreSQL -->
-                    <excludeDependency>org.postgresql:postgresql</excludeDependency>
-                    </excludeDependencies>
-                </configuration>
-                </plugin>
-
-              
-           
-
-
-
-
-        </plugins>
-    </build>
-
-</project>
-
-
-
-
-# servers:
-#   errors:
-#     include-message : always
-#     include-binding-errors: always
-# spring:
-#   datasource:
-#     url: jdbc:postgresql://localhost:5433/etatdavbd
-#     username: postgres
-#     password: S@ad123
-# jpa:
-#   hibernate:
-#     ddl-auto: create-drop
-#   properties:
-#     properties:
-#       hibernate:
-#         dialect: org.hibernate.dialect.PostgreSQLDialect
-#         format-sql: true
-#     show-sql: true
-spring.application.name=backend
-spring.datasource.url=jdbc:postgresql://localhost:5434/szschoolmanager
-spring.datasource.username=postgres
-spring.datasource.password=S@ad123
-spring.datasource.driver-class-name=org.postgresql.Driver
-spring.jpa.hibernate.ddl-auto=validate
-# spring.liquibase.change-log=classpath:db/changelog/db.changelog-master.yaml
-# spring.liquibase.enabled=true
-# spring.flyway.enabled=false
-# spring.flyway.baseline-on-migrate=true
-# spring.flyway.locations=classpath:db/migration
-spring.jpa.show-sql=true
-spring.jpa.properties.hibernate.format_sql=true
-logging.level.org.hibernate.SQL=DEBUG
-logging.level.org.hibernate.type.descriptor.sql=TRACE
-spring.jpa.properties.hibernate.default_batch_fetch_size=30
-# spring.datasource.driver-class-name=cdata.jdbc.json.JSONDriver
-spring.jpa.hibernate.naming.physical-strategy=org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
-server.port=8089
-logging.level.org.springframework.web=DEBUG
-logging.level.org.hibernate=DEBUG
-logging.level.org.springframework.security=DEBUG
-spring.datasource.hikari.maximum-pool-size=15
-spring.datasource.hikari.connection-timeout=30000
-spring.datasource.hikari.idle-timeout=600000
-spring.datasource.hikari.max-lifetime=1800000
-
-spring.jpa.open-in-view=false
-spring.jpa.properties.hibernate.locale_resolver=default
-
-
-springdoc.api-docs.enabled=true
-springdoc.swagger-ui.enabled=true
-springdoc.swagger-ui.path=/swagger-ui.html
-springdoc.api-docs.path=/v3/api-docs
-springdoc.packages-to-scan=com.szschoolmanager
-springdoc.swagger-ui.persist-authorization=true
-springdoc.swagger-ui.display-request-duration=true
-
-
-
-# backend renvoie souvent des JSON (DTO paginés, etc.).
-server.compression.enabled=true
-server.compression.mime-types=application/json
-server.compression.min-response-size=1024
-# JWT Configuration
-app.jwt.secret=change_this_secret_to_a_long_random_string_please_—_store_in_env
-app.jwt.expiration-ms=86400000
-# app.jwt.secret=maCleSecreteTrèsSecurisée123
-# app.jwt.expiration-ms=86400000   # 1 jour en millisecondes
-
-
-# ===== JWT CONFIG =====
-jwt.algorithm=RS256
-# jwt.issuer=myschool
-jwt.access-token.exp-minutes=20
-
-# Ces deux lignes seront remplacées par des variables d’environnement en production
-# jwt.private-key-path=classpath:keys/private_key.pem
-# jwt.public-key-path=classpath:keys/public_key.pem
-
-
-# JWT 
-app.dev=true
-
-
-
-jwt.private-key-path=classpath:keys/private_key.pem
-jwt.public-key-path=classpath:keys/public_key.pem
-jwt.kid=rsa-key-1
-jwt.issuer=https://myschoolmanager.ma/api
-jwt.audience=myschoolmanager-frontend
-jwt.access-expiration-seconds=900
-jwt.refresh-expiration-days=7
-
-
-
-# Redis connection
-spring.data.redis.host=${REDIS_HOST:localhost}
-spring.data.redis.port=${REDIS_PORT:6379}
-spring.data.redis.timeout=2000
-spring.data.redis.lettuce.pool.max-active=8
-spring.data.redis.lettuce.pool.max-idle=8
-spring.data.redis.lettuce.pool.min-idle=1
-spring.data.redis.lettuce.pool.time-between-eviction-runs=60000
-
-# By default we fail-closed (recommended for prod). For local dev you can set to false.
-# app.redis.fail-closed=true
-# If you want to allow Redis outages during dev: (uncomment in dev)
-app.redis.fail-closed=false
-
-
-com.tngtech.archunit:archunit:1.0.1
-# spring.jmx.enabled=true
-# spring.jmx.server=mbeanServer
-# spring.devtools.livereload.enabled=true
-# spring.devtools.restart.enabled=true
-#restart.exclude.myheavy=static/**
-#restart.exclude.lib=public/lib/**
-#restart.exclude.somepackage=com/example/heavy/**
-
-# Actuator health endpoints (monitoring)
-management.endpoints.web.exposure.include=health,info,metrics,prometheus
-management.endpoint.health.show-details=always
-management.health.redis.enabled=true
-management.endpoints.web.base-path=/actuator
-management.prometheus.metrics.export.enabled=true
-
-
-
-spring.jpa.properties.hibernate.jdbc.batch_size=20
-spring.jpa.properties.hibernate.order_updates=true
-spring.jpa.properties.hibernate.order_inserts=true
-logging.level.org.hibernate.type.descriptor.sql.BasicBinder=TRACE
-
-
-# Cors
-
-app.cors.allowed-origins=http://localhost:5173,https://schoolmanager.ma
-
-
-# ✅ Active la prise en compte sécurisée des headers proxy
-server.forward-headers-strategy=framework
 
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\Mapper\FiliereMapper.java
+
+package com.szschoolmanager.Mapper;
+
+import com.szschoolmanager.DTO.FiliereDTO;
+import com.szschoolmanager.Model.Employe;
+import com.szschoolmanager.Model.Filiere;
+
+public class FiliereMapper {
+
+  // Entity → DTO
+  public static FiliereDTO toDTO(Filiere f, Employe responsable) {
+    FiliereDTO dto = new FiliereDTO();
+    dto.setId(f.getId());
+    dto.setCodeFiliere(f.getCodeFiliere());
+    dto.setNomFiliere(f.getNomFiliere());
+    dto.setNiveau(f.getNiveau());
+    dto.setDureeHeures(f.getDureeHeures());
+    dto.setDescription(f.getDescription());
+
+    if (responsable != null) {
+      dto.setResponsableCin(responsable.getCin());
+      dto.setResponsableCin(responsable.getNom() + " " + responsable.getPrenom());
+    }
+
+    return dto;
+  }
+
+  // DTO → Entity
+  public static Filiere toEntity(FiliereDTO dto, Filiere existing) {
+    if (existing == null) existing = new Filiere();
+
+    existing.setCodeFiliere(dto.getCodeFiliere());
+    existing.setNomFiliere(dto.getNomFiliere());
+    existing.setNiveau(dto.getNiveau());
+    existing.setDureeHeures(dto.getDureeHeures());
+    existing.setDescription(dto.getDescription());
+    existing.setResponsableCin(dto.getResponsableCin());
+
+    return existing;
+  }
+}
+
+
+### END FILE
+
+
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\Model\Employe.java
+
+package com.szschoolmanager.Model;
+
+import jakarta.persistence.*;
+import java.math.BigDecimal;
+import java.time.LocalDate;
+
+@Entity
+@Table(name = "employe")
+public class Employe {
+
+  @Id
+  @GeneratedValue(strategy = GenerationType.IDENTITY)
+  private Long id;
+
+  private String cin;
+
+  private String nom;
+
+  private String prenom;
+
+  private String adresse;
+
+  private String telephone;
+
+  private String email;
+
+  private LocalDate dateEmbauche;
+
+  private String role;
+  private String specialite;
+  private String niveauEtude;
+
+  private BigDecimal salaire;
+
+  private int maxHeuresSemaine;
+
+  private Boolean disponibleWeekend;
+
+  private Boolean seulementWeekend;
+
+  private Boolean actif = true;
+
+  // =================== Getters & Setters ===================
+  public Long getId() {
+    return id;
+  }
+
+  public void setId(Long id) {
+    this.id = id;
+  }
+
+  public String getCin() {
+    return cin;
+  }
+
+  public void setCin(String cin) {
+    this.cin = cin;
+  }
+
+  public String getNom() {
+    return nom;
+  }
+
+  public void setNom(String nom) {
+    this.nom = nom;
+  }
+
+  public String getPrenom() {
+    return prenom;
+  }
+
+  public void setPrenom(String prenom) {
+    this.prenom = prenom;
+  }
+
+  public String getAdresse() {
+    return adresse;
+  }
+
+  public void setAdresse(String adresse) {
+    this.adresse = adresse;
+  }
+
+  public String getTelephone() {
+    return telephone;
+  }
+
+  public void setTelephone(String telephone) {
+    this.telephone = telephone;
+  }
+
+  public String getEmail() {
+    return email;
+  }
+
+  public void setEmail(String email) {
+    this.email = email;
+  }
+
+  public LocalDate getDateEmbauche() {
+    return dateEmbauche;
+  }
+
+  public void setDateEmbauche(LocalDate dateEmbauche) {
+    this.dateEmbauche = dateEmbauche;
+  }
+
+  public String getRole() {
+    return role;
+  }
+
+  public void setRole(String role) {
+    this.role = role;
+  }
+
+  public String getSpecialite() {
+    return specialite;
+  }
+
+  public void setSpecialite(String specialite) {
+    this.specialite = specialite;
+  }
+
+  public String getNiveauEtude() {
+    return niveauEtude;
+  }
+
+  public void setNiveauEtude(String niveauEtude) {
+    this.niveauEtude = niveauEtude;
+  }
+
+  public BigDecimal getSalaire() {
+    return salaire;
+  }
+
+  public void setSalaire(BigDecimal salaire) {
+    this.salaire = salaire;
+  }
+
+  public Integer getMaxHeuresSemaine() {
+    return maxHeuresSemaine;
+  }
+
+  public void setMaxHeuresSemaine(Integer maxHeuresSemaine) {
+    this.maxHeuresSemaine = maxHeuresSemaine;
+  }
+
+  public Boolean getDisponibleWeekend() {
+    return disponibleWeekend;
+  }
+
+  public void setDisponibleWeekend(Boolean disponibleWeekend) {
+    this.disponibleWeekend = disponibleWeekend;
+  }
+
+  public Boolean getSeulementWeekend() {
+    return seulementWeekend;
+  }
+
+  public void setSeulementWeekend(Boolean seulementWeekend) {
+    this.seulementWeekend = seulementWeekend;
+  }
+
+  public Boolean getActif() {
+    return actif;
+  }
+
+  public void setActif(Boolean actif) {
+    this.actif = actif;
+  }
+}
+
+
+### END FILE
+
+
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\Model\Filiere.java
+
+package com.szschoolmanager.Model;
+
+import jakarta.persistence.*;
+
+@Entity
+@Table(name = "filiere")
+public class Filiere {
+
+  @Id
+  @GeneratedValue(strategy = GenerationType.IDENTITY)
+  private Long id;
+
+  @Column(unique = true, nullable = false)
+  private String codeFiliere;
+
+  @Column(nullable = false)
+  private String nomFiliere;
+
+  private String niveau;
+
+  private Integer dureeHeures;
+
+  private String description;
+
+  private String responsableCin;
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = "planninType", columnDefinition = "planningTypeEnum")
+  private PlanningType planninType;
+
+  private Boolean actif = true;
+
+  public Long getId() {
+    return id;
+  }
+
+  public void setId(Long id) {
+    this.id = id;
+  }
+
+  public String getCodeFiliere() {
+    return codeFiliere;
+  }
+
+  public void setCodeFiliere(String codeFiliere) {
+    this.codeFiliere = codeFiliere;
+  }
+
+  public String getNomFiliere() {
+    return nomFiliere;
+  }
+
+  public void setNomFiliere(String nomFiliere) {
+    this.nomFiliere = nomFiliere;
+  }
+
+  public String getNiveau() {
+    return niveau;
+  }
+
+  public void setNiveau(String niveau) {
+    this.niveau = niveau;
+  }
+
+  public Integer getDureeHeures() {
+    return dureeHeures;
+  }
+
+  public void setDureeHeures(Integer dureeHeures) {
+    this.dureeHeures = dureeHeures;
+  }
+
+  public String getDescription() {
+    return description;
+  }
+
+  public void setDescription(String description) {
+    this.description = description;
+  }
+
+  public String getResponsableCin() {
+    return responsableCin;
+  }
+
+  public void setResponsableCin(String responsableCin) {
+    this.responsableCin = responsableCin;
+  }
+
+  public PlanningType getPlanninType() {
+    return planninType;
+  }
+
+  public void setPlanninType(PlanningType planninType) {
+    this.planninType = planninType;
+  }
+
+  public Boolean getActif() {
+    return actif;
+  }
+
+  public void setActif(Boolean actif) {
+    this.actif = actif;
+  }
+
+  // Getters & Setters
+  // ...
+}
+
+
+### END FILE
+
+
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\Model\PasswordChangeRequest.java
+
+package com.szschoolmanager.Model;
+
+public class PasswordChangeRequest {
+  private String currentPassword;
+  private String newPassword;
+
+  // Getters and setters
+  public String getCurrentPassword() {
+    return currentPassword;
+  }
+
+  public void setCurrentPassword(String currentPassword) {
+    this.currentPassword = currentPassword;
+  }
+
+  public String getNewPassword() {
+    return newPassword;
+  }
+
+  public void setNewPassword(String newPassword) {
+    this.newPassword = newPassword;
+  }
+}
+
+
+### END FILE
+
+
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\Model\PlanningType.java
+
+package com.szschoolmanager.Model;
+
+public enum PlanningType {
+  Semaine,
+  Weekend,
+  Mixte
+}
+
+
+### END FILE
+
+
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\modulex\Modulex.java
+
+package com.szschoolmanager.modulex;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.szschoolmanager.Model.Employe;
+import com.szschoolmanager.Model.Filiere;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EntityListeners;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
+import jakarta.persistence.Table;
+import jakarta.persistence.Version;
+import java.time.LocalDateTime;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.ToString;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+
+@Entity
+@Table(name = "modulex")
+@EntityListeners(AuditingEntityListener.class)
+@Getter
+@Setter
+// @Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class Modulex {
+
+  @Id
+  @GeneratedValue(strategy = GenerationType.IDENTITY)
+  private Long id;
+
+  @Version private Integer version;
+
+  @Column(name = "codemodule", unique = true, nullable = false)
+  private String codeModule;
+
+  @Column(name = "nommodule", nullable = false)
+  private String nomModule;
+
+  @Column(name = "description", columnDefinition = "TEXT")
+  private String description;
+
+  @Column(name = "nombreheures")
+  private Float nombreHeures;
+
+  @Column(name = "coefficient")
+  private Float coefficient;
+
+  @Column(name = "departementdattache")
+  private String departementDattache;
+
+  @Column(name = "semestre")
+  private Integer semestre;
+
+  @Column(name = "optionmodule")
+  private String optionModule;
+
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "coordinateur", referencedColumnName = "cin", nullable = false)
+  @JsonIgnore
+  @EqualsAndHashCode.Exclude
+  @ToString.Exclude
+  private Employe coordinateur;
+
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "codefiliere", referencedColumnName = "codefiliere", nullable = false)
+  @JsonIgnore
+  @EqualsAndHashCode.Exclude
+  @ToString.Exclude
+  private Filiere filiere;
+
+  @CreatedDate
+  @Column(name = "created_at", nullable = false, updatable = false)
+  private LocalDateTime createdAt;
+
+  @LastModifiedDate
+  @Column(name = "updated_at")
+  private LocalDateTime updatedAt;
+
+  @PrePersist
+  @PreUpdate
+  private void normalizeData() {
+    if (codeModule != null) codeModule = codeModule.trim();
+    if (departementDattache != null) departementDattache = departementDattache.trim();
+  }
+}
+
+
+### END FILE
+
+
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\modulex\ModulexController.java
+
+package com.szschoolmanager.modulex;
+
+import com.szschoolmanager.Service.EmployeService;
+import com.szschoolmanager.Service.FiliereService;
+import com.szschoolmanager.exception.ResponseDTO;
+import com.szschoolmanager.projection.EmployeProjection;
+import com.szschoolmanager.projection.FiliereProjection;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
+import java.util.List;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.ui.Model;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.ModelAndView;
+
+@CrossOrigin(origins = "*")
+@RestController
+@RequestMapping("/api/v1/modulex") // ✅ Versioning + ressource
+@RequiredArgsConstructor
+@Slf4j
+@Validated
+@Tag(name = "Modules", description = "Gestion des modules académiques")
+public class ModulexController {
+
+  private final ModulexService modulexService;
+  private final FiliereService filiereService;
+  private final EmployeService employeService;
+
+  // ===============================
+  // PAGE VIEW
+  // ===============================
+  @GetMapping
+  public ModelAndView modulex(Model model) {
+    return new ModelAndView("fragments/DIRECTION/modulex :: content");
+  }
+
+  // ===============================
+  // GET MODULES PAGINATED
+  // ===============================
+  @GetMapping("/list")
+  @ResponseBody
+  @Operation(summary = "Lister les modules", description = "Retourne une page de modules filtrée")
+  public ResponseEntity<ResponseDTO<Page<ModulexDTO>>> getModules(
+      @RequestParam(required = false) String filiereCode,
+      @RequestParam(required = false) String coordinateurCin,
+      @RequestParam(required = false) String departement,
+      @RequestParam(defaultValue = "0") int page,
+      @RequestParam(defaultValue = "20") int size) {
+    Page<ModulexDTO> result =
+        modulexService.getModulesPage(filiereCode, coordinateurCin, departement, page, size);
+    return ResponseEntity.ok(ResponseDTO.success("Page de modules chargée avec succès", result));
+  }
+
+  // ===============================
+  // CREATE MODULE
+  // ===============================
+  @PostMapping
+  @ResponseBody
+  @PreAuthorize("hasRole('DIRECTION')")
+  @Operation(
+      summary = "Créer un module",
+      description = "Ajoute un nouveau module avec validation complète")
+  public ResponseEntity<ResponseDTO<ModulexDTO>> createModule(@Valid @RequestBody ModulexDTO dto) {
+    log.info("Creating new module: {}", dto.getCodeModule());
+    ModulexDTO created = modulexService.createModule(dto);
+    return ResponseEntity.status(HttpStatus.CREATED)
+        .body(ResponseDTO.success("Module créé avec succès", created));
+  }
+
+  // ===============================
+  // UPDATE MODULE
+  // ===============================
+  @PutMapping("/{id}")
+  @ResponseBody
+  @PreAuthorize("hasRole('DIRECTION')")
+  @Operation(summary = "Modifier un module", description = "Met à jour un module existant")
+  public ResponseEntity<ResponseDTO<ModulexDTO>> updateModule(
+      @PathVariable @NotNull Long id, @Valid @RequestBody ModulexDTO dto) {
+    log.info("Updating module with id: {}", id);
+    ModulexDTO updated = modulexService.updateModule(id, dto);
+    return ResponseEntity.ok(ResponseDTO.success("Module mis à jour avec succès", updated));
+  }
+
+  // ===============================
+  // DELETE MODULE
+  // ===============================
+  @DeleteMapping("/{id}")
+  @ResponseBody
+  @PreAuthorize("hasRole('DIRECTION')")
+  @Operation(summary = "Supprimer un module", description = "Supprime un module existant")
+  public ResponseEntity<ResponseDTO<Void>> deleteModule(@PathVariable @Valid @NotNull Long id) {
+    log.info("Deleting module with id: {}", id);
+    modulexService.deleteModule(id);
+    return ResponseEntity.ok(ResponseDTO.success("Module supprimé avec succès", null));
+  }
+
+  // ===============================
+  // SELECT OPTIONS FOR FILTERING
+  // ===============================
+  @GetMapping("/filieres")
+  @ResponseBody
+  @Operation(summary = "Liste des filières")
+  public ResponseEntity<List<FiliereProjection>> getFilieres() {
+    return ResponseEntity.ok(filiereService.getFilieresProjection());
+  }
+
+  @GetMapping("/employes")
+  @ResponseBody
+  @Operation(summary = "Liste des coordinateurs")
+  public ResponseEntity<List<EmployeProjection>> getEmployes() {
+    return ResponseEntity.ok(employeService.getEmployesProjection());
+  }
+
+  @GetMapping("/departements")
+  @ResponseBody
+  @Operation(summary = "Liste des départements")
+  public ResponseEntity<List<String>> getDepartements() {
+    return ResponseEntity.ok(modulexService.getDistinctDepartements());
+  }
+}
+
+
+### END FILE
+
+
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\modulex\ModulexDTO.java
+
+package com.szschoolmanager.modulex;
+
+import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class ModulexDTO {
+
+  private Long id;
+
+  @Schema(description = "Code unique du module")
+  @NotBlank(message = "Le code du module est obligatoire")
+  @Pattern(
+      regexp = "^[a-zA-Z0-9_-]+$",
+      message = "Code Module ne doit contenir que lettres, chiffres, - ou _")
+  private String codeModule;
+
+  @Schema(description = "Nom du module")
+  @NotBlank(message = "Le nom du module est obligatoire")
+  private String nomModule;
+
+  private String description;
+
+  @Schema(description = "Nombre heures du module")
+  @NotNull(message = "Le nombre d'heures est obligatoire")
+  private Float nombreHeures;
+
+  @Schema(description = "Score du module")
+  @NotNull(message = "Le 'Score' est obligatoire")
+  private Float coefficient;
+
+  @Schema(description = "Departement d'attache")
+  @NotBlank(message = "Ajouter un Departement d'attache!")
+  @Pattern(
+      regexp = "^[a-zA-Z0-9_-]+$",
+      message = "Departement d'attache ne doit contenir que lettres, chiffres, - ou _")
+  private String departementDattache;
+
+  @Schema(description = "Coordinateur du module")
+  @NotBlank(message = "Selectionner un Coordinateur!")
+  private String coordinateurCin;
+
+  private String coordinateurNomPrenom;
+
+  @Schema(description = "Semestre du module")
+  @NotNull(message = "Le Semestre est obligatoire!")
+  private Integer semestre;
+
+  private String optionModule;
+
+  @Schema(description = "Filiere du module")
+  @NotBlank(message = "Selectionner une filière!")
+  private String codeFiliere;
+
+  private String nomFiliere;
+
+  // private LocalDateTime createdAt;
+  // private LocalDateTime updatedAt;
+  // private Integer version;
+}
+
+
+### END FILE
+
+
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\modulex\ModulexMapper.java
+
+package com.szschoolmanager.modulex;
+
+import com.szschoolmanager.Model.Employe;
+import java.util.List;
+import org.mapstruct.BeanMapping;
+import org.mapstruct.IterableMapping;
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
+import org.mapstruct.MappingTarget;
+import org.mapstruct.Named;
+import org.mapstruct.NullValuePropertyMappingStrategy;
+import org.mapstruct.ReportingPolicy;
+
+@Mapper(
+    componentModel = "spring",
+    nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE,
+    unmappedTargetPolicy = ReportingPolicy.IGNORE)
+public interface ModulexMapper {
+
+  // === Mapping Modulex → DTO pour l'affichage ===
+  @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
+  @Mapping(source = "filiere.codeFiliere", target = "codeFiliere")
+  @Mapping(source = "filiere.nomFiliere", target = "nomFiliere")
+  @Mapping(source = "coordinateur.cin", target = "coordinateurCin")
+  @Mapping(
+      source = "coordinateur",
+      target = "coordinateurNomPrenom",
+      qualifiedByName = "formatCoordinateurFullName")
+  @Named("toDto")
+  ModulexDTO toDto(Modulex modulex);
+
+  @Named("formatCoordinateurFullName")
+  default String formatCoordinateurFullName(Employe coord) {
+    return (coord != null) ? coord.getNom() + " " + coord.getPrenom() : null;
+  }
+
+  // méthode utilitaire inverse
+  @IterableMapping(qualifiedByName = "toDto")
+  List<ModulexDTO> toDtoList(List<Modulex> modules);
+
+  // === Mapping DTO → Modulex pour création ===
+  @Mapping(target = "filiere", ignore = true)
+  @Mapping(target = "coordinateur", ignore = true)
+  @Mapping(target = "createdAt", ignore = true)
+  @Mapping(target = "updatedAt", ignore = true)
+  @Mapping(target = "version", ignore = true)
+  Modulex toEntity(ModulexDTO dto);
+
+  // === Mise à jour partielle d'une entité existante ===
+  @Mapping(target = "filiere", ignore = true)
+  @Mapping(target = "coordinateur", ignore = true)
+  @Mapping(target = "createdAt", ignore = true)
+  @Mapping(target = "updatedAt", ignore = true)
+  @Mapping(target = "version", ignore = true)
+  void updateEntityFromDto(ModulexDTO dto, @MappingTarget Modulex ent);
+}
+
+
+### END FILE
+
+
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\modulex\ModulexProjection.java
+
+package com.szschoolmanager.modulex;
+// package com.szschoolmanager.Projection;
+
+// public interface ModulexProjection {
+
+//     // Infos du module
+//     Long getId();
+//     String getCodeModule();
+//     String getNomModule();
+//     String getDescription();
+//     Integer getNombreHeures();
+//     Float getCoefficient();
+//     String getOptionModule();
+//     String getDepartementDattache();
+//     Integer getSemestre();
+
+//     // ⭐ Infos du coordonateur (depuis la relation)
+//     String getCoordonateurCin();
+//     String getCoordonateurNom();
+//     String getCoordonateurPrenom();
+
+//     // ⭐ Méthode calculée pour le nom complet
+//     default String getCoordonateurNomComplet() {
+//         if (getCoordonateurNom() == null || getCoordonateurPrenom() == null) {
+//             return "Non assigné";
+//         }
+//         return getCoordonateurNom() + " " + getCoordonateurPrenom();
+//     }
+
+//     // ⭐ Infos de la filière (depuis la relation)
+//     String getCodeFiliere();
+//     String getNomFiliere();
+// }
+
+
+### END FILE
+
+
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\modulex\ModulexRepository.java
+
+package com.szschoolmanager.modulex;
+
+import java.util.List;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
+@Repository
+public interface ModulexRepository extends JpaRepository<Modulex, Long> {
+  @Query(
+      value =
+          """
+                SELECT new com.szschoolmanager.modulex.ModulexDTO(
+                    m.id,
+                    m.codeModule,
+                    m.nomModule,
+                    m.description,
+                    m.nombreHeures,
+                    m.coefficient,
+                    m.departementDattache,
+                    c.cin,
+                    CONCAT(c.nom, ' ', c.prenom),
+                    m.semestre,
+                    m.optionModule,
+                    f.codeFiliere,
+                    f.nomFiliere
+                )
+                FROM Modulex m
+                LEFT JOIN m.filiere f
+                LEFT JOIN m.coordinateur c
+                WHERE (:filiereCode IS NULL OR :filiereCode = '' OR f.codeFiliere = :filiereCode)
+                AND (:coordinateurCin IS NULL OR :coordinateurCin = '' OR c.cin = :coordinateurCin)
+                AND (:departement IS NULL OR :departement = '' OR m.departementDattache = :departement)
+            """,
+      countQuery =
+          """
+                SELECT count(m.id)
+                FROM Modulex m
+                LEFT JOIN m.filiere f
+                LEFT JOIN m.coordinateur c
+                WHERE (:filiereCode IS NULL OR :filiereCode = '' OR f.codeFiliere = :filiereCode)
+                AND (:coordinateurCin IS NULL OR :coordinateurCin = '' OR c.cin = :coordinateurCin)
+                AND (:departement IS NULL OR :departement = '' OR m.departementDattache = :departement)
+            """)
+  Page<ModulexDTO> findFiltered(
+      @Param("filiereCode") String filiereCode,
+      @Param("coordinateurCin") String coordinateurCin,
+      @Param("departement") String departement,
+      Pageable pageable);
+
+  // Charger juste les noms des departement
+  @Query(
+      "SELECT DISTINCT m.departementDattache FROM Modulex m WHERE m.departementDattache IS NOT NULL")
+  List<String> findDistinctDepartements();
+
+  // Verifier si module existe
+  boolean existsByCodeModule(String codeModule);
+}
+
+
+### END FILE
+
+
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\modulex\ModulexService.java
+
+package com.szschoolmanager.modulex;
+
+import com.szschoolmanager.Model.Employe;
+import com.szschoolmanager.Model.Filiere;
+import com.szschoolmanager.Service.EmployeService;
+import com.szschoolmanager.Service.FiliereService;
+import com.szschoolmanager.exception.DuplicateResourceException;
+import com.szschoolmanager.exception.ResourceNotFoundException;
+import java.util.List;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.*;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+@RequiredArgsConstructor
+@Transactional
+public class ModulexService {
+
+  private static final String ENTITY_NAME = "Module";
+
+  private final ModulexRepository modulexRepository;
+  private final ModulexMapper modulexMapper;
+  private final EmployeService employeService;
+  private final FiliereService filiereService;
+
+  // ======================================
+  // GET PAGINATED MODULES
+  // ======================================
+  @Transactional(readOnly = true)
+  public Page<ModulexDTO> getModulesPage(
+      String filiereCode, String coordinateurCin, String departement, int page, int size) {
+    Pageable pageable =
+        PageRequest.of(
+            page,
+            size,
+            Sort.by("filiere.codeFiliere").ascending().and(Sort.by("codeModule").ascending()));
+
+    Page<ModulexDTO> result =
+        modulexRepository.findFiltered(filiereCode, coordinateurCin, departement, pageable);
+
+    return result;
+  }
+
+  // ======================================
+  // CREATE MODULE
+  // ======================================
+  public ModulexDTO createModule(ModulexDTO dto) {
+    // Vérifier l’unicité du code
+    if (modulexRepository.existsByCodeModule(dto.getCodeModule())) {
+      throw new DuplicateResourceException(
+          "Module avec code " + dto.getCodeModule() + " existe déjà!");
+    }
+    // Mapper DTO → Entity
+    Modulex module = modulexMapper.toEntity(dto);
+    // Gerrer Filiere et coordinteur
+    setModuleRelationships(module, dto);
+
+    // Sauvegarder en base
+    Modulex saved = modulexRepository.save(module);
+    // Mapper Entity → DTO
+    return modulexMapper.toDto(saved);
+  }
+
+  // ======================================
+  // UPDATE MODULE
+  // ======================================
+  public ModulexDTO updateModule(Long id, ModulexDTO dto) {
+    // 1. Récupérer le module existant
+    Modulex ent =
+        modulexRepository
+            .findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException("Module non trouvé avec id : " + id));
+    // 2. Mettre à jour les champs simples via MapStruct
+    modulexMapper.updateEntityFromDto(dto, ent);
+
+    setModuleRelationships(ent, dto);
+    // 5. Sauvegarder et renvoyer
+    Modulex saved = modulexRepository.save(ent);
+    return modulexMapper.toDto(saved);
+  }
+
+  // ======================================
+  // DELETE MODULE
+  // ======================================
+  public void deleteModule(Long id) {
+    if (!modulexRepository.existsById(id)) {
+      throw new ResourceNotFoundException(ENTITY_NAME + " non trouvé avec id: " + id);
+    }
+    modulexRepository.deleteById(id);
+  }
+
+  // ======================================
+  // DISTINCT DEPARTEMENTS
+  // ======================================
+  @Transactional(readOnly = true)
+  public List<String> getDistinctDepartements() {
+    return modulexRepository.findDistinctDepartements();
+  }
+
+  // ======================================
+  // PRIVATE: SET FILIERE & COORDINATEUR
+  // ======================================
+  private void setModuleRelationships(Modulex module, ModulexDTO dto) {
+    // Filiere
+    // Charger seulement si différente
+    if (module.getFiliere() == null
+        || !dto.getCodeFiliere().equals(module.getFiliere().getCodeFiliere())) {
+      Filiere filiere = filiereService.getByCodeFiliere(dto.getCodeFiliere());
+      module.setFiliere(filiere);
+    }
+
+    // === Gestion du Coordinateur ===
+    // verificatin null sur dto
+    // Charger seulement si différent
+    if (module.getCoordinateur() == null
+        || !dto.getCoordinateurCin().equals(module.getCoordinateur().getCin())) {
+      Employe coord = employeService.getEmployeByCin(dto.getCoordinateurCin());
+      module.setCoordinateur(coord);
+    }
+  }
+}
+
+
+### END FILE
+
+
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\projection\EmployeProjection.java
+
+package com.szschoolmanager.projection;
+
+public interface EmployeProjection {
+
+  String getCin();
+
+  String getNom();
+
+  String getPrenom();
+}
+
+
+### END FILE
+
+
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\projection\FiliereProjection.java
+
+package com.szschoolmanager.projection;
+
+public interface FiliereProjection {
+  String getCodeFiliere();
+
+  String getNomFiliere();
+}
+
+
+### END FILE
+
+
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\Repository\EmployeRepository.java
+
+package com.szschoolmanager.Repository;
+
+import com.szschoolmanager.Model.Employe;
+import com.szschoolmanager.projection.EmployeProjection;
+import java.util.List;
+import java.util.Optional;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+
+public interface EmployeRepository extends JpaRepository<Employe, Long> {
+
+  Optional<Employe> findByCin(String cin);
+
+  @Query("SELECT e.cin AS cin, e.nom AS nom, e.prenom AS prenom FROM Employe e")
+  List<EmployeProjection> findEmployesByP();
+
+  @Query("SELECT DISTINCT e.role FROM Employe e")
+  List<String> getUniqueRole();
+
+  boolean existsByCin(String cin);
+}
+
+
+### END FILE
+
+
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\Repository\FiliereRepository.java
+
+package com.szschoolmanager.Repository;
+
+import com.szschoolmanager.Model.Filiere;
+import com.szschoolmanager.projection.FiliereProjection;
+import java.util.List;
+import java.util.Optional;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+public interface FiliereRepository extends JpaRepository<Filiere, Long> {
+
+  @Query("SELECT DISTINCT f.niveau FROM Filiere f")
+  List<String> findUniqueNiveau();
+
+  @Query(
+      "SELECT f.codeFiliere AS codeFiliere, f.nomFiliere AS nomFiliere FROM Filiere f WHERE f.codeFiliere = :codeFiliere")
+  Optional<FiliereProjection> findFiliereDTOByCode(@Param("codeFiliere") String codeFiliere);
+
+  Optional<Filiere> findByCodeFiliere(String codeFiliere);
+
+  @Query("SELECT DISTINCT f.codeFiliere AS codeFiliere, f.nomFiliere AS nomFiliere FROM Filiere f")
+  List<FiliereProjection> findFilieresProjection();
+
+  boolean existsByCodeFiliere(String codeFiliere);
+}
+
+
+### END FILE
+
+
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\Service\EmployeService.java
+
+package com.szschoolmanager.Service;
+
+import com.szschoolmanager.Model.Employe;
+import com.szschoolmanager.Repository.EmployeRepository;
+import com.szschoolmanager.projection.EmployeProjection;
+import jakarta.persistence.EntityNotFoundException;
+import java.util.List;
+import java.util.Optional;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+@Service
+public class EmployeService {
+
+  @Autowired private EmployeRepository employeRepository;
+
+  public Employe getEmployeByCinEx(String cin) {
+    return employeRepository
+        .findByCin(cin)
+        .orElseThrow(() -> new EntityNotFoundException("Filière non trouvée: " + cin));
+  }
+
+  public Optional<Employe> getEmployeByCinO(String cin) {
+    return employeRepository.findByCin(cin);
+  }
+
+  public List<EmployeProjection> getEmployesProjection() {
+    return employeRepository.findEmployesByP();
+  }
+
+  public Employe getEmployeByCin(String cin) {
+    return employeRepository
+        .findByCin(cin)
+        .orElseThrow(() -> new EntityNotFoundException("Employe non trouvée: " + cin));
+  }
+
+  public boolean existsByCin(String cin) {
+    return employeRepository.existsByCin(cin);
+  }
+}
+
+
+### END FILE
+
+
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\Service\FiliereService.java
+
+package com.szschoolmanager.Service;
+
+import com.szschoolmanager.DTO.FiliereDTO;
+import com.szschoolmanager.Model.Filiere;
+import com.szschoolmanager.Repository.EmployeRepository;
+import com.szschoolmanager.Repository.FiliereRepository;
+import com.szschoolmanager.projection.FiliereProjection;
+import jakarta.persistence.EntityNotFoundException;
+import java.util.List;
+import java.util.stream.Collectors;
+import org.springframework.stereotype.Service;
+
+@Service
+public class FiliereService {
+
+  private final FiliereRepository filiereRepository;
+  private final EmployeRepository employeRepository;
+
+  public FiliereService(FiliereRepository filiereRepository, EmployeRepository employeRepository) {
+    this.filiereRepository = filiereRepository;
+    this.employeRepository = employeRepository;
+  }
+
+  public List<FiliereDTO> getAllFilieres() {
+    return filiereRepository.findAll().stream()
+        .map(
+            f -> {
+              FiliereDTO dto = new FiliereDTO();
+              dto.setId(f.getId());
+              dto.setCodeFiliere(f.getCodeFiliere());
+              dto.setNomFiliere(f.getNomFiliere());
+              dto.setNiveau(f.getNiveau());
+              dto.setDureeHeures(f.getDureeHeures());
+              dto.setDescription(f.getDescription());
+              dto.setResponsableCin(f.getResponsableCin());
+              dto.setPlanninType(f.getPlanninType());
+              dto.setActif(f.getActif());
+
+              // Nom complet du responsable
+              if (f.getResponsableCin() != null) {
+                employeRepository
+                    .findByCin(f.getResponsableCin())
+                    .ifPresent(
+                        emp -> {
+                          dto.setResponsableNomComplet(emp.getNom() + " " + emp.getPrenom());
+                        });
+              }
+
+              return dto;
+            })
+        .collect(Collectors.toList());
+  }
+
+  public Filiere createFiliere(Filiere filiere) {
+    return filiereRepository.save(filiere);
+  }
+
+  public Filiere updateFiliere(Long id, Filiere filiere) {
+    Filiere existing =
+        filiereRepository
+            .findById(id)
+            .orElseThrow(() -> new RuntimeException("Filiere non trouvée"));
+    existing.setCodeFiliere(filiere.getCodeFiliere());
+    existing.setNomFiliere(filiere.getNomFiliere());
+    existing.setNiveau(filiere.getNiveau());
+    existing.setDureeHeures(filiere.getDureeHeures());
+    existing.setDescription(filiere.getDescription());
+    existing.setResponsableCin(filiere.getResponsableCin());
+    existing.setPlanninType(filiere.getPlanninType());
+    existing.setActif(filiere.getActif());
+    return filiereRepository.save(existing);
+  }
+
+  public void deleteFiliere(Long id) {
+    filiereRepository.deleteById(id);
+  }
+
+  // public List<EmployeProjection> getEmployesProjection() {
+  //     return employeRepository.findEmployesByP();
+  // }
+
+  public List<String> getUniqueNiveaux() {
+    return filiereRepository.findUniqueNiveau();
+  }
+
+  public List<FiliereProjection> getFilieresProjection() {
+    return filiereRepository.findFilieresProjection();
+  }
+
+  public Filiere getByCodeFiliere(String code) {
+    return filiereRepository
+        .findByCodeFiliere(code)
+        .orElseThrow(() -> new EntityNotFoundException("Filière non trouvée: " + code));
+  }
+
+  public boolean existsByCodeFiliere(String codeFiliere) {
+    return filiereRepository.existsByCodeFiliere(codeFiliere);
+  }
+}
+
+
+### END FILE
+
+
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\tools\GenerateRSAKeys.java
+
+package com.szschoolmanager.tools;
+
+import java.io.FileOutputStream;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
+import java.security.PrivateKey;
+import java.security.PublicKey;
+
+public class GenerateRSAKeys {
+  public static void main(String[] args) throws Exception {
+    KeyPairGenerator generator = KeyPairGenerator.getInstance("RSA");
+    generator.initialize(2048);
+    KeyPair pair = generator.generateKeyPair();
+    PrivateKey privateKey = pair.getPrivate();
+    PublicKey publicKey = pair.getPublic();
+
+    try (FileOutputStream out = new FileOutputStream("src/main/resources/keys/private_key.pem")) {
+      out.write(privateKey.getEncoded());
+    }
+    try (FileOutputStream out = new FileOutputStream("src/main/resources/keys/public_key.pem")) {
+      out.write(publicKey.getEncoded());
+    }
+
+    System.out.println("✅ Clés RSA générées dans src/main/resources/keys/");
+  }
+}
+
+
+### END FILE
+
+
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\util\PemUtils.java
+
+package com.szschoolmanager.util;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.StringReader;
+import java.security.GeneralSecurityException;
+import java.security.KeyFactory;
+import java.security.PrivateKey;
+import java.security.PublicKey;
+import java.security.spec.InvalidKeySpecException;
+import java.security.spec.PKCS8EncodedKeySpec;
+import java.security.spec.X509EncodedKeySpec;
+import java.util.Base64;
+import java.util.stream.Collectors;
+
+public final class PemUtils {
+
+    // 🔒 Constructeur privé pour empêcher l’instanciation (S1118)
+    private PemUtils() {
+        throw new UnsupportedOperationException("Utility class - cannot be instantiated");
+    }
+
+    private static String stripPemHeader(String pem, String beginMarker, String endMarker)
+            throws IOException {
+        try (BufferedReader reader = new BufferedReader(new StringReader(pem))) {
+            return reader
+                    .lines()
+                    .filter(line -> !line.contains(beginMarker) && !line.contains(endMarker))
+                    .collect(Collectors.joining());
+        }
+    }
+
+    public static PrivateKey parsePrivateKeyFromPem(String pem)
+            throws IOException, GeneralSecurityException {
+        try {
+            String cleanPem = stripPemHeader(pem, "-----BEGIN PRIVATE KEY", "-----END PRIVATE KEY");
+            byte[] decoded = Base64.getDecoder().decode(cleanPem);
+            PKCS8EncodedKeySpec keySpec = new PKCS8EncodedKeySpec(decoded);
+            KeyFactory kf = KeyFactory.getInstance("RSA");
+            return kf.generatePrivate(keySpec);
+        } catch (InvalidKeySpecException e) {
+            throw new GeneralSecurityException("Invalid RSA private key format", e);
+        }
+    }
+
+    public static PublicKey parsePublicKeyFromPem(String pem)
+            throws IOException, GeneralSecurityException {
+        try {
+            String cleanPem = stripPemHeader(pem, "-----BEGIN PUBLIC KEY", "-----END PUBLIC KEY");
+            byte[] decoded = Base64.getDecoder().decode(cleanPem);
+            X509EncodedKeySpec keySpec = new X509EncodedKeySpec(decoded);
+            KeyFactory kf = KeyFactory.getInstance("RSA");
+            return kf.generatePublic(keySpec);
+        } catch (InvalidKeySpecException e) {
+            throw new GeneralSecurityException("Invalid RSA public key format", e);
+        }
+    }
+}
 
 
 ### END FILE

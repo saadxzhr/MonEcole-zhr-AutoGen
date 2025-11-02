@@ -1,6 +1,7 @@
 package com.szschoolmanager.auth.service;
 
 import com.szschoolmanager.auth.model.Utilisateur;
+import com.szschoolmanager.security.SecurityConstants;
 
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -28,7 +29,7 @@ public class DatabaseUserDetailsService implements UserDetailsService {
     return User.builder()
         .username(u.getUsername())
         .password(u.getPassword())
-        .authorities(List.of(new SimpleGrantedAuthority("ROLE_" + u.getRole().toUpperCase())))
+        .authorities(List.of(new SimpleGrantedAuthority(SecurityConstants.ROLE_PREFIX + u.getRole().toUpperCase())))
         .build();
   }
 

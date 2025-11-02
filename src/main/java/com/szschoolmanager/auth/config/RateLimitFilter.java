@@ -10,10 +10,12 @@ import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
+
+import com.szschoolmanager.auth.util.ErrorUtil;
+import com.szschoolmanager.util.HttpRequestUtils;
 
 import java.io.IOException;
 import java.util.Collections;
@@ -56,7 +58,9 @@ public class RateLimitFilter extends OncePerRequestFilter {
         // Determine rate limit based on endpoint
         RateLimitConfig config = getRateLimitConfig(path);
         
-        String clientIp = extractClientIP(request);
+        // String clientIp = extractClientIP(request);
+        String clientIp = HttpRequestUtils.extractClientIP(request);
+
         String redisKey = RATE_LIMIT_PREFIX + clientIp + ":" + normalizeUri(path);
 
         Long currentCount;
@@ -121,29 +125,29 @@ public class RateLimitFilter extends OncePerRequestFilter {
      * Extract real client IP from request headers (proxy-aware).
      * Prevents IP spoofing by prioritizing trusted headers.
      */
-    private String extractClientIP(HttpServletRequest request) {
-        // Try X-Real-IP first (single IP, most reliable from reverse proxy)
-        String ip = request.getHeader(X_REAL_IP);
-        if (isValidIp(ip)) {
-            return ip;
-        }
+    // private String extractClientIP(HttpServletRequest request) {
+    //     // Try X-Real-IP first (single IP, most reliable from reverse proxy)
+    //     String ip = request.getHeader(X_REAL_IP);
+    //     if (isValidIp(ip)) {
+    //         return ip;
+    //     }
 
-        // Try X-Forwarded-For (comma-separated list, take first/leftmost = client)
-        String xForwardedFor = request.getHeader(X_FORWARDED_FOR);
-        if (xForwardedFor != null && !xForwardedFor.isBlank()) {
-            String clientIp = xForwardedFor.split(",")[0].trim();
-            if (isValidIp(clientIp)) {
-                return clientIp;
-            }
-        }
+    //     // Try X-Forwarded-For (comma-separated list, take first/leftmost = client)
+    //     String xForwardedFor = request.getHeader(X_FORWARDED_FOR);
+    //     if (xForwardedFor != null && !xForwardedFor.isBlank()) {
+    //         String clientIp = xForwardedFor.split(",")[0].trim();
+    //         if (isValidIp(clientIp)) {
+    //             return clientIp;
+    //         }
+    //     }
 
-        // Fallback to remote address
-        return request.getRemoteAddr();
-    }
+    //     // Fallback to remote address
+    //     return request.getRemoteAddr();
+    // }
 
-    private boolean isValidIp(String ip) {
-        return ip != null && !ip.isBlank() && !"unknown".equalsIgnoreCase(ip);
-    }
+    // private boolean isValidIp(String ip) {
+    //     return ip != null && !ip.isBlank() && !"unknown".equalsIgnoreCase(ip);
+    // }
 
     private boolean isWhitelisted(String path) {
         return WHITELIST_PATHS.stream().anyMatch(path::startsWith);
@@ -183,18 +187,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
     private void rejectRequest(HttpServletResponse response, HttpStatus status, String message) 
             throws IOException {
-        response.setStatus(status.value());
-        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-        response.setCharacterEncoding("UTF-8");
-        
-        String jsonResponse = String.format(
-            "{\"status\":\"error\",\"message\":\"%s\",\"code\":%d}",
-            message.replace("\"", "\\\""),
-            status.value()
-        );
-        
-        response.getWriter().write(jsonResponse);
-        response.getWriter().flush();
+        ErrorUtil.writeJsonError(response, status, message);
     }
 
     /**

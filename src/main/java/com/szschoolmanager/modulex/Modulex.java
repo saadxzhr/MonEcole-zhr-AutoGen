@@ -45,28 +45,28 @@ public class Modulex {
 
   @Version private Integer version;
 
-  @Column(name = "codemodule", unique = true, nullable = false)
+  @Column(name = "code_module", unique = true, nullable = false)
   private String codeModule;
 
-  @Column(name = "nommodule", nullable = false)
+  @Column(name = "nom_module", nullable = false)
   private String nomModule;
 
   @Column(name = "description", columnDefinition = "TEXT")
   private String description;
 
-  @Column(name = "nombreheures")
+  @Column(name = "nombre_heures")
   private Float nombreHeures;
 
   @Column(name = "coefficient")
   private Float coefficient;
 
-  @Column(name = "departementdattache")
+  @Column(name = "departement_dattache")
   private String departementDattache;
 
   @Column(name = "semestre")
   private Integer semestre;
 
-  @Column(name = "optionmodule")
+  @Column(name = "option_module")
   private String optionModule;
 
   @ManyToOne(fetch = FetchType.LAZY)
@@ -77,7 +77,7 @@ public class Modulex {
   private Employe coordinateur;
 
   @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "codefiliere", referencedColumnName = "codefiliere", nullable = false)
+  @JoinColumn(name = "code_filiere", referencedColumnName = "codefiliere", nullable = false)
   @JsonIgnore
   @EqualsAndHashCode.Exclude
   @ToString.Exclude

@@ -25,6 +25,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Duration;
@@ -49,7 +50,9 @@ public class AuthenticationController {
   @Value("${jwt.refresh-days:7}")
   private int refreshDays;
 
+  
   @PostMapping("/login")
+  @Transactional
   public ResponseEntity<ResponseDTO<AuthResponseDTO>> login(
       @Valid @RequestBody AuthRequestDTO dto, HttpServletRequest request, HttpServletResponse response) {
     try {
@@ -75,6 +78,7 @@ public class AuthenticationController {
       String accessToken = tokens.getAccessToken();
       String rawRefresh = tokens.getRefreshToken();
 
+      // ⚠️ In production, app.dev=false must be set to prevent refresh token exposure in JSON
       // In dev mode we return refresh token in JSON. In prod, set HttpOnly cookie instead.
       if (!devMode) {
         ResponseCookie cookie = ResponseCookie.from("refreshToken", rawRefresh) 
@@ -135,7 +139,7 @@ public ResponseEntity<ResponseDTO<AuthResponseDTO>> refreshToken(
 
     
     // 1️⃣ Validate RT (to get user safely)
-    Utilisateur user = refreshTokenService.validateRefreshToken(presented).getUtilisateur();
+    // Utilisateur user = refreshTokenService.validateRefreshToken(presented).getUtilisateur();
 
     // 2️⃣ Rotate (detect reuse first)
     RefreshToken newRt = tokenOrchestratorService.rotateWithAccessHandling(
@@ -143,9 +147,8 @@ public ResponseEntity<ResponseDTO<AuthResponseDTO>> refreshToken(
     );
 
     // 3️⃣ Generate new access token only if rotation succeeded
-    String newAccessToken = jwtService.generateAccessToken(user);
+    String newAccessToken = jwtService.generateAccessToken(newRt.getUtilisateur());
     String newAccessJti = jwtService.parseToken(newAccessToken).getBody().getId();
-
 
     // 4️⃣ Update the new refresh token with this access JTI (sync link)
     newRt.setAccessJti(newAccessJti);

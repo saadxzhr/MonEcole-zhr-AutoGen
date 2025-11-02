@@ -3,12 +3,13 @@ package com.szschoolmanager;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.cache.annotation.EnableCaching;
-import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
+import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
 import org.springframework.data.redis.repository.configuration.EnableRedisRepositories;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
-// @EnableJpaAuditing
 
+
+@EnableJpaAuditing
 @SpringBootApplication
 @EnableScheduling
 @EnableCaching
@@ -69,7 +70,7 @@ public class BackendApplication {
 
 
 // git add .
-// git commit -m “jwt auth 99.3%”
+// git commit -m “jwt auth 99.4%”
 // git push
 
 // postman
