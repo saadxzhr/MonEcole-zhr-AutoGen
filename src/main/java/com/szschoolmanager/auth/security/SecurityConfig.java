@@ -1,7 +1,5 @@
 package com.szschoolmanager.auth.security;
 
-import com.szschoolmanager.auth.util.ErrorUtil;
-
 import jakarta.annotation.PostConstruct;
 
 import java.util.Arrays;
@@ -31,6 +29,8 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.*;
+
+import com.szschoolmanager.shared.util.ErrorUtil;
 
 @RequiredArgsConstructor
 @Configuration

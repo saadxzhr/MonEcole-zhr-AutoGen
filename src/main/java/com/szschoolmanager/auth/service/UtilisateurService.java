@@ -4,8 +4,9 @@ import com.szschoolmanager.auth.dto.*;
 import com.szschoolmanager.auth.mapper.UtilisateurMapper;
 import com.szschoolmanager.auth.model.Utilisateur;
 import com.szschoolmanager.auth.repository.UtilisateurRepository;
-import com.szschoolmanager.exception.ResponseDTO;
-import com.szschoolmanager.security.SecurityConstants;
+import com.szschoolmanager.auth.security.SecurityConstants;
+import com.szschoolmanager.shared.dto.ResponseDTO;
+
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.*;

@@ -1,7 +1,8 @@
 package com.szschoolmanager.auth.service;
 
 import com.szschoolmanager.auth.model.Utilisateur;
-import com.szschoolmanager.security.SecurityConstants;
+import com.szschoolmanager.auth.security.SecurityConstants;
+
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.CacheEvict;

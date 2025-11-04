@@ -1,5 +1,7 @@
 package com.szschoolmanager.auth.model;
 
+import com.szschoolmanager.shared.model.BaseEntity;
+
 import jakarta.persistence.*;
 import lombok.*;
 

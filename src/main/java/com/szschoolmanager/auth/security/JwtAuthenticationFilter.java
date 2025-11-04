@@ -1,7 +1,8 @@
 package com.szschoolmanager.auth.security;
 
 import com.szschoolmanager.auth.service.JwtService;
-import com.szschoolmanager.auth.util.ErrorUtil;
+import com.szschoolmanager.shared.util.ErrorUtil;
+
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jws;
 import io.micrometer.core.instrument.MeterRegistry;

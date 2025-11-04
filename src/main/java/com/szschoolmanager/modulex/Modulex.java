@@ -1,8 +1,9 @@
 package com.szschoolmanager.modulex;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.szschoolmanager.Model.Employe;
-import com.szschoolmanager.Model.Filiere;
+import com.szschoolmanager.employe.Employe;
+import com.szschoolmanager.filiere.Filiere;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EntityListeners;

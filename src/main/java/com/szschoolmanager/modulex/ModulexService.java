@@ -1,11 +1,12 @@
 package com.szschoolmanager.modulex;
 
-import com.szschoolmanager.Model.Employe;
-import com.szschoolmanager.Model.Filiere;
-import com.szschoolmanager.Service.EmployeService;
-import com.szschoolmanager.Service.FiliereService;
-import com.szschoolmanager.exception.DuplicateResourceException;
-import com.szschoolmanager.exception.ResourceNotFoundException;
+import com.szschoolmanager.employe.Employe;
+import com.szschoolmanager.employe.EmployeService;
+import com.szschoolmanager.filiere.Filiere;
+import com.szschoolmanager.filiere.FiliereService;
+import com.szschoolmanager.shared.exception.DuplicateResourceException;
+import com.szschoolmanager.shared.exception.ResourceNotFoundException;
+
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.*;

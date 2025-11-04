@@ -4,7 +4,8 @@ import com.szschoolmanager.auth.model.RefreshToken;
 import com.szschoolmanager.auth.model.Utilisateur;
 import com.szschoolmanager.auth.repository.RefreshTokenRepository;
 import com.szschoolmanager.auth.repository.UtilisateurRepository;
-import com.szschoolmanager.exception.BusinessValidationException;
+import com.szschoolmanager.shared.exception.BusinessValidationException;
+
 import jakarta.annotation.PostConstruct;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;

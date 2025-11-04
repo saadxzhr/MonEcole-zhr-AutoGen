@@ -6,6 +6,8 @@ import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
+import com.szschoolmanager.auth.exception.RedisUnavailableException;
+
 @RequiredArgsConstructor
 @Slf4j
 @Service

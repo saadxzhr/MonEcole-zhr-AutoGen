@@ -3,8 +3,9 @@ package com.szschoolmanager.auth.service;
 import com.szschoolmanager.auth.dto.TokensDTO;
 import com.szschoolmanager.auth.model.RefreshToken;
 import com.szschoolmanager.auth.model.Utilisateur;
-import com.szschoolmanager.security.SecurityConstants;
-import com.szschoolmanager.util.HttpRequestUtils;
+import com.szschoolmanager.auth.security.SecurityConstants;
+import com.szschoolmanager.shared.util.HttpRequestUtils;
+
 import io.jsonwebtoken.*;
 import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.HttpServletRequest;

@@ -11,16 +11,16 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @SpringBootApplication
 @EnableScheduling
 @EnableCaching
-@EnableRedisRepositories(
-    basePackages = "com.szschoolmanager.auth.redis",
-    considerNestedRepositories = true)
+// @EnableRedisRepositories(
+//     basePackages = "com.szschoolmanager.auth.redis",
+//     considerNestedRepositories = true)
 public class BackendApplication {
 
   public static void main(String[] args) {
     SpringApplication.run(BackendApplication.class, args);
   }
 
-  class StringUtils {}
+  // class StringUtils {}
 }
 // Crée la table en SQL dans Flyway (Vx__table_module.sql).
 // Crée l’entité correspondante.
@@ -67,7 +67,7 @@ public class BackendApplication {
 // refresh tokens exposés en JSON → déplacer vers Secure HttpOnly cookie en prod ;
 
 // git add .
-// git commit -m “jwt auth 99.4%”
+// git commit -m "jwt auth 99.5%"
 // git push
 
 // postman

@@ -1,6 +1,5 @@
 package com.szschoolmanager.modulex;
 
-import com.szschoolmanager.Model.Employe;
 import java.util.List;
 import org.mapstruct.BeanMapping;
 import org.mapstruct.IterableMapping;
@@ -10,6 +9,8 @@ import org.mapstruct.MappingTarget;
 import org.mapstruct.Named;
 import org.mapstruct.NullValuePropertyMappingStrategy;
 import org.mapstruct.ReportingPolicy;
+
+import com.szschoolmanager.employe.Employe;
 
 @Mapper(
     componentModel = "spring",

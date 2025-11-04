@@ -1,10 +1,11 @@
 package com.szschoolmanager.modulex;
 
-import com.szschoolmanager.Service.EmployeService;
-import com.szschoolmanager.Service.FiliereService;
-import com.szschoolmanager.exception.ResponseDTO;
-import com.szschoolmanager.projection.EmployeProjection;
-import com.szschoolmanager.projection.FiliereProjection;
+import com.szschoolmanager.employe.EmployeProjection;
+import com.szschoolmanager.employe.EmployeService;
+import com.szschoolmanager.filiere.FiliereProjection;
+import com.szschoolmanager.filiere.FiliereService;
+import com.szschoolmanager.shared.dto.ResponseDTO;
+
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;

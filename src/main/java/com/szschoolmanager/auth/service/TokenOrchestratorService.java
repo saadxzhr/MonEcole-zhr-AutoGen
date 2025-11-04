@@ -1,7 +1,8 @@
 package com.szschoolmanager.auth.service;
 
 import com.szschoolmanager.auth.model.RefreshToken;
-import com.szschoolmanager.exception.BusinessValidationException;
+import com.szschoolmanager.shared.exception.BusinessValidationException;
+
 import java.time.Duration;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
