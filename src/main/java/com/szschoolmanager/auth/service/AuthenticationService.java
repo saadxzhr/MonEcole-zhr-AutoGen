@@ -5,11 +5,6 @@ import com.szschoolmanager.auth.dto.AuthResponseDTO;
 import com.szschoolmanager.auth.dto.TokensDTO;
 import com.szschoolmanager.auth.model.RefreshToken;
 import com.szschoolmanager.auth.model.Utilisateur;
-import com.szschoolmanager.auth.service.DatabaseUserDetailsService;
-import com.szschoolmanager.auth.service.JwtService;
-import com.szschoolmanager.auth.service.RefreshTokenService;
-import com.szschoolmanager.auth.service.TokenOrchestratorService;
-import com.szschoolmanager.auth.service.UtilisateurService;
 import com.szschoolmanager.shared.dto.ResponseDTO;
 import com.szschoolmanager.shared.exception.BusinessValidationException;
 
@@ -26,6 +21,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
@@ -41,19 +37,29 @@ public class AuthenticationService {
   @Value("${jwt.refresh-days:7}")
   private int refreshDays;
 
-
+  private final RedisLoginAttemptService loginAttemptService;
   private final TokenOrchestratorService tokenOrchestratorService;
   private final JwtService jwtService;
   private final UtilisateurService utilisateurService;
   private final RefreshTokenService refreshTokenService;
-  private final DatabaseUserDetailsService userDetailsService;
+  private final PasswordEncoder passwordEncoder;
+
+
 
 @Transactional
   public ResponseEntity<ResponseDTO<AuthResponseDTO>> login(
       @Valid @RequestBody AuthRequestDTO dto,
       HttpServletRequest request,
       HttpServletResponse response) {
+    
     try {
+      String username = dto.getUsername();
+      if (loginAttemptService.isLocked(username)) {
+          log.warn("Tentative de connexion sur un compte verrouillé: {}", username);
+          return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+              .body(ResponseDTO.error("Compte verrouillé pour 30 minutes après plusieurs échecs"));
+      }
+
       Utilisateur utilisateur =
           utilisateurService
               .findByUsername(dto.getUsername())
@@ -62,16 +68,21 @@ public class AuthenticationService {
       boolean encoded = utilisateur.getPassword().startsWith("$2a$");
       boolean matches =
           encoded
-              ? utilisateurService
-                  .passwordEncoder()
-                  .matches(dto.getPassword(), utilisateur.getPassword())
+              ? passwordEncoder.matches(dto.getPassword(), utilisateur.getPassword())
               : dto.getPassword().equals(utilisateur.getPassword());
 
-      if (!matches) throw new BadCredentialsException("Identifiants invalides");
+      
+
+      if (!matches) {
+        loginAttemptService.recordFailedAttemptAndGet(username);
+        throw new BadCredentialsException("Identifiants invalides");
+      }
 
       if (!encoded) {
         utilisateurService.upgradePasswordIfNeeded(dto.getUsername(), dto.getPassword());
       }
+      loginAttemptService.resetAttempts(username);
+      
 
       // 3️⃣ Génération sécurisée des tokens via JwtService
       TokensDTO tokens = jwtService.generateTokens(utilisateur, request);

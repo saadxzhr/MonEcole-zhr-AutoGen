@@ -70,7 +70,7 @@ public class BackendApplication {
 // refresh tokens exposés en JSON → déplacer vers Secure HttpOnly cookie en prod ;
 
 // git add .
-// git commit -m "jwt auth 99.5%"
+// git commit -m "jwt auth done"
 // git push
 
 // postman
@@ -81,6 +81,9 @@ public class BackendApplication {
 
 
 ### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\auth\config\RateLimitConstants.java
+
+// To activate before production
+
 
 // package com.szschoolmanager.auth.config;
 
@@ -119,6 +122,9 @@ public class BackendApplication {
 
 
 ### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\auth\config\RateLimitFilter.java
+
+// To activate before production
+
 
 // package com.szschoolmanager.auth.config;
 
@@ -932,41 +938,6 @@ public class UtilisateurUpdateDTO {
 ### END FILE
 
 
-### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\auth\exception\AccountLockedException.java
-
-package com.szschoolmanager.auth.exception;
-
-import org.springframework.security.core.AuthenticationException;
-
-/** Exception levée lorsqu'un compte est temporairement verrouillé. */
-public class AccountLockedException extends AuthenticationException {
-  public AccountLockedException(String msg) {
-    super(msg);
-  }
-}
-
-
-### END FILE
-
-
-### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\auth\exception\RedisUnavailableException.java
-
-package com.szschoolmanager.auth.exception;
-
-public class RedisUnavailableException extends RuntimeException {
-  public RedisUnavailableException(String message, Throwable cause) {
-    super(message, cause);
-  }
-
-  public RedisUnavailableException(String message) {
-    super(message);
-  }
-}
-
-
-### END FILE
-
-
 ### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\auth\mapper\UtilisateurMapper.java
 
 package com.szschoolmanager.auth.mapper;
@@ -1409,103 +1380,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 ### END FILE
 
 
-### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\auth\security\JwtExceptionHandler.java
-
-// package com.szschoolmanager.auth.security;
-
-// import com.szschoolmanager.auth.exception.AccountLockedException;
-// import io.jsonwebtoken.JwtException;
-// import java.util.Map;
-// import lombok.extern.slf4j.Slf4j;
-// import org.springframework.http.*;
-// import org.springframework.web.bind.annotation.*;
-
-// @RestControllerAdvice
-// @Slf4j
-// public class JwtExceptionHandler {
-
-//   @ExceptionHandler({JwtException.class, IllegalArgumentException.class})
-//   public ResponseEntity<Object> handleJwt(Exception ex) {
-//     log.warn("JWT error: {}", ex.getMessage());
-//     var body = java.util.Map.of("error", "invalid_token", "message", ex.getMessage());
-//     return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(body);
-//   }
-
-//   @ExceptionHandler(AccountLockedException.class)
-//   public ResponseEntity<Map<String, Object>> handleAccountLocked(AccountLockedException ex) {
-//     return ResponseEntity.status(HttpStatus.LOCKED)
-//         .body(
-//             Map.of(
-//                 "status", "error",
-//                 "message", ex.getMessage(),
-//                 "code", HttpStatus.LOCKED.value()));
-//   }
-// }
-
-
-### END FILE
-
-
-### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\auth\security\LoginAttemptService.java
-
-// package com.szschoolmanager.auth.security;
-
-// import java.time.Instant;
-// import java.util.Map;
-// import java.util.concurrent.ConcurrentHashMap;
-// import lombok.extern.slf4j.Slf4j;
-// import org.springframework.stereotype.Service;
-
-// /**
-//  * Simple local brute-force protection (per username). Later can be switched to Redis (TTL-based).
-//  */
-// @Slf4j
-// @Service
-// public class LoginAttemptService {
-
-//   private static final int MAX_ATTEMPTS = 5;
-//   private static final long LOCK_DURATION_MS = 30 * 60 * 1000; // 30 minutes
-
-//   // username -> (failedAttempts, lockExpiration)
-//   private final Map<String, LoginAttempt> attempts = new ConcurrentHashMap<>();
-
-//   public void recordFailedAttempt(String username) {
-//     var current = attempts.getOrDefault(username, new LoginAttempt(0, 0));
-//     int newCount = current.failedAttempts() + 1;
-//     long lockUntil = current.lockUntil();
-
-//     if (newCount >= MAX_ATTEMPTS) {
-//       lockUntil = Instant.now().toEpochMilli() + LOCK_DURATION_MS;
-//       log.warn("🔒 Account {} locked for 30 minutes due to too many failed attempts", username);
-//     }
-
-//     attempts.put(username, new LoginAttempt(newCount, lockUntil));
-//   }
-
-//   public void resetAttempts(String username) {
-//     attempts.remove(username);
-//   }
-
-//   public boolean isLocked(String username) {
-//     var entry = attempts.get(username);
-//     if (entry == null) return false;
-
-//     if (entry.lockUntil() > Instant.now().toEpochMilli()) {
-//       return true;
-//     } else if (entry.lockUntil() != 0) {
-//       // expired lock -> reset
-//       attempts.remove(username);
-//     }
-//     return false;
-//   }
-
-//   private record LoginAttempt(int failedAttempts, long lockUntil) {}
-// }
-
-
-### END FILE
-
-
 ### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\auth\security\SecurityConfig.java
 
 package com.szschoolmanager.auth.security;
@@ -1676,20 +1550,6 @@ public class SecurityConfig {
 ### END FILE
 
 
-### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\auth\security\SecurityConstants.java
-
-package com.szschoolmanager.auth.security;
-
-public final class SecurityConstants {
-  private SecurityConstants() {}
-
-  public static final String ROLE_PREFIX = "ROLE_";
-}
-
-
-### END FILE
-
-
 ### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\auth\service\AuthenticationService.java
 
 package com.szschoolmanager.auth.service;
@@ -1699,11 +1559,6 @@ import com.szschoolmanager.auth.dto.AuthResponseDTO;
 import com.szschoolmanager.auth.dto.TokensDTO;
 import com.szschoolmanager.auth.model.RefreshToken;
 import com.szschoolmanager.auth.model.Utilisateur;
-import com.szschoolmanager.auth.service.DatabaseUserDetailsService;
-import com.szschoolmanager.auth.service.JwtService;
-import com.szschoolmanager.auth.service.RefreshTokenService;
-import com.szschoolmanager.auth.service.TokenOrchestratorService;
-import com.szschoolmanager.auth.service.UtilisateurService;
 import com.szschoolmanager.shared.dto.ResponseDTO;
 import com.szschoolmanager.shared.exception.BusinessValidationException;
 
@@ -1720,6 +1575,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
@@ -1735,19 +1591,29 @@ public class AuthenticationService {
   @Value("${jwt.refresh-days:7}")
   private int refreshDays;
 
-
+  private final RedisLoginAttemptService loginAttemptService;
   private final TokenOrchestratorService tokenOrchestratorService;
   private final JwtService jwtService;
   private final UtilisateurService utilisateurService;
   private final RefreshTokenService refreshTokenService;
-  private final DatabaseUserDetailsService userDetailsService;
+  private final PasswordEncoder passwordEncoder;
+
+
 
 @Transactional
   public ResponseEntity<ResponseDTO<AuthResponseDTO>> login(
       @Valid @RequestBody AuthRequestDTO dto,
       HttpServletRequest request,
       HttpServletResponse response) {
+    
     try {
+      String username = dto.getUsername();
+      if (loginAttemptService.isLocked(username)) {
+          log.warn("Tentative de connexion sur un compte verrouillé: {}", username);
+          return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+              .body(ResponseDTO.error("Compte verrouillé pour 30 minutes après plusieurs échecs"));
+      }
+
       Utilisateur utilisateur =
           utilisateurService
               .findByUsername(dto.getUsername())
@@ -1756,16 +1622,21 @@ public class AuthenticationService {
       boolean encoded = utilisateur.getPassword().startsWith("$2a$");
       boolean matches =
           encoded
-              ? utilisateurService
-                  .passwordEncoder()
-                  .matches(dto.getPassword(), utilisateur.getPassword())
+              ? passwordEncoder.matches(dto.getPassword(), utilisateur.getPassword())
               : dto.getPassword().equals(utilisateur.getPassword());
 
-      if (!matches) throw new BadCredentialsException("Identifiants invalides");
+      
+
+      if (!matches) {
+        loginAttemptService.recordFailedAttemptAndGet(username);
+        throw new BadCredentialsException("Identifiants invalides");
+      }
 
       if (!encoded) {
         utilisateurService.upgradePasswordIfNeeded(dto.getUsername(), dto.getPassword());
       }
+      loginAttemptService.resetAttempts(username);
+      
 
       // 3️⃣ Génération sécurisée des tokens via JwtService
       TokensDTO tokens = jwtService.generateTokens(utilisateur, request);
@@ -1971,7 +1842,7 @@ public ResponseEntity<ResponseDTO<Void>> logout(
 package com.szschoolmanager.auth.service;
 
 import com.szschoolmanager.auth.model.Utilisateur;
-import com.szschoolmanager.auth.security.SecurityConstants;
+import com.szschoolmanager.auth.repository.UtilisateurRepository;
 
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -1985,13 +1856,13 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class DatabaseUserDetailsService implements UserDetailsService {
 
-  private final UtilisateurQueryService utilisateurQueryService;
+  private final UtilisateurRepository utilisateurRepository;
 
   @Override
   @Cacheable(value = "userDetails", key = "#username", cacheManager = "redisCacheManager")
   public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
     Utilisateur u =
-        utilisateurQueryService
+        utilisateurRepository
             .findByUsername(username)
             .orElseThrow(() -> new UsernameNotFoundException("Utilisateur introuvable"));
 
@@ -2000,8 +1871,7 @@ public class DatabaseUserDetailsService implements UserDetailsService {
         .password(u.getPassword())
         .authorities(
             List.of(
-                new SimpleGrantedAuthority(
-                    SecurityConstants.ROLE_PREFIX + u.getRole().toUpperCase())))
+                new SimpleGrantedAuthority("ROLE_" + u.getRole().toUpperCase())))
         .build();
   }
 
@@ -2020,7 +1890,6 @@ package com.szschoolmanager.auth.service;
 import com.szschoolmanager.auth.dto.TokensDTO;
 import com.szschoolmanager.auth.model.RefreshToken;
 import com.szschoolmanager.auth.model.Utilisateur;
-import com.szschoolmanager.auth.security.SecurityConstants;
 import com.szschoolmanager.shared.util.HttpRequestUtils;
 
 import io.jsonwebtoken.*;
@@ -2147,7 +2016,7 @@ public class JwtService {
         .setSubject(user.getUsername())
         .setId(jti)
         .claim("role", user.getRole())
-        .claim("authorities", List.of(SecurityConstants.ROLE_PREFIX + user.getRole().toUpperCase()))
+        .claim("authorities", List.of("ROLE_" + user.getRole().toUpperCase()))
         .setIssuedAt(Date.from(now))
         .setNotBefore(Date.from(now))
         .setExpiration(Date.from(now.plusSeconds(accessExpirationSeconds)))
@@ -2367,62 +2236,6 @@ public class RedisLoginAttemptService {
           ex);
     } catch (Exception ex) {
       log.error("Unexpected error while resetting attempts for {}", username, ex);
-    }
-  }
-}
-
-
-### END FILE
-
-
-### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\auth\service\RedisService.java
-
-package com.szschoolmanager.auth.service;
-
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.redis.RedisConnectionFailureException;
-import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.stereotype.Service;
-
-import com.szschoolmanager.auth.exception.RedisUnavailableException;
-
-@RequiredArgsConstructor
-@Slf4j
-@Service
-public class RedisService {
-
-  private final StringRedisTemplate redisTemplate;
-
-  /**
-   * Vérifie si un token (par son jti) est dans la blacklist. - Si Redis répond, renvoie true/false.
-   * - Si Redis indisponible ou erreur, lance RedisUnavailableException.
-   */
-  public boolean isTokenBlacklisted(String tokenId) {
-    try {
-      String key = "blacklist:access:" + tokenId;
-      Boolean present = redisTemplate.hasKey(key);
-      return Boolean.TRUE.equals(present);
-    } catch (RedisConnectionFailureException ex) {
-      log.error("❌ Redis connection failure while checking blacklist for tokenId={}", tokenId, ex);
-      throw new RedisUnavailableException("Redis unavailable", ex);
-    } catch (Exception ex) {
-      log.error("❌ Unexpected Redis error while checking blacklist for tokenId={}", tokenId, ex);
-      // On considère toutes les erreurs comme critique -> fail-closed
-      throw new RedisUnavailableException("Redis error", ex);
-    }
-  }
-
-  /** Méthode utilitaire : marque un token dans la blacklist (usage ailleurs) */
-  public void blacklistToken(String tokenId) {
-    try {
-      String key = "blacklist:access:" + tokenId;
-      // Exemple: marquer avec TTL (1 jour) — ajuste si nécessaire
-      redisTemplate.opsForValue().set(key, "1");
-      redisTemplate.expire(key, java.time.Duration.ofDays(1));
-    } catch (Exception ex) {
-      log.error("❌ Failed to write blacklist key for tokenId={}", tokenId, ex);
-      throw new RedisUnavailableException("Redis unavailable", ex);
     }
   }
 }
@@ -2840,40 +2653,19 @@ public class TokenOrchestratorService {
 ### END FILE
 
 
-### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\auth\service\UtilisateurQueryService.java
+### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\auth\service\UserCacheEvictor.java
 
 package com.szschoolmanager.auth.service;
 
-import com.szschoolmanager.auth.model.Utilisateur;
-import java.util.Optional;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.stereotype.Component;
 
-public interface UtilisateurQueryService {
-  Optional<Utilisateur> findByUsername(String username);
-}
+@Component
+public class UserCacheEvictor {
 
-
-### END FILE
-
-
-### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\auth\service\UtilisateurQueryServiceImpl.java
-
-package com.szschoolmanager.auth.service;
-
-import com.szschoolmanager.auth.model.Utilisateur;
-import com.szschoolmanager.auth.repository.UtilisateurRepository;
-import java.util.Optional;
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-
-@Service
-@RequiredArgsConstructor
-public class UtilisateurQueryServiceImpl implements UtilisateurQueryService {
-
-  private final UtilisateurRepository repository;
-
-  @Override
-  public Optional<Utilisateur> findByUsername(String username) {
-    return repository.findByUsername(username);
+  @CacheEvict(value = "userDetails", key = "#username")
+  public void evictUser(String username) {
+      // aucun code : Spring s’en charge
   }
 }
 
@@ -2889,7 +2681,6 @@ import com.szschoolmanager.auth.dto.*;
 import com.szschoolmanager.auth.mapper.UtilisateurMapper;
 import com.szschoolmanager.auth.model.Utilisateur;
 import com.szschoolmanager.auth.repository.UtilisateurRepository;
-import com.szschoolmanager.auth.security.SecurityConstants;
 import com.szschoolmanager.shared.dto.ResponseDTO;
 
 import java.util.Optional;
@@ -2908,16 +2699,17 @@ public class UtilisateurService {
   private final UtilisateurRepository repo;
   private final UtilisateurMapper mapper;
   private final PasswordEncoder passwordEncoder;
-  private final DatabaseUserDetailsService userDetailsService;
+  private final UserCacheEvictor userCacheEvictor;
 
-  public PasswordEncoder passwordEncoder() {
-    return passwordEncoder;
-  }
+
+  // public PasswordEncoder passwordEncoder() {
+  //   return passwordEncoder;
+  // }
 
   @Transactional
   public void save(Utilisateur utilisateur) {
     repo.save(utilisateur);
-    userDetailsService.invalidateUserCache(utilisateur.getUsername());
+    userCacheEvictor.evictUser(utilisateur.getUsername());
   }
 
 
@@ -2935,7 +2727,7 @@ public class UtilisateurService {
     if (!encoded) {
       u.setPassword(passwordEncoder.encode(rawPassword));
       repo.save(u);
-      userDetailsService.invalidateUserCache(username);
+      userCacheEvictor.evictUser(username);
       return true;
     }
     return false;
@@ -2949,8 +2741,7 @@ public class UtilisateurService {
         .username(u.getUsername())
         .password(u.getPassword())
         .authorities(
-            SecurityConstants.ROLE_PREFIX
-                + (u.getRole() == null ? "USER" : u.getRole().toUpperCase()))
+            "ROLE_" + (u.getRole() == null ? "USER" : u.getRole().toUpperCase()))
         .build();
   }
 
@@ -2988,7 +2779,7 @@ public class UtilisateurService {
 
     utilisateur.setForceChangePassword(true);
     repo.save(utilisateur);
-    userDetailsService.invalidateUserCache(utilisateur.getUsername());
+    userCacheEvictor.evictUser(utilisateur.getUsername());
     return ResponseEntity.ok(
         ResponseDTO.success("Utilisateur créé", mapper.toResponseDTO(utilisateur)));
   }
@@ -3025,7 +2816,7 @@ public class UtilisateurService {
     }
 
     repo.save(u);
-    userDetailsService.invalidateUserCache(u.getUsername());
+    userCacheEvictor.evictUser(u.getUsername());
     return ResponseEntity.ok(
         ResponseDTO.success("Utilisateur mis à jour avec succès", mapper.toResponseDTO(u)));
   }
@@ -3047,7 +2838,7 @@ public class UtilisateurService {
     u.setPassword(passwordEncoder.encode(dto.getNewPassword()));
     u.setForceChangePassword(false);
     repo.save(u);
-    userDetailsService.invalidateUserCache(u.getUsername());
+    userCacheEvictor.evictUser(u.getUsername());
     return ResponseEntity.ok(ResponseDTO.success("Mot de passe modifié", null));
   }
 
@@ -3108,64 +2899,64 @@ public class GenerateRSAKeys {
 
 ### FILE: C:\MonEcole-zhr-AutoGen-main\src\main\java\com\szschoolmanager\auth\util\PemUtils.java
 
-package com.szschoolmanager.auth.util;
+// package com.szschoolmanager.auth.util;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.StringReader;
-import java.security.GeneralSecurityException;
-import java.security.KeyFactory;
-import java.security.PrivateKey;
-import java.security.PublicKey;
-import java.security.spec.InvalidKeySpecException;
-import java.security.spec.PKCS8EncodedKeySpec;
-import java.security.spec.X509EncodedKeySpec;
-import java.util.Base64;
-import java.util.stream.Collectors;
+// import java.io.BufferedReader;
+// import java.io.IOException;
+// import java.io.StringReader;
+// import java.security.GeneralSecurityException;
+// import java.security.KeyFactory;
+// import java.security.PrivateKey;
+// import java.security.PublicKey;
+// import java.security.spec.InvalidKeySpecException;
+// import java.security.spec.PKCS8EncodedKeySpec;
+// import java.security.spec.X509EncodedKeySpec;
+// import java.util.Base64;
+// import java.util.stream.Collectors;
 
-public final class PemUtils {
+// public final class PemUtils {
 
-  // 🔒 Constructeur privé pour empêcher l’instanciation (S1118)
-  private PemUtils() {
-    throw new UnsupportedOperationException("Utility class - cannot be instantiated");
-  }
+//   // 🔒 Constructeur privé pour empêcher l’instanciation (S1118)
+//   private PemUtils() {
+//     throw new UnsupportedOperationException("Utility class - cannot be instantiated");
+//   }
 
-  private static String stripPemHeader(String pem, String beginMarker, String endMarker)
-      throws IOException {
-    try (BufferedReader reader = new BufferedReader(new StringReader(pem))) {
-      return reader
-          .lines()
-          .filter(line -> !line.contains(beginMarker) && !line.contains(endMarker))
-          .collect(Collectors.joining());
-    }
-  }
+//   private static String stripPemHeader(String pem, String beginMarker, String endMarker)
+//       throws IOException {
+//     try (BufferedReader reader = new BufferedReader(new StringReader(pem))) {
+//       return reader
+//           .lines()
+//           .filter(line -> !line.contains(beginMarker) && !line.contains(endMarker))
+//           .collect(Collectors.joining());
+//     }
+//   }
 
-  public static PrivateKey parsePrivateKeyFromPem(String pem)
-      throws IOException, GeneralSecurityException {
-    try {
-      String cleanPem = stripPemHeader(pem, "-----BEGIN PRIVATE KEY", "-----END PRIVATE KEY");
-      byte[] decoded = Base64.getDecoder().decode(cleanPem);
-      PKCS8EncodedKeySpec keySpec = new PKCS8EncodedKeySpec(decoded);
-      KeyFactory kf = KeyFactory.getInstance("RSA");
-      return kf.generatePrivate(keySpec);
-    } catch (InvalidKeySpecException e) {
-      throw new GeneralSecurityException("Invalid RSA private key format", e);
-    }
-  }
+//   public static PrivateKey parsePrivateKeyFromPem(String pem)
+//       throws IOException, GeneralSecurityException {
+//     try {
+//       String cleanPem = stripPemHeader(pem, "-----BEGIN PRIVATE KEY", "-----END PRIVATE KEY");
+//       byte[] decoded = Base64.getDecoder().decode(cleanPem);
+//       PKCS8EncodedKeySpec keySpec = new PKCS8EncodedKeySpec(decoded);
+//       KeyFactory kf = KeyFactory.getInstance("RSA");
+//       return kf.generatePrivate(keySpec);
+//     } catch (InvalidKeySpecException e) {
+//       throw new GeneralSecurityException("Invalid RSA private key format", e);
+//     }
+//   }
 
-  public static PublicKey parsePublicKeyFromPem(String pem)
-      throws IOException, GeneralSecurityException {
-    try {
-      String cleanPem = stripPemHeader(pem, "-----BEGIN PUBLIC KEY", "-----END PUBLIC KEY");
-      byte[] decoded = Base64.getDecoder().decode(cleanPem);
-      X509EncodedKeySpec keySpec = new X509EncodedKeySpec(decoded);
-      KeyFactory kf = KeyFactory.getInstance("RSA");
-      return kf.generatePublic(keySpec);
-    } catch (InvalidKeySpecException e) {
-      throw new GeneralSecurityException("Invalid RSA public key format", e);
-    }
-  }
-}
+//   public static PublicKey parsePublicKeyFromPem(String pem)
+//       throws IOException, GeneralSecurityException {
+//     try {
+//       String cleanPem = stripPemHeader(pem, "-----BEGIN PUBLIC KEY", "-----END PUBLIC KEY");
+//       byte[] decoded = Base64.getDecoder().decode(cleanPem);
+//       X509EncodedKeySpec keySpec = new X509EncodedKeySpec(decoded);
+//       KeyFactory kf = KeyFactory.getInstance("RSA");
+//       return kf.generatePublic(keySpec);
+//     } catch (InvalidKeySpecException e) {
+//       throw new GeneralSecurityException("Invalid RSA public key format", e);
+//     }
+//   }
+// }
 
 
 ### END FILE

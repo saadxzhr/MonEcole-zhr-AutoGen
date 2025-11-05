@@ -3,7 +3,6 @@ package com.szschoolmanager.auth.service;
 import com.szschoolmanager.auth.dto.TokensDTO;
 import com.szschoolmanager.auth.model.RefreshToken;
 import com.szschoolmanager.auth.model.Utilisateur;
-import com.szschoolmanager.auth.security.SecurityConstants;
 import com.szschoolmanager.shared.util.HttpRequestUtils;
 
 import io.jsonwebtoken.*;
@@ -130,7 +129,7 @@ public class JwtService {
         .setSubject(user.getUsername())
         .setId(jti)
         .claim("role", user.getRole())
-        .claim("authorities", List.of(SecurityConstants.ROLE_PREFIX + user.getRole().toUpperCase()))
+        .claim("authorities", List.of("ROLE_" + user.getRole().toUpperCase()))
         .setIssuedAt(Date.from(now))
         .setNotBefore(Date.from(now))
         .setExpiration(Date.from(now.plusSeconds(accessExpirationSeconds)))

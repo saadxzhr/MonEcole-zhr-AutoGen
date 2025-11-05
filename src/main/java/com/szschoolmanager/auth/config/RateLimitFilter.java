@@ -1,3 +1,6 @@
+// To activate before production
+
+
 // package com.szschoolmanager.auth.config;
 
 // import jakarta.servlet.FilterChain;

@@ -67,7 +67,7 @@ public class BackendApplication {
 // refresh tokens exposés en JSON → déplacer vers Secure HttpOnly cookie en prod ;
 
 // git add .
-// git commit -m "jwt auth 99.5%"
+// git commit -m "jwt auth done 1"
 // git push
 
 // postman

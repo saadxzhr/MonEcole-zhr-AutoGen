@@ -1,7 +1,7 @@
 package com.szschoolmanager.auth.service;
 
 import com.szschoolmanager.auth.model.Utilisateur;
-import com.szschoolmanager.auth.security.SecurityConstants;
+import com.szschoolmanager.auth.repository.UtilisateurRepository;
 
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -15,13 +15,13 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class DatabaseUserDetailsService implements UserDetailsService {
 
-  private final UtilisateurQueryService utilisateurQueryService;
+  private final UtilisateurRepository utilisateurRepository;
 
   @Override
   @Cacheable(value = "userDetails", key = "#username", cacheManager = "redisCacheManager")
   public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
     Utilisateur u =
-        utilisateurQueryService
+        utilisateurRepository
             .findByUsername(username)
             .orElseThrow(() -> new UsernameNotFoundException("Utilisateur introuvable"));
 
@@ -30,8 +30,7 @@ public class DatabaseUserDetailsService implements UserDetailsService {
         .password(u.getPassword())
         .authorities(
             List.of(
-                new SimpleGrantedAuthority(
-                    SecurityConstants.ROLE_PREFIX + u.getRole().toUpperCase())))
+                new SimpleGrantedAuthority("ROLE_" + u.getRole().toUpperCase())))
         .build();
   }
 

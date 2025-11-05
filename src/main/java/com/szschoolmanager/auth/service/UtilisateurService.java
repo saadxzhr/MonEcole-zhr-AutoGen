@@ -4,7 +4,6 @@ import com.szschoolmanager.auth.dto.*;
 import com.szschoolmanager.auth.mapper.UtilisateurMapper;
 import com.szschoolmanager.auth.model.Utilisateur;
 import com.szschoolmanager.auth.repository.UtilisateurRepository;
-import com.szschoolmanager.auth.security.SecurityConstants;
 import com.szschoolmanager.shared.dto.ResponseDTO;
 
 import java.util.Optional;
@@ -23,16 +22,17 @@ public class UtilisateurService {
   private final UtilisateurRepository repo;
   private final UtilisateurMapper mapper;
   private final PasswordEncoder passwordEncoder;
-  private final DatabaseUserDetailsService userDetailsService;
+  private final UserCacheEvictor userCacheEvictor;
 
-  public PasswordEncoder passwordEncoder() {
-    return passwordEncoder;
-  }
+
+  // public PasswordEncoder passwordEncoder() {
+  //   return passwordEncoder;
+  // }
 
   @Transactional
   public void save(Utilisateur utilisateur) {
     repo.save(utilisateur);
-    userDetailsService.invalidateUserCache(utilisateur.getUsername());
+    userCacheEvictor.evictUser(utilisateur.getUsername());
   }
 
 
@@ -50,7 +50,7 @@ public class UtilisateurService {
     if (!encoded) {
       u.setPassword(passwordEncoder.encode(rawPassword));
       repo.save(u);
-      userDetailsService.invalidateUserCache(username);
+      userCacheEvictor.evictUser(username);
       return true;
     }
     return false;
@@ -64,8 +64,7 @@ public class UtilisateurService {
         .username(u.getUsername())
         .password(u.getPassword())
         .authorities(
-            SecurityConstants.ROLE_PREFIX
-                + (u.getRole() == null ? "USER" : u.getRole().toUpperCase()))
+            "ROLE_" + (u.getRole() == null ? "USER" : u.getRole().toUpperCase()))
         .build();
   }
 
@@ -103,7 +102,7 @@ public class UtilisateurService {
 
     utilisateur.setForceChangePassword(true);
     repo.save(utilisateur);
-    userDetailsService.invalidateUserCache(utilisateur.getUsername());
+    userCacheEvictor.evictUser(utilisateur.getUsername());
     return ResponseEntity.ok(
         ResponseDTO.success("Utilisateur créé", mapper.toResponseDTO(utilisateur)));
   }
@@ -140,7 +139,7 @@ public class UtilisateurService {
     }
 
     repo.save(u);
-    userDetailsService.invalidateUserCache(u.getUsername());
+    userCacheEvictor.evictUser(u.getUsername());
     return ResponseEntity.ok(
         ResponseDTO.success("Utilisateur mis à jour avec succès", mapper.toResponseDTO(u)));
   }
@@ -162,7 +161,7 @@ public class UtilisateurService {
     u.setPassword(passwordEncoder.encode(dto.getNewPassword()));
     u.setForceChangePassword(false);
     repo.save(u);
-    userDetailsService.invalidateUserCache(u.getUsername());
+    userCacheEvictor.evictUser(u.getUsername());
     return ResponseEntity.ok(ResponseDTO.success("Mot de passe modifié", null));
   }
 
