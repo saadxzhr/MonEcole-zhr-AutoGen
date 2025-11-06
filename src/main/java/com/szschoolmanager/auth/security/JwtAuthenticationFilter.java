@@ -71,6 +71,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         String correlationId = UUID.randomUUID().toString();
         MDC.put("correlationId", correlationId);
         response.setHeader("X-Correlation-ID", correlationId);
+        
+        // Determine client IP (supports proxies)
+        String clientIp = request.getHeader("X-Forwarded-For");
+        if (clientIp == null || clientIp.isBlank()) {
+            clientIp = request.getRemoteAddr();
+        }
+        MDC.put("clientIp", clientIp);
 
 
         String path = request.getRequestURI();
@@ -119,6 +126,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         Claims claims = jws.getBody();
         String username = claims.getSubject();
+        MDC.put("username", username);
         // vérifier la blacklist
         String jti = claims.getId();
 
@@ -159,7 +167,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         // Continue la chaîne de filtres
         chain.doFilter(request, response);
     } finally {
-          MDC.clear();
+          MDC.remove("username");
+          MDC.remove("clientIp");
+          MDC.remove("correlationId");
       }
   }
 

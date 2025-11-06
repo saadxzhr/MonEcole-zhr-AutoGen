@@ -1,0 +1,11 @@
+
+
+------------generate secret token
+
+setx APP_SECURITY_TOKEN_HASH_SECRET "8c3f8d1b97d2a7e0fbe7d8e91a91c1d0a5f2b2e3d9e4f6a7b8c9d0e1f2a3b4c5"
+
+
+
+-------------Change profile dev to prod
+
+-------------Activate RateLimitFilter and RateLimitConstants

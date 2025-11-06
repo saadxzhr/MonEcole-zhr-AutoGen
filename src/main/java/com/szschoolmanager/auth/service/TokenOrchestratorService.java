@@ -3,6 +3,8 @@ package com.szschoolmanager.auth.service;
 import com.szschoolmanager.auth.model.RefreshToken;
 import com.szschoolmanager.shared.exception.BusinessValidationException;
 
+import io.micrometer.core.instrument.MeterRegistry;
+
 import java.time.Duration;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -15,6 +17,7 @@ public class TokenOrchestratorService {
 
   private final JwtService jwtService;
   private final RefreshTokenService refreshTokenService;
+  private final MeterRegistry meterRegistry;
 
   /**
    * Gère la rotation du refresh token, la détection de réutilisation, et le blacklistage du access
@@ -32,13 +35,14 @@ public class TokenOrchestratorService {
 
       // 🔒 Cas : le refresh token a été réutilisé (reuse detected)
       if (e.getMessage().toLowerCase().contains("reuse")) {
+        meterRegistry.counter("auth.refresh.reuse").increment();
+        log.warn("Detected refresh reuse for presented token (possible token leakage)");
         RefreshToken reused = refreshTokenService.findByRawToken(presentedRaw);
         if (reused != null && reused.getAccessJti() != null) {
           try {
             jwtService.blacklistAccessTokenJti(
                 reused.getAccessJti(), Duration.ofSeconds(jwtService.getAccessExpirationSeconds()));
-            log.warn(
-                "🚫 Access token JTI blacklisted due to refresh reuse for user {}",
+            log.warn("🚫 Access token JTI blacklisted due to refresh reuse for user {}",
                 reused.getUtilisateur().getUsername());
           } catch (Exception ex) {
             log.error("❌ Failed to blacklist reused access token JTI: {}", ex.getMessage());

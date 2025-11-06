@@ -8,6 +8,9 @@ import com.szschoolmanager.auth.model.Utilisateur;
 import com.szschoolmanager.shared.dto.ResponseDTO;
 import com.szschoolmanager.shared.exception.BusinessValidationException;
 
+
+import jakarta.annotation.PostConstruct;
+import org.springframework.core.env.Environment;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
@@ -31,19 +34,33 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 public class AuthenticationService {
 
-  @Value("${app.dev:true}") // default true for development; set false in prod
-  private boolean devMode;
-
-  @Value("${jwt.refresh-days:7}")
-  private int refreshDays;
-
   private final RedisLoginAttemptService loginAttemptService;
   private final TokenOrchestratorService tokenOrchestratorService;
   private final JwtService jwtService;
   private final UtilisateurService utilisateurService;
   private final RefreshTokenService refreshTokenService;
   private final PasswordEncoder passwordEncoder;
+  private final Environment environment;
 
+
+  @Value("${app.dev:true}") // default true for development; set false in prod
+  private boolean devMode;
+
+  @Value("${jwt.refresh-days:7}")
+  private int refreshDays;
+
+  
+
+  @PostConstruct
+    private void checkDevModeSafety() {
+        String[] profiles = environment.getActiveProfiles();
+        for (String profile : profiles) {
+            if ("prod".equalsIgnoreCase(profile) && devMode) {
+                throw new IllegalStateException(
+                    "⚠️ app.dev must be set to false when running with 'prod' profile (safety check)");
+            }
+        }
+    }
 
 
 @Transactional
@@ -97,7 +114,7 @@ public class AuthenticationService {
                 .httpOnly(true)
                 .secure(true)
                 .sameSite("Strict")
-                .path("/api/v1/auth")
+                .path("/")
                 .maxAge(Duration.ofSeconds(tokens.getRefreshExpiresIn()))
                 .build();
         response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());

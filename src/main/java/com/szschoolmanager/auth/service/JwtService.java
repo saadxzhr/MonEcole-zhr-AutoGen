@@ -80,7 +80,12 @@ public class JwtService {
                 + "). Vérifiez le format PEM/DER et que la clé est une clé RSA.");
       }
       this.publicKey = (RSAPublicKey) loaded;
-      this.jwtParser = Jwts.parserBuilder().setSigningKey(publicKey).requireIssuer(issuer).build();
+      this.jwtParser = Jwts.parserBuilder()
+                          .setSigningKey(publicKey)
+                          .requireIssuer(issuer)
+                          .setAllowedClockSkewSeconds(30) // ✅ tolérance horloge 30s
+                          .build();
+
     } catch (Exception e) {
       log.error("Failed to init JwtService: {}", e.getMessage(), e);
       throw new IllegalStateException(e);

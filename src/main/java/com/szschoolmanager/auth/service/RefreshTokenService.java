@@ -58,7 +58,8 @@ public class RefreshTokenService {
   @Value("${jwt.expiry-grace-seconds:30}")
   private int expiryGraceSeconds;
 
-
+  @Value("${app.auth.rotate-lock-seconds:30}")
+  private int rotateLockSeconds;
 
   // ----------------- CREATE -----------------
   @Transactional
@@ -166,7 +167,7 @@ public class RefreshTokenService {
      String hashed = hashToken(presentedRaw);
 
     String lockKey = "rotate:lock:" + hashed;
-    Boolean acquired = redisTemplate.opsForValue().setIfAbsent(lockKey, "1", Duration.ofSeconds(5));
+    Boolean acquired = redisTemplate.opsForValue().setIfAbsent(lockKey, "1", Duration.ofSeconds(rotateLockSeconds));
     if (!Boolean.TRUE.equals(acquired)) {
         throw new BusinessValidationException("Concurrent rotation detected");
     }
@@ -294,11 +295,19 @@ public class RefreshTokenService {
   private String tokenHashSecret;
 
   @PostConstruct
-  void validateSecret() {
-    if (tokenHashSecret == null || tokenHashSecret.length() < 32) {
-      throw new IllegalStateException("Token hash secret must be at least 32 characters long");
-    }
+  public void validateHashSecret() {
+      if (tokenHashSecret == null || tokenHashSecret.isBlank()) {
+          throw new IllegalStateException(
+              "❌ Missing app.security.token-hash-secret (must come from env or secret manager)");
+      }
+
+      if (tokenHashSecret.length() < 32) {
+          throw new IllegalStateException(
+              "❌ Token hash secret must be at least 32 characters long for security");
+      }
   }
+
+
 
   private String hashToken(String rawToken) {
     try {
