@@ -61,17 +61,17 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
   @Value("${app.redis.fail-closed:true}")
   private boolean failClosed;
 
-  @Override
+
+    @Override
   protected void doFilterInternal(@NonNull HttpServletRequest request,
                                   @NonNull HttpServletResponse response,
                                   @NonNull FilterChain chain)
                                   throws ServletException, IOException {
-
     try {
         String correlationId = UUID.randomUUID().toString();
         MDC.put("correlationId", correlationId);
         response.setHeader("X-Correlation-ID", correlationId);
-        
+
         // Determine client IP (supports proxies)
         String clientIp = request.getHeader("X-Forwarded-For");
         if (clientIp == null || clientIp.isBlank()) {
@@ -113,28 +113,27 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
           return;
         }
 
-        // 4) Vérification cryptographique (signature / expiration)
-        Jws<Claims> jws;
+        // 4) Vérification cryptographique (signature / expiration) and blacklist
+        Claims claims;
         try {
-          jws = jwtService.parseToken(token);
+            claims = jwtService.validateAccessToken(token);
         } catch (Exception e) {
-          meterRegistry.counter("jwt.auth.failure").increment();
-          log.warn("JWT invalide/expiré : {}", e.getMessage());
-          ErrorUtil.writeJsonError(response, HttpStatus.UNAUTHORIZED, "Invalid or expired token");
-          return;
+            meterRegistry.counter("jwt.auth.failure").increment();
+            log.warn("JWT invalide/expiré : {}", e.getMessage());
+            ErrorUtil.writeJsonError(response, HttpStatus.UNAUTHORIZED, "Invalid or expired token");
+            return;
         }
 
-        Claims claims = jws.getBody();
         String username = claims.getSubject();
         MDC.put("username", username);
-        // vérifier la blacklist
-        String jti = claims.getId();
-
-        if (jti != null && jwtService.isAccessTokenBlacklisted(jti)) {
-          log.warn("Access token JTI {} is blacklisted", jti);
-          ErrorUtil.writeJsonError(response, HttpStatus.UNAUTHORIZED, "Access token revoked");
-          return;
-        }
+        // vérifier la blacklist // done on validateAccessToken
+//        String jti = claims.getId();
+//
+//        if (jti != null && jwtService.isAccessTokenBlacklisted(jti)) {
+//          log.warn("Access token JTI {} is blacklisted", jti);
+//          ErrorUtil.writeJsonError(response, HttpStatus.UNAUTHORIZED, "Access token revoked");
+//          return;
+//        }
 
         // 6) Reconstruction du SecurityContext **depuis le JWT uniquement**
         if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
@@ -166,6 +165,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         // Continue la chaîne de filtres
         chain.doFilter(request, response);
+
     } finally {
           MDC.remove("username");
           MDC.remove("clientIp");

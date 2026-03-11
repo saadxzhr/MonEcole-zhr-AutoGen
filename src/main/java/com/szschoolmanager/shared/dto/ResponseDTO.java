@@ -20,7 +20,7 @@ public class ResponseDTO<T> {
     return new ResponseDTO<>("SUCCESS", message, data, LocalDateTime.now());
   }
 
-  public static <T> ResponseDTO<T> error(String message) {
-    return new ResponseDTO<>("ERROR", message, null, LocalDateTime.now());
-  }
+//  public static <T> ResponseDTO<T> error(String message) {
+//    return new ResponseDTO<>("ERROR", message, null, LocalDateTime.now());
+//  }
 }

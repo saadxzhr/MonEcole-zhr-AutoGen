@@ -7,6 +7,10 @@ import com.szschoolmanager.auth.repository.UtilisateurRepository;
 import com.szschoolmanager.shared.dto.ResponseDTO;
 
 import java.util.Optional;
+
+import com.szschoolmanager.shared.exception.BusinessValidationException;
+import com.szschoolmanager.shared.exception.DuplicateResourceException;
+import com.szschoolmanager.shared.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.*;
 import org.springframework.http.ResponseEntity;
@@ -86,9 +90,10 @@ public class UtilisateurService {
 
   @Transactional
   public ResponseEntity<ResponseDTO<UtilisateurResponseDTO>> create(UtilisateurCreateDTO dto) {
-    if (repo.existsByUsername(dto.getUsername())) {
-      return ResponseEntity.badRequest().body(ResponseDTO.error("Nom d'utilisateur déjà existant"));
-    }
+      if (repo.existsByUsername(dto.getUsername())) {
+          throw new DuplicateResourceException("Nom d'utilisateur déjà existant");
+      }
+
 
     Utilisateur utilisateur = mapper.toEntity(dto);
     utilisateur.setPassword(passwordEncoder.encode(dto.getPassword()));
@@ -110,18 +115,15 @@ public class UtilisateurService {
   @Transactional
   public ResponseEntity<ResponseDTO<UtilisateurResponseDTO>> update(
       Long id, UtilisateurUpdateDTO dto) {
-    Optional<Utilisateur> opt = repo.findById(id);
-    if (opt.isEmpty()) {
-      return ResponseEntity.badRequest().body(ResponseDTO.error("Utilisateur introuvable"));
-    }
+      Optional<Utilisateur> opt = repo.findById(id);    // TODO: simplify
 
-    Utilisateur u = opt.get();
+      Utilisateur u = opt.orElseThrow(() ->
+              new ResourceNotFoundException("Utilisateur introuvable"));
 
-    if (!u.getUsername().equals(dto.getUsername()) && repo.existsByUsername(dto.getUsername())) {
-      return ResponseEntity.badRequest().body(ResponseDTO.error("Nom d'utilisateur déjà existant"));
-    }
-
-    mapper.updateFromDto(dto, u);
+      if (!u.getUsername().equals(dto.getUsername()) && repo.existsByUsername(dto.getUsername())) {
+          throw new DuplicateResourceException("Nom d'utilisateur déjà existant");
+      }
+      mapper.updateFromDto(dto, u);
 
     if (dto.getPassword() != null && !dto.getPassword().isBlank()) {
       u.setPassword(passwordEncoder.encode(dto.getPassword()));
@@ -148,14 +150,12 @@ public class UtilisateurService {
   public ResponseEntity<ResponseDTO<String>> changePassword(
       Long id, ChangePasswordDTO dto, boolean verifyOld) {
     Optional<Utilisateur> opt = repo.findById(id);
-    if (opt.isEmpty()) {
-      return ResponseEntity.badRequest().body(ResponseDTO.error("Utilisateur introuvable"));
-    }
 
-    Utilisateur u = opt.get();
+    Utilisateur u = opt.orElseThrow(() ->
+              new ResourceNotFoundException("Utilisateur introuvable"));
 
     if (verifyOld && !passwordEncoder.matches(dto.getOldPassword(), u.getPassword())) {
-      return ResponseEntity.badRequest().body(ResponseDTO.error("Ancien mot de passe incorrect"));
+          throw new BusinessValidationException("Ancien mot de passe incorrect");
     }
 
     u.setPassword(passwordEncoder.encode(dto.getNewPassword()));
@@ -165,19 +165,22 @@ public class UtilisateurService {
     return ResponseEntity.ok(ResponseDTO.success("Mot de passe modifié", null));
   }
 
-  @Transactional
-  public ResponseEntity<ResponseDTO<String>> delete(Long id) {
-    if (!repo.existsById(id)) {
-      return ResponseEntity.badRequest().body(ResponseDTO.error("Utilisateur introuvable"));
+    @Transactional
+    public ResponseEntity<ResponseDTO<String>> delete(Long id) {
+        Utilisateur u = repo.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+        repo.delete(u);
+        return ResponseEntity.ok(ResponseDTO.success(
+                "Utilisateur '" + u.getUsername() + "' supprimé", null));
     }
-    repo.deleteById(id);
-    return ResponseEntity.ok(ResponseDTO.success("Utilisateur supprimé", null));
-  }
+
+    /// /
 
   public Optional<Utilisateur> findByUsername(String username) {
     return repo.findByUsername(username);
   }
 
+  /// /
   public String encodePassword(String rawPassword) {
     return passwordEncoder.encode(rawPassword);
   }

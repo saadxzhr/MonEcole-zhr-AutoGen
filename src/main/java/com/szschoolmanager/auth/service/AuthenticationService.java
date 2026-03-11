@@ -3,12 +3,15 @@ package com.szschoolmanager.auth.service;
 import com.szschoolmanager.auth.dto.AuthRequestDTO;
 import com.szschoolmanager.auth.dto.AuthResponseDTO;
 import com.szschoolmanager.auth.dto.TokensDTO;
+import com.szschoolmanager.auth.dto.AccessTokenResult;
 import com.szschoolmanager.auth.model.RefreshToken;
 import com.szschoolmanager.auth.model.Utilisateur;
 import com.szschoolmanager.shared.dto.ResponseDTO;
+import com.szschoolmanager.shared.exception.AccountLockedException;
 import com.szschoolmanager.shared.exception.BusinessValidationException;
 
 
+import io.jsonwebtoken.Claims;
 import jakarta.annotation.PostConstruct;
 import org.springframework.core.env.Environment;
 import jakarta.servlet.http.HttpServletRequest;
@@ -65,17 +68,16 @@ public class AuthenticationService {
 
 @Transactional
   public ResponseEntity<ResponseDTO<AuthResponseDTO>> login(
-      @Valid @RequestBody AuthRequestDTO dto,
+      AuthRequestDTO dto,
       HttpServletRequest request,
       HttpServletResponse response) {
-    
-    try {
+
       String username = dto.getUsername();
       if (loginAttemptService.isLocked(username)) {
           log.warn("Tentative de connexion sur un compte verrouillé: {}", username);
-          return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
-              .body(ResponseDTO.error("Compte verrouillé pour 30 minutes après plusieurs échecs"));
+          throw new AccountLockedException("Compte verrouillé pour 30 minutes après plusieurs échecs");
       }
+
 
       Utilisateur utilisateur =
           utilisateurService
@@ -141,14 +143,6 @@ public class AuthenticationService {
               .build();
 
       return ResponseEntity.ok(ResponseDTO.success("Authentification réussie", body));
-    } catch (BadCredentialsException ex) {
-      return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-          .body(ResponseDTO.error("Identifiants invalides"));
-    } catch (Exception ex) {
-      log.error("Erreur inattendue pendant le login : {}", ex.getMessage(), ex);
-      return ResponseEntity.internalServerError()
-          .body(ResponseDTO.error("Erreur interne pendant l’authentification"));
-    }
   }
 
 
@@ -158,7 +152,6 @@ public class AuthenticationService {
       HttpServletRequest request,
       HttpServletResponse response) {
 
-    try {
       // 1️⃣ Retrieve presented refresh token (header or cookie)
       String presented = getPresentedToken(headerRefresh, request);
       if (presented == null || presented.isBlank())
@@ -173,10 +166,11 @@ public class AuthenticationService {
               presented, request.getHeader("User-Agent"), getClientIP(request), null);
 
       // 3️⃣ Generate new access token only if rotation succeeded
-      String newAccessToken = jwtService.generateAccessToken(newRt.getUtilisateur());
-      String newAccessJti = jwtService.parseToken(newAccessToken).getBody().getId();
+        AccessTokenResult access = jwtService.generateAccessToken(newRt.getUtilisateur());
+        String newAccessToken = access.token();
+        String newAccessJti = access.jti();
 
-      // 4️⃣ Update the new refresh token with this access JTI (sync link)
+        // 4️⃣ Update the new refresh token with this access JTI (sync link)
       newRt.setAccessJti(newAccessJti);
       refreshTokenService.saveAccessJtiLink(newRt.getId(), newAccessJti);
 
@@ -204,11 +198,6 @@ public class AuthenticationService {
               null);
       return ResponseEntity.ok(ResponseDTO.success("Token régénéré avec succès", body));
 
-    } catch (BusinessValidationException e) {
-      // ✅ Handle token reuse or invalid token gracefully (no rollback)
-      log.warn("Erreur lors du refresh token: {}", e.getMessage());
-      return ResponseEntity.badRequest().body(ResponseDTO.error(e.getMessage()));
-    }
   }
 
   private String getPresentedToken(String headerRefresh, HttpServletRequest request) {
@@ -271,21 +260,25 @@ public ResponseEntity<ResponseDTO<Void>> logout(
     // 3) Blacklist access token jti (if provided)
     if (authorizationHeader != null && authorizationHeader.startsWith("Bearer ")) {
       String accessToken = authorizationHeader.substring(7).trim();
-      try {
-        var jws = jwtService.parseToken(accessToken);
-        var claims = jws.getBody();
-        String jti = claims.getId();
-        if (jti != null && !jti.isBlank()) {
-          var exp = claims.getExpiration().toInstant();
-          var now = Instant.now();
-          var ttl = Duration.between(now, exp);
-          if (!ttl.isNegative() && !ttl.isZero()) {
-            jwtService.blacklistAccessTokenJti(jti, ttl); // atomic set with TTL
-          }
+        try {
+            Claims claims = jwtService.validateAccessToken(accessToken);
+
+            String jti = claims.getId();
+            if (jti != null && !jti.isBlank()) {
+
+                Instant exp = claims.getExpiration().toInstant();
+                Instant now = Instant.now();
+                Duration ttl = Duration.between(now, exp);
+
+                if (!ttl.isNegative() && !ttl.isZero()) {
+                    jwtService.blacklistAccessTokenJti(jti, ttl);
+                }
+            }
+
+        } catch (Exception ignored) {
+            // ignore validation errors
         }
-      } catch (Exception ignored) {
-        // ignore parse errors
-      }
+
     }
 
     return ResponseEntity.ok(ResponseDTO.success("Déconnexion réussie", null));

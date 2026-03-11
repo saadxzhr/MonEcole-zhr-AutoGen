@@ -102,10 +102,10 @@ public class SecurityConfig {
                 ex.authenticationEntryPoint(restAuthenticationEntryPoint())
                     .accessDeniedHandler(restAccessDeniedHandler()))
         .authenticationProvider(
-            daoAuthenticationProvider(passwordEncoder())) // ✅ correspond à ton bean réel
+            daoAuthenticationProvider(passwordEncoder()))
         .addFilterBefore(
             jwtAuthenticationFilter,
-            UsernamePasswordAuthenticationFilter.class) // ✅ nom réel de ton filtre
+            UsernamePasswordAuthenticationFilter.class) // nom réel du filtre
         .build();
   }
 

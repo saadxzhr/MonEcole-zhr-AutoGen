@@ -1,6 +1,7 @@
 package com.szschoolmanager.auth.service;
 
 import com.szschoolmanager.auth.dto.TokensDTO;
+import com.szschoolmanager.auth.dto.AccessTokenResult;
 import com.szschoolmanager.auth.model.RefreshToken;
 import com.szschoolmanager.auth.model.Utilisateur;
 import com.szschoolmanager.shared.util.HttpRequestUtils;
@@ -122,12 +123,14 @@ public class JwtService {
     return input;
   }
 
-  // --- JWT Generation ---
-  public String generateAccessToken(Utilisateur user) {
+
+
+    // --- JWT Generation ---
+  public AccessTokenResult  generateAccessToken(Utilisateur user) {
     Instant now = Instant.now();
     String jti = UUID.randomUUID().toString();
 
-    return Jwts.builder()
+    String token = Jwts.builder()
         .setHeaderParam("kid", configuredKid)
         .setIssuer(issuer)
         .setAudience(audience)
@@ -140,19 +143,21 @@ public class JwtService {
         .setExpiration(Date.from(now.plusSeconds(accessExpirationSeconds)))
         .signWith(privateKey, SignatureAlgorithm.RS256)
         .compact();
+      return new AccessTokenResult(token, jti);
   }
 
   /** Génère un couple (access + refresh) complet et prêt à production. */
   public TokensDTO generateTokens(Utilisateur user, HttpServletRequest request) {
-    String accessToken = generateAccessToken(user);
+      AccessTokenResult access = generateAccessToken(user);
+      String accessToken = access.token();
     String clientIp = HttpRequestUtils.extractClientIP(request);
 
     String userAgent =
         (request != null && request.getHeader("User-Agent") != null)
             ? request.getHeader("User-Agent")
             : "unknown-client";
-    String accessJti = extractJti(accessToken);
-    RefreshToken refreshEntity =
+      String accessJti = access.jti();
+      RefreshToken refreshEntity =
         refreshTokenService.createRefreshToken(user, userAgent, clientIp, accessJti);
     String rawRefresh = refreshEntity.getToken();
 
@@ -177,30 +182,61 @@ public class JwtService {
     return generateTokens(user, null);
   }
 
-  // --- JWT parsing ---
-  public Jws<Claims> parseToken(String token) {
-    Jws<Claims> jws = jwtParser.parseClaimsJws(token);
-    Claims c = jws.getBody();
-    if (c.getAudience() == null || !c.getAudience().contains(audience))
-      throw new JwtException("Invalid audience");
-    return jws;
-  }
+    private String extractJti(Claims claims) { return claims.getId();}
 
-  private String extractJti(String token) {
-    return parseToken(token).getBody().getId();
-  }
+//  private String extractJti(String token) {
+//        return parseToken(token).getBody().getId();
+//    }
 
-  public boolean isTokenValid(String token, String username) {
-    try {
-      Claims claims = parseToken(token).getBody();
-      return username.equals(claims.getSubject()) && claims.getExpiration().after(new Date());
-    } catch (JwtException | IllegalArgumentException e) {
-      log.warn("Invalid JWT: {}", e.getMessage());
-      return false;
+//  // --- JWT parsing ---
+//  public Jws<Claims> parseToken(String token) {
+//    Jws<Claims> jws = jwtParser.parseClaimsJws(token);
+//    Claims c = jws.getBody();
+//    if (c.getAudience() == null || !c.getAudience().contains(audience))
+//      throw new JwtException("Invalid audience");
+//    return jws;
+//  }
+//
+//
+//  public boolean isTokenValid(String token, String username) {
+//    try {
+//      Claims claims = parseToken(token).getBody();
+//      return username.equals(claims.getSubject()) && claims.getExpiration().after(new Date());
+//    } catch (JwtException | IllegalArgumentException e) {
+//      log.warn("Invalid JWT: {}", e.getMessage());
+//      return false;
+//    }
+//  }
+
+    // --- Single validation entry point ---
+    public Claims validateAccessToken(String token) {
+        try {
+            // 1) Cryptographic validation (signature, expiration, issuer, clock skew)
+            Jws<Claims> jws = jwtParser.parseClaimsJws(token);
+            Claims claims = jws.getBody();
+
+            // 2) Audience validation
+            if (claims.getAudience() == null || !claims.getAudience().contains(audience)) {
+                throw new JwtException("Invalid audience");
+            }
+
+            // 3) Blacklist validation
+            String jti = claims.getId();
+            if (jti != null && isAccessTokenBlacklisted(jti)) {
+                throw new JwtException("Access token revoked");
+            }
+
+            return claims;
+
+        } catch (JwtException | IllegalArgumentException e) {
+            log.warn("Invalid JWT: {}", e.getMessage());
+            throw e; // Fail fast — filter handles 401
+        }
     }
-  }
 
-  public void blacklistAccessTokenJti(String jti, Duration ttl) {
+
+
+    public void blacklistAccessTokenJti(String jti, Duration ttl) {
     try {
       if (ttl == null || ttl.isZero() || ttl.isNegative()) return;
       stringRedisTemplate.opsForValue().set("blacklist:access:" + jti, "revoked", ttl);

@@ -5,16 +5,19 @@ import com.szschoolmanager.auth.dto.*;
 import com.szschoolmanager.auth.service.UtilisateurService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/v1/utilisateurs")
 @RequiredArgsConstructor
 public class UtilisateurController {
 
-  private final UtilisateurService service;
+  private final UtilisateurService utilisateurService;
 
   @PreAuthorize("hasRole('DIRECTION')")
   @GetMapping("/direction")
@@ -28,20 +31,20 @@ public class UtilisateurController {
       @RequestParam(defaultValue = "0") int page,
       @RequestParam(defaultValue = "10") int size,
       @RequestParam(required = false) String role) {
-    return service.list(page, size, role);
+    return utilisateurService.list(page, size, role);
   }
 
   @PostMapping
   @PreAuthorize("hasRole('DIRECTION') or hasRole('ADMIN')")
   public ResponseEntity<?> create(@Valid @RequestBody UtilisateurCreateDTO dto) {
-    return service.create(dto);
+    return utilisateurService.create(dto);
   }
 
   @PutMapping("/{id}")
   @PreAuthorize("hasRole('DIRECTION') or hasRole('ADMIN')")
   public ResponseEntity<?> update(
       @PathVariable Long id, @Valid @RequestBody UtilisateurUpdateDTO dto) {
-    return service.update(id, dto);
+    return utilisateurService.update(id, dto);
   }
 
   @PutMapping("/{id}/change-password")
@@ -50,12 +53,12 @@ public class UtilisateurController {
       @PathVariable Long id, @Valid @RequestBody ChangePasswordDTO dto) {
     // si l'utilisateur change son propre mdp => verifyOld true, sinon si admin => verifyOld false
     // Ici on suppose que contrôles en place côté frontend/back (ou vérifier SecurityContext)
-    return service.changePassword(id, dto, true);
+    return utilisateurService.changePassword(id, dto, true);
   }
 
   @DeleteMapping("/{id}")
   @PreAuthorize("hasRole('DIRECTION') or hasRole('ADMIN')")
   public ResponseEntity<?> delete(@PathVariable Long id) {
-    return service.delete(id);
+    return utilisateurService.delete(id);
   }
 }

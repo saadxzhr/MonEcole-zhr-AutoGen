@@ -252,7 +252,7 @@ public class RefreshTokenService {
    */
   @Async
   @Transactional(propagation = Propagation.REQUIRES_NEW)
-  public int revokeAllActiveSessionsForUserCommitted(Long userId) {
+      public int revokeAllActiveSessionsForUserCommitted(Long userId) {
      // Ne lance en async que si profil prod
     List<String> profiles = List.of(environment.getActiveProfiles());
     if (!profiles.contains("prod")) {
