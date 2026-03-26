@@ -45,8 +45,28 @@ public class ModulexController {
 
   // ===============================
   // GET MODULES PAGINATED
+    // KEYSET PAGINATION
   // ===============================
-  @GetMapping("/list")
+
+    @GetMapping("/list")
+    @ResponseBody
+    @Operation(summary = "Lister les modules", description = "Retourne une page de modules filtrée")
+    public ResponseEntity<ResponseDTO<List<ModulexDTO>>> getModulesKeyset(
+            @RequestParam(required = false) String filiereCode,
+            @RequestParam(required = false) String coordinateurCin,
+            @RequestParam(required = false) String departement,
+            @RequestParam(defaultValue = "") String lastCodeFiliere,
+            @RequestParam(defaultValue = "") String lastCodeModule) {
+        return ResponseEntity.ok(ResponseDTO.success(
+                "Modules chargés avec succès",
+                modulexService.getModulesKeyset(
+                        filiereCode, coordinateurCin, departement,
+                        lastCodeFiliere, lastCodeModule)));
+    }
+    /// OFFSET PAGINATION
+    ///
+
+  @GetMapping("/list1")
   @ResponseBody
   @Operation(summary = "Lister les modules", description = "Retourne une page de modules filtrée")
   public ResponseEntity<ResponseDTO<Page<ModulexDTO>>> getModules(

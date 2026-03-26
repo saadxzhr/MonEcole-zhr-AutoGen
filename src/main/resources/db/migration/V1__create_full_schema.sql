@@ -23,11 +23,15 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA public;
 -- TYPES
 -- =============================================================
 
+DO $$ BEGIN
 CREATE TYPE public.planningtypeenum AS ENUM ('Semaine', 'Weekend', 'Mixte');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- =============================================================
 -- FUNCTIONS
 -- =============================================================
+
 
 CREATE FUNCTION public.createuseronemployeinsert() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN

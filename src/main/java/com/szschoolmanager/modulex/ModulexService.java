@@ -26,8 +26,21 @@ public class ModulexService {
   private final FiliereService filiereService;
 
   // ======================================
-  // GET PAGINATED MODULES
+  // GET PAGINATED MODULES (KEYSET)
   // ======================================
+
+    @Transactional(readOnly = true)
+    public List<ModulexDTO> getModulesKeyset(
+            String filiereCode, String coordinateurCin, String departement,
+            String lastCodeFiliere, String lastCodeModule) {
+        return modulexRepository.findKeyset(
+                filiereCode, coordinateurCin, departement,
+                lastCodeFiliere, lastCodeModule,
+                PageRequest.of(0, 20));
+    }
+
+    //GET PAGINATED MODULES (OFFSET)--------------------
+
   @Transactional(readOnly = true)
   public Page<ModulexDTO> getModulesPage(
       String filiereCode, String coordinateurCin, String departement, int page, int size) {

@@ -70,6 +70,10 @@ public class Modulex {
   @Column(name = "option_module")
   private String optionModule;
 
+  @Column(name = "code_filiere", insertable = false, updatable = false)
+  private String codeFiliere;
+
+
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "coordinateur", referencedColumnName = "cin", nullable = false)
   @JsonIgnore
